@@ -37,9 +37,9 @@ mechanics change, and it cannot amend anything here.
 
 Two neighbours, neither of them constitutional. [`../../CONTEXT.md`](../../CONTEXT.md) is the
 lifecycle glossary; it defers to these documents for authority language and holds only the
-vocabulary layered on top. [`../adr/`](../adr/) records accepted implementation decisions —
-currently the retirement of the decontamination writers (0001). Being linked here promotes
-neither, and adopting this set adopts neither.
+vocabulary layered on top. [`../adr/`](../adr/) records accepted implementation decisions; read
+the directory for the current set. Being linked here promotes neither, and adopting this set
+adopts neither.
 
 ## Scope and precedence
 
