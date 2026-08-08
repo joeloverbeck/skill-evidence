@@ -11,13 +11,11 @@ adopt any returned recommendation.
 
 ### Skill-local meta-tooling
 
-The brief validator under `scripts/` is executable meta-tooling admitted by
-[P30's skill-local meta-tooling exception](../../../docs/principles/30-rust-foundation-and-reuse.md#skill-local-meta-tooling-exception).
-It does not interpret or execute game semantics, produce or adjudicate game evidence, or set
-analytical claim or aggregate verdict state. Its production path reads only the explicit brief and
-optional evidence-bundle inputs, emits validation diagnostics, one success receipt, and exit
-status, performs no network access, uses no external service, and remains confined to this skill
-package.
+The brief validator under `scripts/` is executable meta-tooling. It does not read, write, or
+adjudicate recorded evidence, gate state, or dispositions. Its production path reads only the
+explicit brief and optional evidence-bundle inputs, emits validation diagnostics, one success
+receipt, and exit status, performs no network access, uses no external service, and remains confined
+to this skill package.
 
 Determinism contract: with the same Node.js runtime, command arguments, current working directory,
 byte-identical brief and bundle inputs, and the same input path identities, the validator emits the

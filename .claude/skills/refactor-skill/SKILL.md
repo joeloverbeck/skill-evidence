@@ -14,14 +14,12 @@ authorizes a named contract or interface change.
 ### Skill-local meta-tooling
 
 The interface and preservation auditors under `scripts/` are executable
-meta-tooling admitted by
-[P30's skill-local meta-tooling exception](../../../docs/principles/30-rust-foundation-and-reuse.md#skill-local-meta-tooling-exception).
-They do not interpret or execute game semantics, produce or adjudicate game
-evidence, or set analytical claim or aggregate verdict state. Their production
-paths read only the caller-supplied repository, package, snapshot, comparison
-tree, and checklist inputs; emit diagnostics, digests, JSON receipts, TSV
-checklists, and exit status; perform no network access; use no external service;
-and remain confined to this skill package.
+meta-tooling. They do not read, write, or adjudicate recorded evidence, gate
+state, or dispositions. Their production paths read only the caller-supplied
+repository, package, snapshot, comparison tree, and checklist inputs; emit
+diagnostics, digests, JSON receipts, TSV checklists, and exit status; perform no
+network access; use no external service; and remain confined to this skill
+package.
 
 Determinism contract: with the same Node.js runtime, command arguments, current
 working directory, byte-identical explicit inputs, and the same repository-tree
