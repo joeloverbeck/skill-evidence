@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-08T15:56:26.859926106Z",
+  "generated_at": "2026-08-08T19:34:38.944925113Z",
   "target_content_hash": "2785481265152dec4b7c8cf4e756bd4c232e0d836bb5d03dd5cec16b588958a9",
-  "qualifying_uses_on_current_hash": 2,
+  "qualifying_uses_on_current_hash": 3,
   "open_incident_ids": [
     "evt_a660a6dd-97d4-4e5f-9eb8-4018f673dac0",
     "evt_49479ad7-9a58-4139-a1ef-197454401e8c"
@@ -29,5 +29,5 @@
   "review_reentry_basis": null,
   "target_name": "implement",
   "target_repo_relative_path": ".claude/skills/implement",
-  "derivation_session_id": "2a94f437-50df-40c1-9f41-5dfd396eb9a7"
+  "derivation_session_id": "019fe2aa-7017-7102-8c37-e05a5e823863"
 }
