@@ -117,6 +117,7 @@
         "first_eligibility",
         "post_review_incident",
         "queued_pre_close_evidence",
+        "queued_behind_instrument_limited_review",
         "unadjudicated_severe",
         null
       ]
@@ -125,6 +126,11 @@
     "target_repo_relative_path": { "type": "string", "minLength": 1 },
     "derivation_session_id": {
       "type": ["string", "null"]
+    },
+    "instrument_limited_incident_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
     },
     "integrity_errors": {
       "type": "array",

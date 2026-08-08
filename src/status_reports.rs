@@ -40,6 +40,14 @@ struct MethodGapTargetInventory {
     evidence_integrity_errors: Vec<String>,
     current_evidence: CurrentEvidence,
     current_candidate_clusters: Vec<CandidateCluster>,
+    /// Open incidents an instrument-limited close retired from the evolution gate.
+    ///
+    /// `current_candidate_clusters` drops them, because they no longer cluster, while
+    /// `current_evidence` still lists them individually — without this the difference
+    /// between the two reads as an inconsistency rather than a recorded decision.
+    /// Omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    instrument_limited_incident_ids: Vec<String>,
     active_evidence_review_id: Option<String>,
     last_completed_evidence_review_id: Option<String>,
     lineage_candidates: Vec<LineageCandidate>,
@@ -215,6 +223,7 @@ pub fn method_gap_research_inventory(
                     &gate.open_incident_ids,
                 ),
                 current_candidate_clusters: gate.candidate_clusters,
+                instrument_limited_incident_ids: gate.instrument_limited_incident_ids,
                 active_evidence_review_id: gate.active_review_id,
                 last_completed_evidence_review_id: gate.last_completed_review_id,
                 lineage_candidates: lineage_candidates(
@@ -292,6 +301,7 @@ pub fn skill_evolution_status(
     };
     let mut ready = Vec::new();
     let mut deferred = Vec::new();
+    let mut retired = Vec::new();
     let mut blocked = Vec::new();
     let mut indeterminate = Vec::new();
     let mut omitted = 0;
@@ -439,6 +449,7 @@ pub fn skill_evolution_status(
                 target_path: target.repo_relative_path,
                 authorization_reason,
                 review_reentry_basis: underlying.review_reentry_basis,
+                instrument_limited_incidents: underlying.instrument_limited_incident_ids.len(),
                 quarantined,
                 kind: EvolutionBlockedKind::ReviewInProgress {
                     review_id: status.active_review_id.unwrap_or_default(),
@@ -462,13 +473,34 @@ pub fn skill_evolution_status(
             });
             continue;
         }
-        if status.authorization_reason.is_none()
-            && status.review_reentry_basis.as_deref() == Some("queued_pre_close_evidence")
-        {
-            deferred.push(target.repo_relative_path);
-            continue;
+        if status.authorization_reason.is_none() {
+            let basis = status.review_reentry_basis.as_deref();
+            let instrument_limited_incidents = status.instrument_limited_incident_ids.len();
+            if matches!(
+                basis,
+                Some("queued_pre_close_evidence" | "queued_behind_instrument_limited_review")
+            ) {
+                deferred.push(EvolutionDeferredEntry {
+                    instrument_limited: basis == Some("queued_behind_instrument_limited_review"),
+                    instrument_limited_incidents,
+                    target_path: target.repo_relative_path,
+                });
+                continue;
+            }
+            if instrument_limited_incidents > 0 {
+                retired.push(EvolutionRetiredEntry {
+                    incidents: instrument_limited_incidents,
+                    still_collecting: status
+                        .open_incident_ids
+                        .len()
+                        .saturating_sub(instrument_limited_incidents),
+                    target_path: target.repo_relative_path,
+                });
+                continue;
+            }
         }
         if status.authorization_reason.is_some() {
+            let instrument_limited_incidents = status.instrument_limited_incident_ids.len();
             let quarantined = status.state.starts_with("quarantined_")
                 || status.authorization_reason.as_deref() == Some("severe");
             let authorization_reason = status.authorization_reason.unwrap_or_default();
@@ -488,6 +520,7 @@ pub fn skill_evolution_status(
                     target_path: target.repo_relative_path,
                     authorization_reason,
                     review_reentry_basis: status.review_reentry_basis,
+                    instrument_limited_incidents,
                     quarantined,
                     kind: EvolutionBlockedKind::SelfTarget { proof },
                 });
@@ -497,6 +530,7 @@ pub fn skill_evolution_status(
                         target_path: target.repo_relative_path,
                         authorization_reason,
                         review_reentry_basis: status.review_reentry_basis,
+                        instrument_limited_incidents,
                         quarantined,
                         kind: EvolutionBlockedKind::SessionHostRequired,
                     });
@@ -506,6 +540,7 @@ pub fn skill_evolution_status(
                         authorization_reason,
                         threshold_session_id: status.threshold_session_id,
                         review_reentry_basis: status.review_reentry_basis,
+                        instrument_limited_incidents,
                         quarantined,
                         command: evolution_command(&target.repo_relative_path),
                         proof: EvolutionReadyProof::DifferentSession,
@@ -518,6 +553,7 @@ pub fn skill_evolution_status(
                             target_path: target.repo_relative_path,
                             authorization_reason,
                             review_reentry_basis: status.review_reentry_basis,
+                            instrument_limited_incidents,
                             quarantined,
                             kind: EvolutionBlockedKind::Timer {
                                 not_before,
@@ -531,6 +567,7 @@ pub fn skill_evolution_status(
                             authorization_reason,
                             threshold_session_id: None,
                             review_reentry_basis: status.review_reentry_basis,
+                            instrument_limited_incidents,
                             quarantined,
                             command: evolution_command(&target.repo_relative_path),
                             proof: EvolutionReadyProof::CooldownElapsed { not_before },
@@ -558,7 +595,8 @@ pub fn skill_evolution_status(
             .then_with(|| left.not_before().cmp(right.not_before()))
             .then_with(|| left.target_path.cmp(&right.target_path))
     });
-    deferred.sort();
+    deferred.sort_by(|left, right| left.target_path.cmp(&right.target_path));
+    retired.sort_by(|left, right| left.target_path.cmp(&right.target_path));
     indeterminate.sort_by(|left, right| {
         left.target_path
             .as_deref()
@@ -570,8 +608,19 @@ pub fn skill_evolution_status(
     } else {
         "stores"
     };
+    // Present only when it has something to report. Every bucket has to appear in the
+    // census or the counts stop summing to the stores scanned — but a bucket that is
+    // always printed would have rewritten `status-reporters-v1`'s golden, and
+    // `docs/principles/inherited-prohibitions.md` forbids editing a fixture corpus to make
+    // a change pass, without qualification. Omitting an empty count leaves the existing
+    // bytes exactly as the JavaScript reporter emitted them.
+    let retired_census = if retired.is_empty() {
+        String::new()
+    } else {
+        format!("retired as untestable: {}; ", retired.len())
+    };
     let mut report = format!(
-        "# Skill Evolution Status\n\nScanned {stores_scanned} evidence {store_noun} read-only. Ready: {}; deferred after review: {}; blocked after eligibility: {}; indeterminate: {}; omitted as not eligible: {omitted}.",
+        "# Skill Evolution Status\n\nScanned {stores_scanned} evidence {store_noun} read-only. Ready: {}; deferred after review: {}; {retired_census}blocked after eligibility: {}; indeterminate: {}; omitted as not eligible: {omitted}.",
         ready.len(),
         deferred.len(),
         blocked.len(),
@@ -595,11 +644,17 @@ pub fn skill_evolution_status(
         report.push_str(
             &deferred
                 .iter()
-                .map(|target_path| {
-                    format!(
-                        "### {target_path}\n\n- Re-entry basis: queued pre-close evidence only; no threshold-supporting incident was recorded after the last completed same-hash review.\n- Gate: Still collecting. Skill Evolution is not authorized, and no command is available."
-                    )
-                })
+                .map(render_deferred_entry)
+                .collect::<Vec<_>>()
+                .join("\n\n"),
+        );
+    }
+    if !retired.is_empty() {
+        report.push_str("\n\n## Retired as untestable\n\n");
+        report.push_str(
+            &retired
+                .iter()
+                .map(render_retired_entry)
                 .collect::<Vec<_>>()
                 .join("\n\n"),
         );
@@ -669,6 +724,7 @@ struct EvolutionReadyEntry {
     authorization_reason: String,
     threshold_session_id: Option<String>,
     review_reentry_basis: Option<String>,
+    instrument_limited_incidents: usize,
     quarantined: bool,
     command: String,
     proof: EvolutionReadyProof,
@@ -678,6 +734,82 @@ struct EvolutionReadyEntry {
 enum EvolutionReadyProof {
     DifferentSession,
     CooldownElapsed { not_before: String },
+}
+
+/// A target whose threshold-supporting evidence is held behind the last completed
+/// same-hash review.
+#[derive(Debug)]
+struct EvolutionDeferredEntry {
+    target_path: String,
+    /// Whether the review that laid the watermark reached a conclusion. A review that
+    /// adjudicated accounted for the evidence it saw; one that closed
+    /// `blocked_no_valid_test` accounted for nothing, and saying otherwise reports
+    /// unexamined evidence as handled.
+    instrument_limited: bool,
+    instrument_limited_incidents: usize,
+}
+
+fn render_deferred_entry(entry: &EvolutionDeferredEntry) -> String {
+    let mut rendered = format!("### {}\n\n", entry.target_path);
+    if entry.instrument_limited {
+        rendered.push_str(
+            "- Re-entry basis: queued behind a review whose instrument could not test what it covered; that close reached no conclusion and adjudicated nothing, so this evidence is unexamined rather than accounted for.\n",
+        );
+    } else {
+        rendered.push_str(
+            "- Re-entry basis: queued pre-close evidence only; no threshold-supporting incident was recorded after the last completed same-hash review.\n",
+        );
+    }
+    if let Some(line) = retired_line(entry.instrument_limited_incidents) {
+        rendered.push_str(&line);
+        rendered.push('\n');
+    }
+    rendered.push_str(
+        "- Gate: Still collecting. Skill Evolution is not authorized, and no command is available.",
+    );
+    rendered
+}
+
+/// A target whose open evidence a review covered under an instrument-limited
+/// disposition, so it no longer drives the gate.
+///
+/// Without its own section these targets fall into `omitted as not eligible`, which is
+/// where skills that never recorded an incident go. Reporting real retired evidence as
+/// indistinguishable from no evidence is the silence this section exists to break.
+#[derive(Debug)]
+struct EvolutionRetiredEntry {
+    target_path: String,
+    incidents: usize,
+    /// Open incidents the close did not cover, still short of a threshold. Without this
+    /// the entry reads as a closed book, when the target may be one incident from
+    /// authorizing a review.
+    still_collecting: usize,
+}
+
+/// The one place a count meets a noun. Every sentence built on it refers back with
+/// "that evidence" rather than a pronoun or verb that would have to agree, because the
+/// ten-use threshold can fire on a single incident and a blocked close can retire it.
+fn open_incidents(count: usize) -> String {
+    let noun = if count == 1 { "incident" } else { "incidents" };
+    format!("{count} open {noun}")
+}
+
+fn render_retired_entry(entry: &EvolutionRetiredEntry) -> String {
+    let mut rendered = format!(
+        "### {}\n\n- Retired as untestable: {}, covered by a review that closed `blocked_no_valid_test`. That evidence no longer drives this gate, and remains in the event stream.\n",
+        entry.target_path,
+        open_incidents(entry.incidents)
+    );
+    if entry.still_collecting > 0 {
+        rendered.push_str(&format!(
+            "- Still collecting: {} the close did not cover, short of a threshold.\n",
+            open_incidents(entry.still_collecting)
+        ));
+    }
+    rendered.push_str(
+        "- Gate: Skill Evolution is not authorized, and no command is available. Another review of the same evidence would meet the same instrument.",
+    );
+    rendered
 }
 
 #[derive(Debug)]
@@ -727,6 +859,7 @@ struct EvolutionBlockedEntry {
     target_path: String,
     authorization_reason: String,
     review_reentry_basis: Option<String>,
+    instrument_limited_incidents: usize,
     quarantined: bool,
     kind: EvolutionBlockedKind,
 }
@@ -795,6 +928,9 @@ fn render_blocked_entry(entry: &EvolutionBlockedEntry) -> String {
     ];
     if let Some(line) = reentry_line(entry.review_reentry_basis.as_deref()) {
         lines.push(line.to_owned());
+    }
+    if let Some(line) = retired_line(entry.instrument_limited_incidents) {
+        lines.push(line);
     }
     match &entry.kind {
         EvolutionBlockedKind::Timer {
@@ -941,6 +1077,9 @@ fn render_ready_entry(entry: &EvolutionReadyEntry, census_session_id: &str) -> S
     if let Some(line) = reentry_line(entry.review_reentry_basis.as_deref()) {
         lines.push(line.to_owned());
     }
+    if let Some(line) = retired_line(entry.instrument_limited_incidents) {
+        lines.push(line);
+    }
     match &entry.proof {
         EvolutionReadyProof::DifferentSession => {
             lines.push("- Destination proof: Paste into a session-ID-capable fresh session (Claude Code or Codex) whose top-level-session identity differs from the threshold session. A no-ID destination will be refused; waiting will not help.".to_owned());
@@ -991,6 +1130,18 @@ fn explain_authorization_reason(reason: &str) -> String {
     } else {
         format!("gate rule `{reason}`")
     }
+}
+
+/// A target can be actionable on new evidence and still carry evidence an earlier
+/// blocked close retired. Saying so here keeps the census from implying the gate holds
+/// everything that was ever recorded against this target.
+fn retired_line(count: usize) -> Option<String> {
+    (count > 0).then(|| {
+        format!(
+            "- Retired as untestable: {}. An earlier `blocked_no_valid_test` close removed that evidence from this gate.",
+            open_incidents(count)
+        )
+    })
 }
 
 fn reentry_line(basis: Option<&str>) -> Option<&'static str> {

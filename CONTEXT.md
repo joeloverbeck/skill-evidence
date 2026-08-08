@@ -142,6 +142,15 @@ reached a conclusion about it. A *non-adjudicating* disposition closes the revie
 trigger evidence active, because no conclusion was reached.
 _Avoid_: terminal disposition, final disposition
 
+**Instrument-limited disposition**:
+A non-adjudicating disposition that nonetheless retires its covered evidence from the gate, because
+the review established that this instrument cannot test that evidence. It adjudicates nothing — the
+incidents stay open and unresolved in the ledger — but they stop clustering, so they can never again
+reach a threshold the review already proved untestable. The one such disposition is
+`blocked_no_valid_test`. See
+[`docs/adr/0002-blocked-no-valid-test-retires-its-evidence-from-the-gate.md`](docs/adr/0002-blocked-no-valid-test-retires-its-evidence-from-the-gate.md).
+_Avoid_: dismissed, wontfix, closed-untestable
+
 **Landing**:
 The one authorized act that modifies a live target, carrying a baseline snapshot, a diff, and a
 durable receipt. Landing is separate from acceptance: it applies a validated candidate, it does not

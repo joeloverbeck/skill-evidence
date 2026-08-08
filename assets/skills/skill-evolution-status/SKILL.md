@@ -1,6 +1,6 @@
 ---
 name: skill-evolution-status
-description: Read-only readiness census for evidence-gated skills in the current repository — distinguishes targets ready for Skill Evolution, queued pre-close evidence that remains deferred, eligible targets that remain blocked, and stores whose eligibility cannot be determined.
+description: Read-only readiness census for evidence-gated skills in the current repository — distinguishes targets ready for Skill Evolution, queued pre-close evidence that remains deferred, evidence retired as untestable by an instrument-limited close, eligible targets that remain blocked, and stores whose eligibility cannot be determined.
 disable-model-invocation: true
 ---
 
@@ -16,7 +16,7 @@ Arguments: none.
 - Census only: never diagnose incidents, inspect target prose semantically, propose repairs, invoke Skill Evolution, or record evidence.
 - Current repository only: never search sibling repositories or a global evidence directory.
 - Canonical mechanics only: use the compiled command's shared Rust event validation, target hashing, and in-memory gate derivation; never duplicate eligibility thresholds or trust a stored projection as current.
-- Safe uncertainty: never print an evolution command for queued pre-close evidence, self-targeting, an active timer, an owned review, an unreadable stream, or a missing target.
+- Safe uncertainty: never print an evolution command for queued pre-close evidence, evidence retired as untestable, self-targeting, an active timer, an owned review, an unreadable stream, or a missing target.
 
 ## Workflow
 
@@ -49,7 +49,7 @@ _Done when the compiled command prints one reconciled census or a safe failure s
 
 ### 2. Relay the result and stop
 
-Relay the compiled command output verbatim. Commands appear only under `Ready to evolve` and are already shaped for copy-paste into another top-level session. `Deferred after review` identifies the canonical queued-pre-close subset of collecting stores and explicitly supplies no command. `Eligible but blocked` gives the active blocker and all available timing, ownership, quarantine, or routing detail. `Could not determine` names stores that might conceal eligibility but cannot be trusted. Other closed, collecting, and current-hash-reset stores appear only in the omitted count.
+Relay the compiled command output verbatim. Commands appear only under `Ready to evolve` and are already shaped for copy-paste into another top-level session. `Deferred after review` identifies the canonical queued subset of collecting stores and explicitly supplies no command, distinguishing evidence a review accounted for from evidence queued behind a close that reached no conclusion. `Retired as untestable` names stores whose open incidents left the gate under an instrument-limited close: real evidence that no longer drives eligibility and never will, listed separately so it is not read as an absence of evidence. `Eligible but blocked` gives the active blocker and all available timing, ownership, quarantine, or routing detail. `Could not determine` names stores that might conceal eligibility but cannot be trusted. Other closed, collecting, and current-hash-reset stores appear only in the omitted count.
 
 Do not reinterpret readiness, add commands to blocked entries, suggest early review, or continue into evolution in this session.
 

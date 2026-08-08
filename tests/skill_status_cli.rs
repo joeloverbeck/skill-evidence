@@ -109,6 +109,57 @@ fn fixture_use_event(
     })
 }
 
+/// The two events a blocked Skill Evolution review leaves behind: the claim that froze
+/// `trigger_event_ids`, and the close that covers them. Every test that needs this pair
+/// differs only in the target, the review id, the rule that authorized it, and coverage.
+fn fixture_blocked_close(
+    target_name: &str,
+    target_hash: &str,
+    review_id: &str,
+    authorizing_rule: &str,
+    covered: &[&str],
+) -> [Value; 2] {
+    let target = json!({
+        "name": target_name,
+        "repo_relative_path": format!(".claude/skills/{target_name}"),
+        "content_hash": target_hash,
+        "repo_head": "fixture-head"
+    });
+    [
+        json!({
+            "schema_version": 1,
+            "event_id": format!("evt_review_started_{review_id}"),
+            "event_type": "review_started",
+            "recorded_at": "2026-07-21T11:59:50.000Z",
+            "operator_workflow": "skill-evolution",
+            "target": target,
+            "top_level_session_id": "review-session",
+            "payload": {
+                "review_id": review_id,
+                "target_hash": target_hash,
+                "trigger_event_ids": covered,
+                "authorizing_rule": authorizing_rule,
+                "risk_tier": "provisional",
+                "session_or_cooldown_proof": { "type": "different_session" }
+            }
+        }),
+        json!({
+            "schema_version": 1,
+            "event_id": format!("evt_review_disposition_{review_id}"),
+            "event_type": "review_disposition",
+            "recorded_at": "2026-07-21T11:59:51.000Z",
+            "operator_workflow": "skill-evolution",
+            "target": target,
+            "top_level_session_id": "review-session",
+            "payload": {
+                "review_id": review_id,
+                "disposition": "blocked_no_valid_test",
+                "adjudicated_event_ids": covered
+            }
+        }),
+    ]
+}
+
 fn create_fixture_skill(root: &Path, name: &str) {
     let skill = root.join(".claude/skills").join(name);
     fs::create_dir_all(&skill).expect("create fixture skill");
@@ -287,6 +338,60 @@ fn method_gap_research_status_refuses_an_empty_terminal_family_segment() {
 
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("Invalid family selector"));
+}
+
+/// Retired incidents leave `current_candidate_clusters` but stay in the per-incident
+/// evidence summary, so without naming them the inventory reads as though it lost track
+/// of its own incidents rather than recording a decision about them.
+#[test]
+fn method_gap_research_status_names_evidence_retired_by_a_blocked_close() {
+    let root = tempfile::tempdir().expect("temporary repository");
+    create_fixture_skill(root.path(), "game-retired");
+    let inventory = |root: &Path| {
+        let output = skill_evidence()
+            .args(["skills", "method-gap-research-status", "game-*", "--root"])
+            .arg(root)
+            .args(["--now-epoch-milliseconds", "1784980800000"])
+            .output()
+            .expect("run Method-Gap Research Status");
+        assert!(output.status.success());
+        serde_json::from_slice::<Value>(&output.stdout).expect("inventory JSON")
+    };
+
+    let hash = inventory(root.path())["targets"][0]["target_content_hash"]
+        .as_str()
+        .expect("current target hash")
+        .to_owned();
+    let retired = ["evt_retired_a", "evt_retired_b", "evt_retired_c"];
+    let mut events = retired
+        .iter()
+        .enumerate()
+        .map(|(index, event_id)| {
+            fixture_use_event(
+                "game-retired",
+                &hash,
+                event_id,
+                &format!("2026-07-21T11:59:4{index}.000Z"),
+                &format!("retired-session-{index}"),
+                "friction",
+            )
+        })
+        .collect::<Vec<_>>();
+    events.extend(fixture_blocked_close(
+        "game-retired",
+        &hash,
+        "rev_retired",
+        "friction_recurrence:execution",
+        &retired,
+    ));
+    write_events(root.path(), "game-retired", &events);
+
+    let target_inventory = inventory(root.path())["targets"][0].clone();
+    assert_eq!(
+        target_inventory["instrument_limited_incident_ids"],
+        json!(retired)
+    );
+    assert_eq!(target_inventory["current_candidate_clusters"], json!([]));
 }
 
 #[test]
@@ -889,6 +994,352 @@ fn skill_evolution_status_defers_queued_pre_close_evidence() {
     );
     assert!(report.contains("queued pre-close evidence only"));
     assert!(!report.contains("$skill-evolution"));
+}
+
+/// Routing evidence out of the gate is the honest exit; letting the census fall silent
+/// about it is not. Before this, a target whose only evidence a blocked close covered
+/// simply stopped being counted — the census reported it under "omitted as not eligible"
+/// alongside skills that never recorded an incident at all.
+#[test]
+fn skill_evolution_status_reports_evidence_retired_as_untestable() {
+    let root = tempfile::tempdir().expect("temporary repository");
+    for name in ["skill-evolution", "blocked-after-review"] {
+        create_fixture_skill(root.path(), name);
+    }
+    let hash = skill_hash(root.path(), ".claude/skills/blocked-after-review");
+    let triggers = ["evt_trigger_a", "evt_trigger_b", "evt_trigger_c"];
+    let mut events = triggers
+        .iter()
+        .enumerate()
+        .map(|(index, event_id)| {
+            fixture_use_event(
+                "blocked-after-review",
+                &hash,
+                event_id,
+                &format!("2026-07-21T11:59:4{index}.000Z"),
+                &format!("trigger-session-{index}"),
+                "friction",
+            )
+        })
+        .collect::<Vec<_>>();
+    events.extend(fixture_blocked_close(
+        "blocked-after-review",
+        &hash,
+        "rev_blocked",
+        "friction_recurrence:execution",
+        &triggers,
+    ));
+    write_events(root.path(), "blocked-after-review", &events);
+
+    let output = skill_evidence()
+        .args(["skills", "evolution-status", "--root"])
+        .arg(root.path())
+        .args([
+            "--now-epoch-milliseconds",
+            "1784635200000",
+            "--session-id",
+            "fresh-session",
+        ])
+        .output()
+        .expect("run Skill Evolution Status");
+    assert!(output.status.success());
+    let report = String::from_utf8(output.stdout).expect("UTF-8 status report");
+    assert!(
+        report.contains("## Retired as untestable"),
+        "report={report}"
+    );
+    assert!(
+        report.contains(".claude/skills/blocked-after-review"),
+        "report={report}"
+    );
+    assert!(
+        report.contains("3 open incident"),
+        "the census must name how much evidence left the gate: report={report}"
+    );
+    assert!(
+        report.contains("retired as untestable: 1;"),
+        "the summary counts must account for this store, not drop it: report={report}"
+    );
+    assert!(!report.contains("$skill-evolution"));
+}
+
+/// A review claimed on one cluster closes having reached no conclusion; a second
+/// cluster it never covered is still deferred behind it. Reporting that as "queued
+/// pre-close evidence only" tells the operator the evidence was accounted for by a
+/// review that accounted for nothing.
+#[test]
+fn skill_evolution_status_distinguishes_evidence_queued_behind_an_instrument_limited_close() {
+    let root = tempfile::tempdir().expect("temporary repository");
+    for name in ["skill-evolution", "inconclusive-after-review"] {
+        create_fixture_skill(root.path(), name);
+    }
+    let hash = skill_hash(root.path(), ".claude/skills/inconclusive-after-review");
+    let covered = ["evt_covered_a", "evt_covered_b", "evt_covered_c"];
+    let mut events = covered
+        .iter()
+        .enumerate()
+        .map(|(index, event_id)| {
+            fixture_use_event(
+                "inconclusive-after-review",
+                &hash,
+                event_id,
+                &format!("2026-07-21T11:59:4{index}.000Z"),
+                &format!("covered-session-{index}"),
+                "friction",
+            )
+        })
+        .collect::<Vec<_>>();
+    events.extend((0..3).map(|index| {
+        let mut event = fixture_use_event(
+            "inconclusive-after-review",
+            &hash,
+            &format!("evt_uncovered_{index}"),
+            &format!("2026-07-21T11:59:5{index}.000Z"),
+            &format!("uncovered-session-{index}"),
+            "friction",
+        );
+        event["payload"]["symptom_key"] = json!("output");
+        event
+    }));
+    events.extend(fixture_blocked_close(
+        "inconclusive-after-review",
+        &hash,
+        "rev_inconclusive",
+        "friction_recurrence:execution",
+        &covered,
+    ));
+    write_events(root.path(), "inconclusive-after-review", &events);
+
+    let output = skill_evidence()
+        .args(["skills", "evolution-status", "--root"])
+        .arg(root.path())
+        .args([
+            "--now-epoch-milliseconds",
+            "1784635200000",
+            "--session-id",
+            "fresh-session",
+        ])
+        .output()
+        .expect("run Skill Evolution Status");
+    assert!(output.status.success());
+    let report = String::from_utf8(output.stdout).expect("UTF-8 status report");
+    assert!(
+        report.contains("## Deferred after review"),
+        "report={report}"
+    );
+    assert!(
+        report.contains("whose instrument could not test what it covered"),
+        "the operator must not read an inconclusive close as an accounting: report={report}"
+    );
+    assert!(
+        !report.contains("queued pre-close evidence only"),
+        "report={report}"
+    );
+    assert!(
+        report.contains(
+            "- Retired as untestable: 3 open incidents. An earlier `blocked_no_valid_test` \
+             close removed that evidence from this gate."
+        ),
+        "the deferred entry must also account for what the same close retired: report={report}"
+    );
+    assert!(!report.contains("$skill-evolution"));
+}
+
+/// A target can be actionable on new evidence and still carry evidence an earlier
+/// blocked close retired. The retired half is easy to lose here, because the entry is
+/// filed under "Ready to evolve" and nothing else on the page would mention it — and a
+/// reviewer who does not know a cluster was already ruled untestable may go looking for
+/// it.
+#[test]
+fn skill_evolution_status_reports_retired_evidence_on_a_target_that_is_also_ready() {
+    let root = tempfile::tempdir().expect("temporary repository");
+    for name in ["skill-evolution", "ready-with-retired"] {
+        create_fixture_skill(root.path(), name);
+    }
+    let hash = skill_hash(root.path(), ".claude/skills/ready-with-retired");
+    let retired = ["evt_retired_a", "evt_retired_b", "evt_retired_c"];
+    let mut events = retired
+        .iter()
+        .enumerate()
+        .map(|(index, event_id)| {
+            fixture_use_event(
+                "ready-with-retired",
+                &hash,
+                event_id,
+                &format!("2026-07-21T11:59:4{index}.000Z"),
+                &format!("retired-session-{index}"),
+                "friction",
+            )
+        })
+        .collect::<Vec<_>>();
+    events.extend(fixture_blocked_close(
+        "ready-with-retired",
+        &hash,
+        "rev_retired",
+        "friction_recurrence:execution",
+        &retired,
+    ));
+    // Recorded after the close, so this cluster clears the watermark and authorizes on
+    // its own — the retired cluster contributes nothing to it.
+    events.extend((0..3).map(|index| {
+        let mut event = fixture_use_event(
+            "ready-with-retired",
+            &hash,
+            &format!("evt_fresh_{index}"),
+            &format!("2026-07-21T11:59:5{}.000Z", index + 2),
+            &format!("fresh-incident-session-{index}"),
+            "friction",
+        );
+        event["payload"]["symptom_key"] = json!("output");
+        event
+    }));
+    write_events(root.path(), "ready-with-retired", &events);
+
+    let output = skill_evidence()
+        .args(["skills", "evolution-status", "--root"])
+        .arg(root.path())
+        .args([
+            "--now-epoch-milliseconds",
+            "1784635200000",
+            "--session-id",
+            "fresh-session",
+        ])
+        .output()
+        .expect("run Skill Evolution Status");
+    assert!(output.status.success());
+    let report = String::from_utf8(output.stdout).expect("UTF-8 status report");
+    assert!(report.contains("## Ready to evolve"), "report={report}");
+    assert!(
+        report.contains(
+            "- Retired as untestable: 3 open incidents. An earlier `blocked_no_valid_test` \
+             close removed that evidence from this gate."
+        ),
+        "a ready target must still declare what an earlier close retired: report={report}"
+    );
+}
+
+/// The ten-use threshold fires on a single open contemporaneous incident, so a blocked
+/// close can retire exactly one — and every count in this report reaches an English
+/// sentence. Guards the singular that the plural-only assertions elsewhere cannot see.
+#[test]
+fn skill_evolution_status_renders_a_single_retired_incident_grammatically() {
+    let root = tempfile::tempdir().expect("temporary repository");
+    for name in ["skill-evolution", "one-retired"] {
+        create_fixture_skill(root.path(), name);
+    }
+    let hash = skill_hash(root.path(), ".claude/skills/one-retired");
+    let mut events = vec![fixture_use_event(
+        "one-retired",
+        &hash,
+        "evt_only",
+        "2026-07-21T11:59:40.000Z",
+        "only-session",
+        "friction",
+    )];
+    events.extend(fixture_blocked_close(
+        "one-retired",
+        &hash,
+        "rev_one",
+        "ten_use_unresolved",
+        &["evt_only"],
+    ));
+    write_events(root.path(), "one-retired", &events);
+
+    let output = skill_evidence()
+        .args(["skills", "evolution-status", "--root"])
+        .arg(root.path())
+        .args([
+            "--now-epoch-milliseconds",
+            "1784635200000",
+            "--session-id",
+            "fresh-session",
+        ])
+        .output()
+        .expect("run Skill Evolution Status");
+    assert!(output.status.success());
+    let report = String::from_utf8(output.stdout).expect("UTF-8 status report");
+    assert!(
+        report.contains(
+            "- Retired as untestable: 1 open incident, covered by a review that closed \
+             `blocked_no_valid_test`. That evidence no longer drives this gate, and remains \
+             in the event stream."
+        ),
+        "report={report}"
+    );
+    assert!(!report.contains("1 open incidents"), "report={report}");
+}
+
+/// A target in the retired bucket can still be accumulating. Reporting only what left
+/// the gate, with "another review would meet the same instrument", reads as a closed book
+/// — when the target may be one incident away from authorizing a review on evidence that
+/// close never touched.
+#[test]
+fn skill_evolution_status_reports_evidence_still_collecting_beside_retired_evidence() {
+    let root = tempfile::tempdir().expect("temporary repository");
+    for name in ["skill-evolution", "retired-and-collecting"] {
+        create_fixture_skill(root.path(), name);
+    }
+    let hash = skill_hash(root.path(), ".claude/skills/retired-and-collecting");
+    let retired = ["evt_retired_a", "evt_retired_b", "evt_retired_c"];
+    let mut events = retired
+        .iter()
+        .enumerate()
+        .map(|(index, event_id)| {
+            fixture_use_event(
+                "retired-and-collecting",
+                &hash,
+                event_id,
+                &format!("2026-07-21T11:59:4{index}.000Z"),
+                &format!("retired-session-{index}"),
+                "friction",
+            )
+        })
+        .collect::<Vec<_>>();
+    events.extend(fixture_blocked_close(
+        "retired-and-collecting",
+        &hash,
+        "rev_retired",
+        "friction_recurrence:execution",
+        &retired,
+    ));
+    // Two on another symptom: real, open, and one short of a threshold.
+    events.extend((0..2).map(|index| {
+        let mut event = fixture_use_event(
+            "retired-and-collecting",
+            &hash,
+            &format!("evt_live_{index}"),
+            &format!("2026-07-21T11:59:5{}.000Z", index + 2),
+            &format!("live-session-{index}"),
+            "friction",
+        );
+        event["payload"]["symptom_key"] = json!("output");
+        event
+    }));
+    write_events(root.path(), "retired-and-collecting", &events);
+
+    let output = skill_evidence()
+        .args(["skills", "evolution-status", "--root"])
+        .arg(root.path())
+        .args([
+            "--now-epoch-milliseconds",
+            "1784635200000",
+            "--session-id",
+            "fresh-session",
+        ])
+        .output()
+        .expect("run Skill Evolution Status");
+    assert!(output.status.success());
+    let report = String::from_utf8(output.stdout).expect("UTF-8 status report");
+    assert!(
+        report.contains("## Retired as untestable"),
+        "report={report}"
+    );
+    assert!(
+        report.contains(
+            "- Still collecting: 2 open incidents the close did not cover, short of a threshold."
+        ),
+        "the entry must not read as a closed book: report={report}"
+    );
 }
 
 #[test]

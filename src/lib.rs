@@ -54,6 +54,14 @@ const EVOLUTION_ADJUDICATING_DISPOSITIONS: &[&str] = &[
     "monitor_for_recurrence",
     "candidate_rejected_validation",
 ];
+/// Dispositions that reach no conclusion about the skill and still retire their
+/// covered evidence from the gate, because the review established that this
+/// instrument cannot test it.
+///
+/// See [`docs/adr/0002-blocked-no-valid-test-retires-its-evidence-from-the-gate.md`](../docs/adr/0002-blocked-no-valid-test-retires-its-evidence-from-the-gate.md).
+/// The events stay in the stream forever and stay open in the projection; they
+/// stop driving a gate whose own instrument proved unable to act on them.
+const EVOLUTION_INSTRUMENT_LIMITED_DISPOSITIONS: &[&str] = &["blocked_no_valid_test"];
 const USE_PAYLOAD_KEYS: &[&str] = &[
     "qualifying_use",
     "retrospective",
@@ -281,6 +289,14 @@ pub struct GateStatus {
     pub target_name: String,
     pub target_repo_relative_path: String,
     pub derivation_session_id: Option<String>,
+    /// Open incidents a review covered under an instrument-limited disposition, so
+    /// they no longer cluster and can no longer reach a threshold.
+    ///
+    /// Omitted when empty, like `integrity_errors`: the overwhelming majority of
+    /// projections have none, and every projection ever written before this field
+    /// existed must keep validating.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub instrument_limited_incident_ids: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub integrity_errors: Vec<String>,
 }
@@ -1168,6 +1184,7 @@ fn authorize_evolution(
             "blocked",
             "event_stream_integrity_valid",
             "refused_closed_gate",
+            status.instrument_limited_incident_ids.len(),
         ));
     }
     if status.state == "review_in_progress" {
@@ -1178,6 +1195,7 @@ fn authorize_evolution(
                 status.active_review_id.as_deref().unwrap_or("none")
             ),
             "refused_closed_gate",
+            status.instrument_limited_incident_ids.len(),
         ));
     }
     if matches!(
@@ -1188,6 +1206,7 @@ fn authorize_evolution(
             &status.state,
             "cooldown_or_different_session_condition_passed",
             "refused_cooldown_or_same_session",
+            status.instrument_limited_incident_ids.len(),
         ));
     }
     if status.authorized_workflow.as_deref() != Some("skill-evolution")
@@ -1197,6 +1216,7 @@ fn authorize_evolution(
             &status.state,
             "authorized_workflow == \"skill-evolution\" AND state IN {eligible, quarantined_eligible}",
             "refused_closed_gate",
+            status.instrument_limited_incident_ids.len(),
         ));
     }
     if status.target_content_hash != hash.content_hash {
@@ -1204,6 +1224,7 @@ fn authorize_evolution(
             &status.state,
             "current_target_content_hash == gate_status.target_content_hash",
             "refused_closed_gate",
+            status.instrument_limited_incident_ids.len(),
         ));
     }
     Ok((events, hash, status))
@@ -1351,6 +1372,10 @@ fn evolution_evidence_packet(events: &[EvidenceEvent], status: &GateStatus) -> V
         "trigger_events": triggers.iter().map(|event| &event.raw).collect::<Vec<_>>(),
         "qualifying_uses_on_current_hash": status.qualifying_uses_on_current_hash,
         "open_incident_ids": status.open_incident_ids,
+        // Without this the packet shows more open incidents than its clusters account
+        // for, and the reviewer — told to work from the packet and not the ledger — has
+        // to rediscover the reason from `prior_reviews`.
+        "instrument_limited_incident_ids": status.instrument_limited_incident_ids,
         "candidate_clusters": status.candidate_clusters,
         "prior_reviews": prior_reviews,
         "related_prior_dispositions": related_prior_dispositions,
@@ -1481,9 +1506,23 @@ fn evidence_relative_path(target: &TargetContext) -> String {
         .replace(std::path::MAIN_SEPARATOR, "/")
 }
 
-fn evolution_refusal(state: &str, condition: &str, outcome: &str) -> Error {
+fn evolution_refusal(
+    state: &str,
+    condition: &str,
+    outcome: &str,
+    instrument_limited_incidents: usize,
+) -> Error {
+    // A refusal that says only "collecting" invites the operator to wait for a gate that
+    // will never open on this evidence. If a close retired some, say so here — this is the
+    // surface they hit when they try to act.
+    let retired = match instrument_limited_incidents {
+        0 => String::new(),
+        count => format!(
+            "\nRetired as untestable: {count} (an earlier blocked_no_valid_test close removed that evidence from this gate)."
+        ),
+    };
     refusal(format!(
-        "Skill Evolution not authorized.\nGate: {state}.\nFailed condition: {condition}.\nNo target analysis or modification performed.\nTerminal outcome: {outcome}."
+        "Skill Evolution not authorized.\nGate: {state}.{retired}\nFailed condition: {condition}.\nNo target analysis or modification performed.\nTerminal outcome: {outcome}."
     ))
 }
 
@@ -1998,8 +2037,22 @@ fn build_reply(event_id: &str, status: &GateStatus) -> String {
                 .map(|cluster| format!("{}={}", cluster.symptom_key, cluster.independent_incidents))
                 .collect::<Vec<_>>()
                 .join(", ");
+            // Open incidents retired by an instrument-limited close are still counted as
+            // open — nothing was adjudicated — but they cluster no longer, so the symptom
+            // list can now be empty while the count is not. Reporting the count without
+            // saying where those incidents went reads as a gate quietly failing to
+            // advance.
+            let clusters = if clusters.is_empty() {
+                "none".to_owned()
+            } else {
+                clusters
+            };
+            let retired = match status.instrument_limited_incident_ids.len() {
+                0 => String::new(),
+                count => format!(" retired as untestable: {count};"),
+            };
             format!(
-                "{head}\nGate: collecting — open incidents: {} (independent by symptom: {clusters}); qualifying uses on current target hash: {}.\nNo action authorized.",
+                "{head}\nGate: collecting — open incidents: {} (independent by symptom: {clusters});{retired} qualifying uses on current target hash: {}.\nNo action authorized.",
                 status.open_incident_ids.len(),
                 status.qualifying_uses_on_current_hash
             )
@@ -2050,6 +2103,7 @@ fn lifecycle_target_context(
             "not derived (self-target)",
             "operator_skill_path != target_skill_path",
             "refused_self_target",
+            0,
         ));
     }
     Ok(target)
@@ -2393,6 +2447,7 @@ fn derive_gate(
         target_repo_relative_path: target.repo_relative_path.clone(),
         derivation_session_id: (inputs.session_id != "unavailable")
             .then(|| inputs.session_id.clone()),
+        instrument_limited_incident_ids: Vec::new(),
         integrity_errors,
     };
     if !status.integrity_errors.is_empty() {
@@ -2412,23 +2467,80 @@ fn derive_gate(
             _ => [].iter().map(String::as_str),
         })
         .collect::<HashSet<_>>();
+    let recorded_symptoms = events
+        .iter()
+        .filter_map(|event| {
+            let symptom = event.use_recorded()?.symptom_key.as_deref()?;
+            Some((event.event_id.as_str(), symptom))
+        })
+        .collect::<HashMap<_, _>>();
     let review_starts = events
         .iter()
         .filter(|event| event.is_review_start())
         .map(|event| (event.review_id().expect("review start identity"), event))
         .collect::<Vec<_>>();
-    let mut last_same_hash_disposition_index = None;
-    for (index, event) in events.iter().enumerate() {
-        if !matches!(&event.kind, EventKind::ReviewDisposition { .. }) {
-            continue;
-        }
-        let review_id = event.review_id().expect("review disposition identity");
-        if review_starts.iter().any(|(started_id, start)| {
+    // The watermark and the retirement scan both key on this, and they have to agree: a
+    // close that lays a watermark is exactly a close whose findings are about the target
+    // as it stands now.
+    let ran_on_current_hash = |review_id: &str| {
+        review_starts.iter().any(|(started_id, start)| {
             *started_id == review_id && start.target_content_hash == current_hash
-        }) {
+        })
+    };
+    let mut last_same_hash_disposition_index = None;
+    let mut last_same_hash_close_was_instrument_limited = false;
+    for (index, event) in events.iter().enumerate() {
+        let EventKind::ReviewDisposition { disposition, .. } = &event.kind else {
+            continue;
+        };
+        let review_id = event.review_id().expect("review disposition identity");
+        if ran_on_current_hash(review_id) {
             last_same_hash_disposition_index = Some(index);
+            last_same_hash_close_was_instrument_limited =
+                EVOLUTION_INSTRUMENT_LIMITED_DISPOSITIONS.contains(&disposition.as_str());
         }
     }
+    // What an instrument-limited close retires, and how far.
+    //
+    // The trigger list is frozen when the threshold fires, so incidents that arrive while
+    // the review runs are never in it — and a `material_recurrence` list never contains
+    // the cluster's merely-frictional siblings at all. Those share the symptom whose
+    // binding constraint the instrument could not vary, so retiring only the listed IDs
+    // would leave the next review a lower bar than the first one faced, permanently in the
+    // friction-sibling case. Retirement therefore reaches the whole covered cluster, and
+    // stops at the close: evidence recorded afterwards is new, and drives the gate.
+    //
+    // Restricted to closes whose review ran against the current hash. A finding about what
+    // this instrument cannot test says nothing about a target that has since changed.
+    let instrument_limited_closes = events
+        .iter()
+        .enumerate()
+        .filter_map(|(index, event)| {
+            let EventKind::ReviewDisposition {
+                disposition,
+                adjudicated_event_ids,
+                ..
+            } = &event.kind
+            else {
+                return None;
+            };
+            if !EVOLUTION_INSTRUMENT_LIMITED_DISPOSITIONS.contains(&disposition.as_str()) {
+                return None;
+            }
+            if !ran_on_current_hash(event.review_id().expect("review disposition identity")) {
+                return None;
+            }
+            let covered = adjudicated_event_ids
+                .iter()
+                .map(String::as_str)
+                .collect::<HashSet<_>>();
+            let symptoms = covered
+                .iter()
+                .filter_map(|identity| recorded_symptoms.get(identity).copied())
+                .collect::<HashSet<_>>();
+            Some((index, covered, symptoms))
+        })
+        .collect::<Vec<_>>();
     let started = events
         .iter()
         .filter(|event| event.starts_ownership())
@@ -2482,13 +2594,44 @@ fn derive_gate(
         status.qualifying_uses_on_current_hash += 1;
         let open_incident =
             recorded.outcome != Outcome::Clean && !adjudicated.contains(event.event_id.as_str());
-        let symptom = if open_incident {
+        // A contemporaneous severe incident authorizes on its own below, from
+        // `open_incident` alone, so it was never deferred and this exit has no trap to
+        // release for it. Listing one here would have the projection report that it
+        // stopped driving the gate while it demonstrably still does.
+        //
+        // A *retrospective* severe incident is a different animal despite the same
+        // outcome: the loop skips it before that trigger, so it authorizes nothing and
+        // only counts toward a cluster. Carving it out would protect nothing and leave it
+        // discounting every later review of the symptom — so the carve-out keys on the
+        // property that justifies it, not on severity alone.
+        let authorizes_on_its_own =
+            recorded.outcome == Outcome::SevereIncident && !recorded.retrospective;
+        let instrument_limited_incident = open_incident
+            && !authorizes_on_its_own
+            && instrument_limited_closes
+                .iter()
+                .any(|(close, covered, symptoms)| {
+                    covered.contains(event.event_id.as_str())
+                        || (event_index < *close
+                            && recorded
+                                .symptom_key
+                                .as_deref()
+                                .is_some_and(|symptom| symptoms.contains(symptom)))
+                });
+        if open_incident {
+            status.open_incident_ids.push(event.event_id.clone());
+        }
+        if instrument_limited_incident {
+            status
+                .instrument_limited_incident_ids
+                .push(event.event_id.clone());
+        }
+        let symptom = if open_incident && !instrument_limited_incident {
             let symptom = recorded
                 .symptom_key
                 .as_deref()
                 .expect("validated symptom key")
                 .to_owned();
-            status.open_incident_ids.push(event.event_id.clone());
             if !cluster_events.iter().any(|(key, _)| key == &symptom) {
                 cluster_events.push((symptom.clone(), Vec::new()));
                 status.candidate_clusters.push(CandidateCluster {
@@ -2673,7 +2816,20 @@ fn derive_gate(
         status.state = "collecting".to_owned();
     }
     if queued_pre_close_evidence && status.state == "collecting" {
-        status.review_reentry_basis = Some("queued_pre_close_evidence".to_owned());
+        // Evidence the last same-hash review never covered is deferred behind it either
+        // way. What differs is what that deferral means: a review that adjudicated
+        // accounted for the evidence it saw, while an instrument-limited close accounted
+        // for nothing. Keyed on instrument-limited rather than on non-adjudicating in
+        // general, because `superseded_by_target_version` also reaches no conclusion and
+        // its reporting is deliberately left alone — see ADR 0002.
+        status.review_reentry_basis = Some(
+            if last_same_hash_close_was_instrument_limited {
+                "queued_behind_instrument_limited_review"
+            } else {
+                "queued_pre_close_evidence"
+            }
+            .to_owned(),
+        );
     }
     status
 }

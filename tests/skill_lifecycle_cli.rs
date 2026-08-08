@@ -726,6 +726,110 @@ fn skill_evolution_preflight_fails_closed_for_a_corrupt_event_stream() {
     assert!(corrupt_error.contains("event_stream_integrity_valid"));
 }
 
+/// The refusal is what an operator sees when they try to evolve a target whose evidence a
+/// blocked close retired. Reporting a bare "collecting" there, while the capture reply on
+/// the very same store names the retired incidents, invites them to go looking for a gate
+/// that is never going to open on that evidence.
+#[test]
+fn skill_evolution_preflight_refusal_names_evidence_retired_by_a_blocked_close() {
+    let fixture = repository_with_demo_skill();
+    claim_evolution(fixture.path());
+    let close = run_evolution_close(
+        fixture.path(),
+        "evt_blocked_close",
+        "blocked_no_valid_test",
+        Some("no fresh trial can vary the binding run length"),
+    );
+    assert!(
+        close.status.success(),
+        "{}",
+        String::from_utf8_lossy(&close.stderr)
+    );
+
+    let refusal = run_evolution_preflight(
+        fixture.path(),
+        "lock_blocked_refusal_preflight",
+        "fixture-session",
+    );
+    assert_eq!(refusal.status.code(), Some(3));
+    let message = String::from_utf8_lossy(&refusal.stderr);
+    assert!(message.contains("Gate: collecting"), "message={message}");
+    assert!(
+        message.contains("Retired as untestable: 3 (an earlier blocked_no_valid_test close"),
+        "the refusal must say why this evidence will never open the gate: message={message}"
+    );
+}
+
+/// The packet is the reviewer's whole world — `authorized-review.md` tells them to work
+/// from it and not to ingest the ledger. So a packet that shows more open incidents than
+/// its clusters account for, without saying why, asks the reviewer to hand-derive the
+/// difference from `prior_reviews`, which is exactly the derivation this crate exists to
+/// centralize.
+#[test]
+fn skill_evolution_preflight_packet_names_evidence_retired_by_a_blocked_close() {
+    let fixture = repository_with_demo_skill();
+    claim_evolution(fixture.path());
+    let close = run_evolution_close(
+        fixture.path(),
+        "evt_blocked_close",
+        "blocked_no_valid_test",
+        Some("no fresh trial can vary the binding run length"),
+    );
+    assert!(
+        close.status.success(),
+        "{}",
+        String::from_utf8_lossy(&close.stderr)
+    );
+    // A different symptom, recorded after the close, so the gate reopens on evidence the
+    // blocked review never covered.
+    record_outcome(fixture.path(), "task d", "session-d", "output", "friction");
+    record_outcome(fixture.path(), "task e", "session-e", "output", "friction");
+    record_outcome(fixture.path(), "task f", "session-f", "output", "friction");
+
+    let output = run_evolution_preflight(
+        fixture.path(),
+        "lock_blocked_reentry_preflight",
+        "fixture-session",
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let receipt: Value = serde_json::from_slice(&output.stdout).expect("preflight receipt JSON");
+    let packet = &receipt["evidence_packet"];
+    let retired = packet["instrument_limited_incident_ids"]
+        .as_array()
+        .expect("packet names the retired evidence")
+        .clone();
+    assert_eq!(retired.len(), 3, "packet={packet}");
+
+    let open = packet["open_incident_ids"]
+        .as_array()
+        .expect("packet open incidents");
+    let clustered = packet["candidate_clusters"]
+        .as_array()
+        .expect("packet clusters")
+        .iter()
+        .flat_map(|cluster| {
+            cluster["open_event_ids"]
+                .as_array()
+                .expect("cluster open events")
+                .clone()
+        })
+        .collect::<Vec<_>>();
+    for identity in &retired {
+        assert!(
+            open.contains(identity),
+            "retired evidence stays open — nothing was adjudicated: packet={packet}"
+        );
+        assert!(
+            !clustered.contains(identity),
+            "retired evidence must not cluster: packet={packet}"
+        );
+    }
+}
+
 #[test]
 fn skill_evolution_preflight_classifies_prior_reviews_by_target_hash() {
     let prior = repository_with_demo_skill();
