@@ -10,9 +10,9 @@ Recorded evidence in the consuming repositories, at the time of writing:
 
 | Consumer | Evidence stores | Recorded events | How it depends |
 |---|---|---|---|
-| `playbench` | 32 | 994 | crates.io / git tag; host command `playbench` |
-| `mundifold` | 15 | 75 | **vendored fork** at `crates/skill-evidence` |
-| `what-we-bring-home` | 3 | 4 | crates.io / git tag; host command `cargo run --locked -p developer-tools --` |
+| `playbench` | 32 | 1002 | `skill-evidence = "0.1"`; host command `playbench` |
+| `mundifold` | 15 | 75 | **vendored fork** at `crates/skill-evidence` — see §8 |
+| `what-we-bring-home` | 5 | 8 | `skill-evidence = "0.1"`; host command `cargo run --locked -p developer-tools --` |
 
 Over a thousand append-only events that no release can regenerate. That is the number to have in
 mind when deciding whether a change is really additive.
