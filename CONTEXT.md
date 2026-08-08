@@ -173,7 +173,8 @@ _Avoid_: config, client, integration, adapter
 **Skill package**:
 One installed Markdown operator — the thing an agent actually reads — written into a consumer's
 `.claude/skills/`. Part of the contract, not incidental data: the library without the packages is
-machinery with no operator.
+machinery with no operator. That directory also holds skills this crate does not install; sharing
+it does not make one a skill package, and a package may not cite one.
 _Avoid_: skill, asset, template, bundle
 
 **Consumer**:

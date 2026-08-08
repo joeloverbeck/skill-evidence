@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-08T07:37:00.178381513Z",
+  "generated_at": "2026-08-08T18:33:53.503385046Z",
   "target_content_hash": "3055f8fcfa7185ed34d0ca3a577de178d965026d1ac415b986565e9c352dc07b",
-  "qualifying_uses_on_current_hash": 1,
+  "qualifying_uses_on_current_hash": 2,
   "open_incident_ids": [],
   "candidate_clusters": [],
   "state": "closed",
@@ -16,5 +16,5 @@
   "review_reentry_basis": null,
   "target_name": "triage",
   "target_repo_relative_path": ".claude/skills/triage",
-  "derivation_session_id": "019fe047-8e22-75d1-8544-c8bc3bebd05e"
+  "derivation_session_id": "0ad2ccef-4bc2-499b-bd23-e5ed6e6d98ce"
 }
