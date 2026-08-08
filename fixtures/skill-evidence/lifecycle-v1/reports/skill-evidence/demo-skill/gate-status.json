@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-31T09:36:33.724Z",
+  "target_content_hash": "8e4105a7d1feec3db862a9272e78156a738ba24f004c2d8799e3e00ba247d1d8",
+  "qualifying_uses_on_current_hash": 0,
+  "open_incident_ids": [],
+  "candidate_clusters": [],
+  "state": "closed",
+  "authorized_workflow": null,
+  "authorization_reason": null,
+  "trigger_event_ids": [],
+  "threshold_session_id": null,
+  "not_before": null,
+  "active_review_id": null,
+  "last_completed_review_id": "dec_13763440-083e-4d19-87e5-51a2f1f743dc",
+  "review_reentry_basis": null,
+  "target_name": "demo-skill",
+  "target_repo_relative_path": ".claude/skills/demo-skill",
+  "derivation_session_id": "fixture-decontamination-session"
+}

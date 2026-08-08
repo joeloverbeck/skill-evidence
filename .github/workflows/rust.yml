@@ -1,0 +1,42 @@
+name: Rust
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Check the crate
+        run: cargo check --all-targets --locked
+      - name: Lint with warnings denied
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Test
+        run: cargo test --all-targets --locked
+      # The library half must keep building without clap or uuid, or a host that
+      # drives the lifecycle from something other than clap finds out late.
+      - name: Check the library without the command surface
+        run: cargo check --lib --no-default-features --locked
+      # The packages committed here are what `install` emits for this host. A
+      # drift between the two means every repository that installs from this
+      # revision gets something the suites never exercised.
+      - name: Prove the committed packages match what install emits
+        run: |
+          cargo run --locked --quiet -- skills evidence install --root .
+          git diff --exit-code -- .claude schemas .agents

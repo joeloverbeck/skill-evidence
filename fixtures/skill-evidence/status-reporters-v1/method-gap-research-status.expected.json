@@ -1,0 +1,192 @@
+{
+  "schema": "skill-evidence.method-gap-research-status.inventory/v1",
+  "generated_at": "2026-07-25T12:00:00.000Z",
+  "family_selector": "game-*",
+  "family_prefix": "game-",
+  "canonical_members": 2,
+  "targets": [
+    {
+      "target_name": "game-alpha",
+      "target_path": ".claude/skills/game-alpha",
+      "target_content_hash": "ba588411a32688f969b2c30f275372fb1b9043320b958a1320dfb4b1c442868c",
+      "target_file_count": 1,
+      "evidence_store": "reports/skill-evidence/game-alpha",
+      "evidence_integrity_errors": [],
+      "current_evidence": {
+        "qualifying_uses": 3,
+        "outcome_counts": {
+          "clean": 0,
+          "friction": 3,
+          "material_failure": 0,
+          "severe_incident": 0
+        },
+        "open_incidents": [
+          {
+            "event_id": "evt_alpha_a",
+            "recorded_at": "2026-07-25T10:59:58.000Z",
+            "top_level_session_id": "alpha-session-a",
+            "retrospective": false,
+            "task_label": "alpha-a",
+            "task_fingerprint": "alpha-a",
+            "outcome": "friction",
+            "symptom_key": "execution",
+            "expected": "expected",
+            "observed": "observed",
+            "consequence": "consequence",
+            "workaround_taken": null,
+            "evidence_refs": []
+          },
+          {
+            "event_id": "evt_alpha_b",
+            "recorded_at": "2026-07-25T10:59:59.000Z",
+            "top_level_session_id": "alpha-session-b",
+            "retrospective": false,
+            "task_label": "alpha-b",
+            "task_fingerprint": "alpha-b",
+            "outcome": "friction",
+            "symptom_key": "execution",
+            "expected": "expected",
+            "observed": "observed",
+            "consequence": "consequence",
+            "workaround_taken": null,
+            "evidence_refs": []
+          },
+          {
+            "event_id": "evt_alpha_c",
+            "recorded_at": "2026-07-25T11:00:00.000Z",
+            "top_level_session_id": "alpha-session-c",
+            "retrospective": false,
+            "task_label": "alpha-c",
+            "task_fingerprint": "alpha-c",
+            "outcome": "friction",
+            "symptom_key": "execution",
+            "expected": "expected",
+            "observed": "observed",
+            "consequence": "consequence",
+            "workaround_taken": null,
+            "evidence_refs": []
+          }
+        ],
+        "observed_target_hashes": [
+          {
+            "content_hash": "ba588411a32688f969b2c30f275372fb1b9043320b958a1320dfb4b1c442868c",
+            "qualifying_uses": 3,
+            "first_recorded_at": "2026-07-25T10:59:58.000Z",
+            "last_recorded_at": "2026-07-25T11:00:00.000Z"
+          }
+        ]
+      },
+      "current_candidate_clusters": [
+        {
+          "symptom_key": "execution",
+          "open_event_ids": [
+            "evt_alpha_a",
+            "evt_alpha_b",
+            "evt_alpha_c"
+          ],
+          "independent_incidents": 3,
+          "max_severity": "friction"
+        }
+      ],
+      "active_evidence_review_id": null,
+      "last_completed_evidence_review_id": null,
+      "lineage_candidates": [
+        {
+          "path": "reports/game-alpha-method-gap-research-brief.md",
+          "discovery": "filename",
+          "kind": "brief",
+          "size_bytes": 104,
+          "line_count": 4,
+          "sha256": "f92b38ca8b2aae378a0aeeaf2b7af5775c1af926f90f6a94db27d98721dd1c07",
+          "header_excerpt": [
+            "1: # Research Brief — Method-Gap Audit of game-alpha",
+            "2: ",
+            "3: Status: returned for fixture lineage verification.",
+            "4: "
+          ],
+          "signal_lines": [
+            "3: Status: returned for fixture lineage verification."
+          ],
+          "unreadable_reason": null
+        }
+      ],
+      "git": {
+        "worktree_status": [],
+        "recent_commits": [
+          {
+            "commit": "d226629bb7790f4d8b24eca23e6161ce4fdbebe2",
+            "committed_at": "2026-07-25T12:00:00Z",
+            "subject": "Fixture baseline"
+          }
+        ],
+        "unavailable_reason": null
+      }
+    },
+    {
+      "target_name": "game-beta",
+      "target_path": ".claude/skills/game-beta",
+      "target_content_hash": "1ad0d45f27d4b5bec94e0c589c18af3361a888b9d24c76082a93f7f63277d6a7",
+      "target_file_count": 1,
+      "evidence_store": "reports/skill-evidence/game-beta",
+      "evidence_integrity_errors": [],
+      "current_evidence": {
+        "qualifying_uses": 1,
+        "outcome_counts": {
+          "clean": 0,
+          "friction": 0,
+          "material_failure": 0,
+          "severe_incident": 1
+        },
+        "open_incidents": [
+          {
+            "event_id": "evt_beta_severe",
+            "recorded_at": "2026-07-25T11:00:00.000Z",
+            "top_level_session_id": "unavailable",
+            "retrospective": false,
+            "task_label": "beta-severe",
+            "task_fingerprint": "beta-severe",
+            "outcome": "severe_incident",
+            "symptom_key": "state",
+            "expected": "expected",
+            "observed": "observed",
+            "consequence": "consequence",
+            "workaround_taken": null,
+            "evidence_refs": []
+          }
+        ],
+        "observed_target_hashes": [
+          {
+            "content_hash": "1ad0d45f27d4b5bec94e0c589c18af3361a888b9d24c76082a93f7f63277d6a7",
+            "qualifying_uses": 1,
+            "first_recorded_at": "2026-07-25T11:00:00.000Z",
+            "last_recorded_at": "2026-07-25T11:00:00.000Z"
+          }
+        ]
+      },
+      "current_candidate_clusters": [
+        {
+          "symptom_key": "state",
+          "open_event_ids": [
+            "evt_beta_severe"
+          ],
+          "independent_incidents": 1,
+          "max_severity": "severe_incident"
+        }
+      ],
+      "active_evidence_review_id": null,
+      "last_completed_evidence_review_id": null,
+      "lineage_candidates": [],
+      "git": {
+        "worktree_status": [],
+        "recent_commits": [
+          {
+            "commit": "d226629bb7790f4d8b24eca23e6161ce4fdbebe2",
+            "committed_at": "2026-07-25T12:00:00Z",
+            "subject": "Fixture baseline"
+          }
+        ],
+        "unavailable_reason": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+[package]
+name = "skill-evidence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.93"
+license = "MIT"
+authors = ["Joel Overbeck"]
+description = "The skill-evidence lifecycle: use records, gate projections, evolution reviews, and the skill package that drives them."
+repository = "https://github.com/joeloverbeck/skill-evidence"
+keywords = ["agent", "skills", "evidence", "lifecycle"]
+categories = ["development-tools"]
+# The skill package this crate installs is part of its contract, not incidental
+# data: a host that gets the library without the skills has the machinery and no
+# operator for it.
+include = ["src/**/*", "assets/**/*", "README.md", "LICENSE"]
+
+[features]
+default = ["cli"]
+# The mountable command surface. A host that only wants the library API — or
+# that drives the lifecycle from something other than clap — turns this off and
+# stops depending on clap entirely.
+cli = ["dep:clap", "dep:uuid"]
+
+[dependencies]
+clap = { version = "4.5.54", features = ["derive"], optional = true }
+uuid = { version = "1.19.0", features = ["v4"], optional = true }
+regex = "1.12.2"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.149", features = ["float_roundtrip"] }
+sha2 = "0.10.9"
+time = { version = "0.3.44", features = ["formatting", "parsing"] }
+
+[dev-dependencies]
+# The installed contracts are validated against, not compared key by key: a
+# hand-rolled check sprang a fresh hole on three consecutive review passes in
+# the repository this crate came from.
+jsonschema = { version = "0.49.2", default-features = false }
+tempfile = "3.24.0"
+
+# The reference host. Every repository that mounts the command surface under its
+# own binary name gets the same behavior; this one exists so the compiled-binary
+# suites have something to spawn, and so a repository with no Rust of its own can
+# still install and drive the lifecycle.
+[[bin]]
+name = "skill-evidence"
+path = "src/bin/skill-evidence.rs"
+required-features = ["cli"]
+
+[lints.rust]
+unsafe_code = "forbid"
