@@ -45,6 +45,22 @@ If gates 1 or 2 cannot be determined, use `could not determine`. If gates 3 or 4
 have some evidence but do not yet hold, use `watch`. If interval evidence is
 absent or does not cover the current target, use `insufficient evidence`.
 
+## Reject common false gaps
+
+Before treating eligibility gate 4 as plausible, reject:
+
+- **Renamed coverage:** equivalent machinery already exists under another term.
+- **Optimization:** the capability exists; the proposal only makes it faster or
+  more pleasant.
+- **Feature wish:** the proposal expands the intended outcome instead of
+  warranting it.
+- **Framework shopping:** a named practice exists elsewhere but no local
+  capability need is shown.
+- **Evaluator-subject confusion:** a questionable verdict is treated as proof
+  that its subject is defective.
+- **Evidence-tier substitution:** human, analytical, or simulated evidence is
+  allowed to overrule another tier without a transfer rule.
+
 ## Ordered positive signals
 
 Compare eligible candidates by the first controlling signal below. The order is
@@ -120,4 +136,3 @@ applies. This is not a permanent `decline`.
 
 Evidence integrity, target identity, lineage, in-flight ownership, or baseline
 stability cannot be established safely.
-

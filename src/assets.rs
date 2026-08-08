@@ -68,6 +68,7 @@ const ASSETS: &[Asset] = &[
     skill_asset!("skill-evolution-status/agents/openai.yaml"),
     skill_asset!("method-gap-research-status/SKILL.md"),
     skill_asset!("method-gap-research-status/agents/openai.yaml"),
+    skill_asset!("method-gap-research-status/references/lineage-reconstruction.md"),
     skill_asset!("method-gap-research-status/references/selection-rules.md"),
     schema_asset!("event.v1.schema.json"),
     schema_asset!("gate-status.v1.schema.json"),
@@ -262,6 +263,8 @@ fn read_existing(path: &Path) -> Result<Option<String>, Error> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
 
     fn host() -> Host {
@@ -271,6 +274,94 @@ mod tests {
             cargo_package: "demo-cli".to_owned(),
             skills_directory: PathBuf::from("/nonexistent/.claude/skills"),
         }
+    }
+
+    fn markdown_link_targets(contents: &str) -> Vec<&str> {
+        let mut targets = Vec::new();
+        let mut remainder = contents;
+        while let Some(start) = remainder.find("](") {
+            remainder = &remainder[start + 2..];
+            let Some(end) = remainder.find(')') else {
+                break;
+            };
+            let target = &remainder[..end];
+            if !target.is_empty()
+                && !target.starts_with('#')
+                && !target.contains("://")
+                && !target.starts_with("mailto:")
+            {
+                targets.push(target);
+            }
+            remainder = &remainder[end + 1..];
+        }
+        targets
+    }
+
+    fn backticked_package_relative_paths(contents: &str) -> Vec<&str> {
+        contents
+            .split('`')
+            .enumerate()
+            .filter_map(|(index, span)| {
+                (index % 2 == 1 && (span.starts_with("references/") || span.starts_with("../")))
+                    .then_some(span)
+            })
+            .collect()
+    }
+
+    fn resolve_package_relative_path(source: &str, target: &str) -> Option<String> {
+        let mut components: Vec<&str> = source.split('/').collect();
+        components.pop();
+
+        for component in target.split('/') {
+            match component {
+                "" | "." => {}
+                ".." => {
+                    components.pop()?;
+                }
+                component => components.push(component),
+            }
+        }
+
+        Some(components.join("/"))
+    }
+
+    #[test]
+    fn every_shipped_markdown_reference_resolves_within_shipped_assets() {
+        let shipped_paths: HashSet<&str> = ASSETS.iter().map(|asset| asset.relative_path).collect();
+        let evolution = ASSETS
+            .iter()
+            .find(|asset| asset.relative_path == ".claude/skills/skill-evolution/SKILL.md")
+            .expect("the shipped Skill Evolution package");
+        assert_eq!(
+            backticked_package_relative_paths(evolution.template),
+            vec!["references/authorized-review.md"]
+        );
+        let authorized_review = ASSETS
+            .iter()
+            .find(|asset| {
+                asset.relative_path
+                    == ".claude/skills/skill-evolution/references/authorized-review.md"
+            })
+            .expect("the shipped authorized-review reference");
+        assert!(backticked_package_relative_paths(authorized_review.template).is_empty());
+
+        let mut unresolved = Vec::new();
+        for asset in ASSETS
+            .iter()
+            .filter(|asset| asset.relative_path.ends_with(".md"))
+        {
+            let targets = markdown_link_targets(asset.template)
+                .into_iter()
+                .chain(backticked_package_relative_paths(asset.template));
+            for target in targets {
+                match resolve_package_relative_path(asset.relative_path, target) {
+                    Some(path) if shipped_paths.contains(path.as_str()) => {}
+                    _ => unresolved.push(format!("{} -> {target}", asset.relative_path)),
+                }
+            }
+        }
+
+        assert_eq!(unresolved, Vec::<String>::new());
     }
 
     #[test]

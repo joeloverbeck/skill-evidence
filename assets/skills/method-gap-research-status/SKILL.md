@@ -8,8 +8,7 @@ disable-model-invocation: true
 # Method-Gap Research Status
 
 Run one read-only census across an explicitly named family of skills. Recommend
-at most one exact target for a later, census-only invocation of
-[`commission-method-gap-research`](../commission-method-gap-research/SKILL.md).
+at most one exact target for a later, census-only method-gap commission.
 This skill is a portfolio selector, not a method-gap auditor: it never concludes
 that a method gap exists, decides that research is due, authors a brief, or
 invokes the commission.
@@ -29,7 +28,7 @@ classes, brace expansion, and a bare `*` are refused.
   method-gap signal.
 - Safe uncertainty: missing, corrupt, stale, ambiguous, or insufficient evidence
   never means a skill is healthy or research is not due.
-- No authority escalation: never invoke `commission-method-gap-research`, emit a
+- No authority escalation: never invoke a method-gap commission, emit a
   brief-authoring instruction, perform external research, or adopt a prior
   recommendation.
 - Transient result: do not write a census report. A durable `postpone` or
@@ -66,17 +65,14 @@ repository.*
 
 ### 2. Reconstruct only decision-relevant lineage
 
-Read
-[`Gap classifier`](../commission-method-gap-research/references/gap-classifier.md)
-and
-[`Lineage and cadence`](../commission-method-gap-research/references/lineage-and-cadence.md)
-completely. Use each candidate's inventory-provided `header_excerpt`,
-`signal_lines`, kind, size, and digest first. Read an exact additional section
-only when those bounded projections leave an ambiguity that could change the
-member's selection. Never read embedded evidence payloads or whole reports
-merely to prove absence. Search by that target's exact name, path, prior names
-found in those artifacts, and stable report markers only when a named candidate
-reveals that the inventory is incomplete.
+Read [Lineage reconstruction](references/lineage-reconstruction.md) completely.
+Use each candidate's inventory-provided `header_excerpt`, `signal_lines`, kind,
+size, and digest first. Read an exact additional section only when those bounded
+projections leave an ambiguity that could change the member's selection. Never
+read embedded evidence payloads or whole reports merely to prove absence.
+Search by that target's exact name, path, prior names found in those artifacts,
+and stable report markers only when a named candidate reveals that the inventory
+is incomplete.
 
 For each family member, establish:
 
@@ -138,13 +134,13 @@ Return:
 4. unavailable or pending evidence;
 5. a literal statement that the census wrote nothing and did not determine that
    any method gap exists; and
-6. only when one target is selected, this census-only ready invocation:
+6. only when one target is selected, this census-only mandate:
 
 ```text
-$commission-method-gap-research "Census only for <exact-target-path>. Decide commission now, postpone, or decline; do not author a research brief in this invocation."
+Census only for <exact-target-path>. Decide commission now, postpone, or decline; do not author a research brief in this invocation.
 ```
 
-Never shorten that invocation to a bare target: a bare target can authorize a
+Never shorten that mandate to a bare target: a bare target can authorize a
 brief when the target-specific census recommends `commission now`.
 
 *Done when the output accounts for the whole family, contains zero or one safe
@@ -152,7 +148,7 @@ handoff, and performs no follow-on action.*
 
 ## Completion terminals
 
-- **Selection:** one exact `screen next` target, one census-only invocation, and
+- **Selection:** one exact `screen next` target, one census-only mandate, and
   no mutation or research authorization.
 - **No selection:** every family member classified, the controlling absence,
   tie, insufficiency, in-flight work, or uncertainty stated, and no invocation.

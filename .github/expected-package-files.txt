@@ -8,6 +8,7 @@ assets/schemas/event.v1.schema.json
 assets/schemas/gate-status.v1.schema.json
 assets/skills/method-gap-research-status/SKILL.md
 assets/skills/method-gap-research-status/agents/openai.yaml
+assets/skills/method-gap-research-status/references/lineage-reconstruction.md
 assets/skills/method-gap-research-status/references/selection-rules.md
 assets/skills/skill-evidence-capture/SKILL.md
 assets/skills/skill-evidence-capture/agents/openai.yaml
