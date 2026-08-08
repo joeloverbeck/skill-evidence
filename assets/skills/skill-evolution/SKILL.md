@@ -13,7 +13,7 @@ Arguments: the path of the target skill directory (required). Everything else is
 
 ## Hard boundaries
 
-- Only the freshly derived gate authorizes work. No rationale substitutes: not reassurance, a noticed possible improvement, staleness, size or ugliness, one non-severe incident, many clean uses, a new model or tool version without observed incompatibility, old `skill-audit` history (that belongs to Legacy Skill Decontamination), pending decontamination, a prior premature refusal, explicit user insistence, or an "obvious tiny" change.
+- Only the freshly derived gate authorizes work. No rationale substitutes: not reassurance, a noticed possible improvement, staleness, size or ugliness, one non-severe incident, many clean uses, a new model or tool version without observed incompatibility, old `skill-audit` history, a prior premature refusal, explicit user insistence, or an "obvious tiny" change.
 - Until the preflight passes: never read the target semantically, inspect it or repository conventions for improvement opportunities, propose or suggest anything, append any incident, or edit anything. Repeated invocations do not advance the gate, create evidence, or shorten the cooldown.
 - Fresh session means a different top-level session. Never satisfy the cooldown through a child agent, subagent, continuation, or context reset inside the same top-level session.
 - Self-targeting is forbidden. If this skill's own evidence gate ever opens, route the bounded evidence packet to an independent skill-authoring workflow; judging the live skill via a copied candidate of itself is still self-review.

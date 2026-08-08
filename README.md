@@ -66,7 +66,7 @@ worked example.
 <host-command> skills evidence install --root .
 ```
 
-Writes the five packages under `.claude/skills/`, their `.agents/skills/`
+Writes the four packages under `.claude/skills/`, their `.agents/skills/`
 discovery links, and the two versioned contracts under
 `schemas/skill-evidence/`, with the host's own names substituted in. Refuses
 rather than clobbering a file that has been edited locally; `--force` replaces

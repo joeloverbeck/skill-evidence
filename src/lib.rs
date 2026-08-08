@@ -54,24 +54,6 @@ const EVOLUTION_ADJUDICATING_DISPOSITIONS: &[&str] = &[
     "monitor_for_recurrence",
     "candidate_rejected_validation",
 ];
-const LEGACY_BASES: &[&str] = &[
-    "owner-confirmed",
-    "audit-history",
-    "imported",
-    "routed-review",
-];
-const DECONTAMINATION_ADJUDICATING_OUTCOMES: &[&str] = &[
-    "validated_simplification_landed",
-    "healthy_no_change",
-    "candidate_rejected_validation",
-];
-const DECONTAMINATION_OUTCOMES: &[&str] = &[
-    "validated_simplification_landed",
-    "healthy_no_change",
-    "candidate_rejected_validation",
-    "blocked_no_valid_test",
-    "superseded_by_target_version",
-];
 const USE_PAYLOAD_KEYS: &[&str] = &[
     "qualifying_use",
     "retrospective",
@@ -211,44 +193,6 @@ pub struct EvolutionCloseRequest {
     pub adjudicate: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DecontaminationEligibilityRequest {
-    pub basis: Option<String>,
-    pub basis_ref: Option<String>,
-    pub basis_note: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DecontaminationClaimRequest {
-    pub run_id: String,
-    pub eligibility: DecontaminationEligibilityRequest,
-    pub trials: String,
-    pub risk_rationale: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DecontaminationValidationRequest {
-    pub run_id: String,
-    pub decision: String,
-    pub candidate: PathBuf,
-    pub trials: String,
-    pub artifacts: String,
-    pub summary: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DecontaminationLandRequest {
-    pub run_id: String,
-    pub candidate: PathBuf,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DecontaminationCompleteRequest {
-    pub run_id: String,
-    pub outcome: String,
-    pub note: String,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct DirectoryDiff {
     pub added: Vec<String>,
@@ -263,21 +207,6 @@ pub struct LandingMechanicsReceipt {
     pub mirror_status: &'static str,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LandingOwnerKind {
-    Review,
-    Run,
-}
-
-impl LandingOwnerKind {
-    fn noun(self) -> &'static str {
-        match self {
-            Self::Review => "review",
-            Self::Run => "run",
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ValidatedLandingPreparation {
     candidate_hash: String,
@@ -287,7 +216,6 @@ struct ValidatedLandingPreparation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ValidatedLandingPolicy<'a> {
     owner_id: &'a str,
-    owner_kind: LandingOwnerKind,
     backup_directory: PathBuf,
     event_id: &'a str,
 }
@@ -779,12 +707,7 @@ pub fn evolution_preflight(
     inputs: &LifecycleInputs,
 ) -> Result<Value, Error> {
     let derivation_inputs = lifecycle_derivation_inputs(inputs)?;
-    let target = lifecycle_target_context(
-        root,
-        target,
-        &inputs.operator_skill,
-        LifecycleWorkflow::Evolution,
-    )?;
+    let target = lifecycle_target_context(root, target, &inputs.operator_skill)?;
     fs::create_dir_all(&target.evidence_directory).map_err(|error| {
         unsafe_failure(format!(
             "Could not create evidence directory {}: {error}",
@@ -834,12 +757,7 @@ pub fn evolution_claim(
         return Err(refusal("Missing required --review-id.".to_owned()));
     }
     let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
-    let target = lifecycle_target_context(
-        root,
-        target,
-        &inputs.operator_skill,
-        LifecycleWorkflow::Evolution,
-    )?;
+    let target = lifecycle_target_context(root, target, &inputs.operator_skill)?;
     fs::create_dir_all(&target.evidence_directory).map_err(|error| {
         unsafe_failure(format!(
             "Could not create evidence directory {}: {error}",
@@ -939,12 +857,7 @@ pub fn evolution_record_validation(
         ));
     }
     let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
-    let target = lifecycle_target_context(
-        root,
-        target,
-        &inputs.operator_skill,
-        LifecycleWorkflow::Evolution,
-    )?;
+    let target = lifecycle_target_context(root, target, &inputs.operator_skill)?;
     let candidate_real = resolve_target(&target.repository_root, &request.candidate)?;
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
     let mut events = read_valid_lifecycle_stream(&target)?;
@@ -1007,12 +920,7 @@ pub fn evolution_land(
         return Err(refusal("Missing required --review-id.".to_owned()));
     }
     let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
-    let target = lifecycle_target_context(
-        root,
-        target,
-        &inputs.operator_skill,
-        LifecycleWorkflow::Evolution,
-    )?;
+    let target = lifecycle_target_context(root, target, &inputs.operator_skill)?;
     let candidate_real = resolve_target(&target.repository_root, &request.candidate)?;
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
     let mut events = read_valid_lifecycle_stream(&target)?;
@@ -1046,7 +954,6 @@ pub fn evolution_land(
         &candidate_real,
         ValidatedLandingPolicy {
             owner_id: &request.review_id,
-            owner_kind: LandingOwnerKind::Review,
             backup_directory: target
                 .evidence_directory
                 .join("reviews")
@@ -1130,12 +1037,7 @@ pub fn evolution_close(
         )));
     }
     let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
-    let target = lifecycle_target_context(
-        root,
-        target,
-        &inputs.operator_skill,
-        LifecycleWorkflow::Evolution,
-    )?;
+    let target = lifecycle_target_context(root, target, &inputs.operator_skill)?;
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
     let mut events = read_valid_lifecycle_stream(&target)?;
     let review = find_review_start(&events, &request.review_id)?;
@@ -1246,629 +1148,6 @@ pub fn evolution_close(
     }))
 }
 
-pub fn decontamination_preflight(
-    root: &Path,
-    target: &Path,
-    request: &DecontaminationEligibilityRequest,
-    inputs: &LifecycleInputs,
-) -> Result<Value, Error> {
-    let derivation_inputs = lifecycle_derivation_inputs(inputs)?;
-    let target = lifecycle_target_context(
-        root,
-        target,
-        &inputs.operator_skill,
-        LifecycleWorkflow::Decontamination,
-    )?;
-    fs::create_dir_all(&target.evidence_directory).map_err(|error| {
-        unsafe_failure(format!(
-            "Could not create evidence directory {}: {error}",
-            target.evidence_directory.display()
-        ))
-    })?;
-    let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
-    let (events, hash, status) =
-        check_decontamination_eligibility(&target, request, &derivation_inputs)?;
-    let prior_completions = events
-        .iter()
-        .filter(|event| matches!(event.kind, EventKind::DecontaminationCompleted { .. }))
-        .map(|event| {
-            serde_json::json!({
-                "run_id": event.review_id(),
-                "outcome": event.raw.pointer("/payload/outcome").and_then(Value::as_str),
-                "target_hash": event.target_content_hash
-            })
-        })
-        .collect::<Vec<_>>();
-    let evidence_directory = evidence_relative_path(&target);
-    Ok(serde_json::json!({
-        "eligible": true,
-        "target": {
-            "name": target.target_name,
-            "repo_relative_path": target.repo_relative_path,
-            "content_hash": hash.content_hash
-        },
-        "gate_state": status.state,
-        "legacy_basis": legacy_basis_payload(request),
-        "open_incident_count": status.open_incident_ids.len(),
-        "prior_completions": prior_completions,
-        "min_paired_trials": 5,
-        "evidence_dir": evidence_directory,
-        "artifacts_dir": format!("{evidence_directory}/decontamination")
-    }))
-}
-
-pub fn decontamination_claim(
-    root: &Path,
-    target: &Path,
-    request: &DecontaminationClaimRequest,
-    inputs: &LifecycleEventInputs,
-) -> Result<Value, Error> {
-    if request.run_id.is_empty() {
-        return Err(refusal("Missing required --run-id.".to_owned()));
-    }
-    let trials = request
-        .trials
-        .parse::<usize>()
-        .ok()
-        .filter(|count| *count >= 5)
-        .ok_or_else(|| {
-            refusal(
-                "--trials must be an integer >= 5: every decontamination is a broad change."
-                    .to_owned(),
-            )
-        })?;
-    let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
-    let target = lifecycle_target_context(
-        root,
-        target,
-        &inputs.operator_skill,
-        LifecycleWorkflow::Decontamination,
-    )?;
-    fs::create_dir_all(&target.evidence_directory).map_err(|error| {
-        unsafe_failure(format!(
-            "Could not create evidence directory {}: {error}",
-            target.evidence_directory.display()
-        ))
-    })?;
-    let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
-    let (mut events, hash, _) =
-        check_decontamination_eligibility(&target, &request.eligibility, &derivation_inputs)?;
-    if events.iter().any(|event| event.event_id == inputs.event_id) {
-        return Err(unsafe_failure(format!(
-            "Constructed event failed validation — nothing appended:\n  duplicate event_id {}",
-            inputs.event_id
-        )));
-    }
-    let run_directory = target
-        .evidence_directory
-        .join("decontamination")
-        .join(&request.run_id);
-    let baseline_directory = run_directory.join("baseline");
-    snapshot_baseline(&target.target_real, &baseline_directory, &hash.content_hash)?;
-    let event = lifecycle_event(
-        &target,
-        &hash.content_hash,
-        "legacy-skill-decontamination",
-        "decontamination_started",
-        serde_json::json!({
-            "review_id": request.run_id,
-            "target_hash": hash.content_hash,
-            "legacy_basis": legacy_basis_payload(&request.eligibility),
-            "provisional_trial_count": trials,
-            "risk_rationale": request.risk_rationale
-        }),
-        inputs,
-    );
-    let after = match append_lifecycle_event(
-        &target,
-        &hash.content_hash,
-        &mut events,
-        event,
-        &derivation_inputs,
-    ) {
-        Ok(status) => status,
-        Err(error) => {
-            let _ = fs::remove_dir_all(&run_directory);
-            return Err(error);
-        }
-    };
-    if after.active_review_id.as_deref() != Some(request.run_id.as_str()) {
-        return Err(unsafe_failure(format!(
-            "Claim appended but another review owns the target ({}). Stop without semantic analysis.",
-            after.active_review_id.as_deref().unwrap_or("none")
-        )));
-    }
-    Ok(serde_json::json!({
-        "run_id": request.run_id,
-        "state": after.state,
-        "target_hash": hash.content_hash,
-        "baseline_copy": baseline_directory
-            .strip_prefix(&target.repository_root)
-            .unwrap_or(&baseline_directory)
-            .to_string_lossy()
-            .replace(std::path::MAIN_SEPARATOR, "/"),
-        "provisional_trial_count": trials,
-        "evidence_dir": evidence_relative_path(&target)
-    }))
-}
-
-pub fn decontamination_record_validation(
-    root: &Path,
-    target: &Path,
-    request: &DecontaminationValidationRequest,
-    inputs: &LifecycleEventInputs,
-) -> Result<Value, Error> {
-    if request.run_id.is_empty() {
-        return Err(refusal("Missing required --run-id.".to_owned()));
-    }
-    if !matches!(request.decision.as_str(), "accepted" | "rejected") {
-        return Err(refusal("--decision must be accepted|rejected.".to_owned()));
-    }
-    let trial_count = request
-        .trials
-        .parse::<usize>()
-        .ok()
-        .filter(|count| *count >= 1)
-        .ok_or_else(|| refusal("--trials must be a positive integer.".to_owned()))?;
-    if request.decision == "accepted" && trial_count < 5 {
-        return Err(refusal(format!(
-            "An accepted decontamination candidate requires at least 5 paired trials (always a broad change); got {trial_count}."
-        )));
-    }
-    if request.artifacts.is_empty() {
-        return Err(refusal(
-            "Missing required --artifacts <path to retained trial outputs>.".to_owned(),
-        ));
-    }
-    let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
-    let target = lifecycle_target_context(
-        root,
-        target,
-        &inputs.operator_skill,
-        LifecycleWorkflow::Decontamination,
-    )?;
-    let candidate_real = resolve_target(&target.repository_root, &request.candidate)?;
-    let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
-    let mut events = read_valid_lifecycle_stream(&target)?;
-    find_decontamination_start(&events, &request.run_id)?;
-    let hash = hash_target_directory(&target.target_real)?;
-    require_active_ownership(
-        &target,
-        &events,
-        &hash.content_hash,
-        &request.run_id,
-        &derivation_inputs,
-        "Run",
-    )?;
-    let candidate_hash = hash_target_directory(&candidate_real)?;
-    let candidate_path = candidate_real
-        .strip_prefix(&target.repository_root)
-        .unwrap_or(&candidate_real)
-        .to_string_lossy()
-        .replace(std::path::MAIN_SEPARATOR, "/");
-    let event = lifecycle_event(
-        &target,
-        &hash.content_hash,
-        "legacy-skill-decontamination",
-        "validation_completed",
-        serde_json::json!({
-            "review_id": request.run_id,
-            "decision": request.decision,
-            "risk_tier": "high",
-            "candidate_hash": candidate_hash.content_hash,
-            "candidate_path": candidate_path,
-            "trial_count": trial_count,
-            "artifacts_path": request.artifacts,
-            "summary": request.summary
-        }),
-        inputs,
-    );
-    append_lifecycle_event(
-        &target,
-        &hash.content_hash,
-        &mut events,
-        event,
-        &derivation_inputs,
-    )?;
-    Ok(serde_json::json!({
-        "recorded": inputs.event_id,
-        "decision": request.decision,
-        "risk_tier": "high",
-        "candidate_hash": candidate_hash.content_hash,
-        "trial_count": trial_count
-    }))
-}
-
-pub fn decontamination_land(
-    root: &Path,
-    target: &Path,
-    request: &DecontaminationLandRequest,
-    inputs: &LifecycleEventInputs,
-) -> Result<Value, Error> {
-    if request.run_id.is_empty() {
-        return Err(refusal("Missing required --run-id.".to_owned()));
-    }
-    let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
-    let target = lifecycle_target_context(
-        root,
-        target,
-        &inputs.operator_skill,
-        LifecycleWorkflow::Decontamination,
-    )?;
-    let candidate_real = resolve_target(&target.repository_root, &request.candidate)?;
-    let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
-    let mut events = read_valid_lifecycle_stream(&target)?;
-    let run = find_decontamination_start(&events, &request.run_id)?;
-    let live_hash = hash_target_directory(&target.target_real)?.content_hash;
-    require_active_ownership(
-        &target,
-        &events,
-        &live_hash,
-        &request.run_id,
-        &derivation_inputs,
-        "Run",
-    )?;
-    let baseline = run
-        .raw
-        .pointer("/payload/target_hash")
-        .and_then(Value::as_str)
-        .expect("validated decontamination target hash")
-        .to_owned();
-    if live_hash != baseline {
-        return Err(refusal(format!(
-            "Live target hash {}… no longer equals the run baseline {}…; the target changed since the claim. Stop without landing and complete with superseded_by_target_version.",
-            &live_hash[..12],
-            &baseline[..baseline.len().min(12)]
-        )));
-    }
-    let preparation = prepare_validated_landing(
-        &target,
-        &events,
-        &live_hash,
-        &candidate_real,
-        ValidatedLandingPolicy {
-            owner_id: &request.run_id,
-            owner_kind: LandingOwnerKind::Run,
-            backup_directory: target
-                .evidence_directory
-                .join("decontamination")
-                .join(&request.run_id)
-                .join("pre-land-backup"),
-            event_id: &inputs.event_id,
-        },
-    )?;
-    let mirror = expected_mirror_path(&target);
-    let landing = land_validated_candidate(
-        &target.target_real,
-        &candidate_real,
-        &preparation.backup_directory,
-        &baseline,
-        &preparation.candidate_hash,
-        mirror.as_deref(),
-    )?;
-    let event = lifecycle_event(
-        &target,
-        &landing.after_hash,
-        "legacy-skill-decontamination",
-        "change_landed",
-        serde_json::json!({
-            "review_id": request.run_id,
-            "before_hash": baseline,
-            "after_hash": landing.after_hash,
-            "changed_files": landing.changed_files,
-            "mirror_status": landing.mirror_status
-        }),
-        inputs,
-    );
-    append_lifecycle_event(
-        &target,
-        &landing.after_hash,
-        &mut events,
-        event,
-        &derivation_inputs,
-    )?;
-    Ok(serde_json::json!({
-        "landed": true,
-        "before_hash": baseline,
-        "after_hash": landing.after_hash,
-        "changed_files": landing.changed_files,
-        "mirror_status": landing.mirror_status,
-        "backup": preparation
-            .backup_directory
-            .strip_prefix(&target.repository_root)
-            .unwrap_or(&preparation.backup_directory)
-            .to_string_lossy()
-            .replace(std::path::MAIN_SEPARATOR, "/")
-    }))
-}
-
-pub fn decontamination_complete(
-    root: &Path,
-    target: &Path,
-    request: &DecontaminationCompleteRequest,
-    inputs: &LifecycleEventInputs,
-) -> Result<Value, Error> {
-    if request.run_id.is_empty() {
-        return Err(refusal("Missing required --run-id.".to_owned()));
-    }
-    if !DECONTAMINATION_OUTCOMES.contains(&request.outcome.as_str()) {
-        return Err(refusal(format!(
-            "--outcome must be one of {}",
-            DECONTAMINATION_OUTCOMES.join("|")
-        )));
-    }
-    if request.note.is_empty() {
-        return Err(refusal(
-            "Missing required --note: record the completion rationale in the immutable event."
-                .to_owned(),
-        ));
-    }
-    let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
-    let target = lifecycle_target_context(
-        root,
-        target,
-        &inputs.operator_skill,
-        LifecycleWorkflow::Decontamination,
-    )?;
-    let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
-    let mut events = read_valid_lifecycle_stream(&target)?;
-    let run = find_decontamination_start(&events, &request.run_id)?;
-    let baseline = run
-        .raw
-        .pointer("/payload/target_hash")
-        .and_then(Value::as_str)
-        .expect("validated decontamination target hash")
-        .to_owned();
-    if events.iter().any(|event| {
-        matches!(event.kind, EventKind::DecontaminationCompleted { .. })
-            && event.review_id() == Some(request.run_id.as_str())
-    }) {
-        return Err(refusal(format!(
-            "Run {} already has a decontamination_completed event. Nothing done.",
-            request.run_id
-        )));
-    }
-    let live_hash = hash_target_directory(&target.target_real)?.content_hash;
-    let landed = events.iter().any(|event| {
-        matches!(event.kind, EventKind::ChangeLanded { .. })
-            && event.review_id() == Some(request.run_id.as_str())
-    });
-    if landed {
-        if request.outcome != "validated_simplification_landed" {
-            return Err(refusal(
-                "A change already landed for this run; the only valid outcome is validated_simplification_landed."
-                    .to_owned(),
-            ));
-        }
-    } else {
-        require_active_ownership(
-            &target,
-            &events,
-            &live_hash,
-            &request.run_id,
-            &derivation_inputs,
-            "Run",
-        )?;
-        if request.outcome == "validated_simplification_landed" {
-            return Err(refusal(
-                "validated_simplification_landed requires a change_landed event for this run; land first or pick a no-change outcome."
-                    .to_owned(),
-            ));
-        }
-        if live_hash != baseline && request.outcome != "superseded_by_target_version" {
-            return Err(refusal(format!(
-                "Live target hash {}… no longer equals the run baseline; the only valid outcome is superseded_by_target_version.",
-                &live_hash[..12]
-            )));
-        }
-        if live_hash == baseline && request.outcome == "superseded_by_target_version" {
-            return Err(refusal(
-                "superseded_by_target_version requires the live target to differ from the run baseline; it is unchanged."
-                    .to_owned(),
-            ));
-        }
-        if request.outcome == "candidate_rejected_validation" {
-            let latest = events.iter().rfind(|event| {
-                matches!(event.kind, EventKind::ValidationCompleted { .. })
-                    && event.review_id() == Some(request.run_id.as_str())
-            });
-            if latest.and_then(|event| {
-                event
-                    .raw
-                    .pointer("/payload/decision")
-                    .and_then(Value::as_str)
-            }) != Some("rejected")
-            {
-                return Err(refusal(
-                    "candidate_rejected_validation requires the latest validation_completed for this run to record decision=rejected."
-                        .to_owned(),
-                ));
-            }
-        }
-    }
-    let event = lifecycle_event(
-        &target,
-        &live_hash,
-        "legacy-skill-decontamination",
-        "decontamination_completed",
-        serde_json::json!({
-            "review_id": request.run_id,
-            "outcome": request.outcome,
-            "note": request.note
-        }),
-        inputs,
-    );
-    let after =
-        append_lifecycle_event(&target, &live_hash, &mut events, event, &derivation_inputs)?;
-    Ok(serde_json::json!({
-        "completed": request.run_id,
-        "outcome": request.outcome,
-        "state": after.state,
-        "report_path": format!(
-            "{}/decontamination/{}.md",
-            evidence_relative_path(&target),
-            request.run_id
-        )
-    }))
-}
-
-fn check_decontamination_eligibility(
-    target: &TargetContext,
-    request: &DecontaminationEligibilityRequest,
-    inputs: &DerivationInputs,
-) -> Result<(Vec<EvidenceEvent>, DirectoryHash, GateStatus), Error> {
-    let (events, integrity_errors) =
-        read_event_stream(&target.evidence_directory.join("events.jsonl"))?;
-    let hash = hash_target_directory(&target.target_real)?;
-    let status = derive_gate(
-        target,
-        &hash.content_hash,
-        &events,
-        integrity_errors,
-        inputs,
-    );
-    write_gate_status(&target.evidence_directory, &status)?;
-    if status.state == "blocked" {
-        return Err(decontamination_refusal(
-            "blocked",
-            "event_stream_integrity_valid",
-            "refused_not_legacy_eligible",
-        ));
-    }
-    if let Some(active) = status.active_review_id.as_deref() {
-        return Err(decontamination_refusal(
-            "review_in_progress",
-            &format!("no_other_review_owns_target (active: {active})"),
-            "refused_not_legacy_eligible",
-        ));
-    }
-    if status.authorized_workflow.as_deref() == Some("skill-evolution") {
-        return Err(decontamination_refusal(
-            &status.state,
-            "no_pending_skill_evolution_authorization — run or resolve Skill Evolution first",
-            "refused_not_legacy_eligible",
-        ));
-    }
-    let completions = events
-        .iter()
-        .filter(|event| matches!(event.kind, EventKind::DecontaminationCompleted { .. }))
-        .collect::<Vec<_>>();
-    if let Some(completion) = completions.iter().find(|event| {
-        event.target_content_hash == hash.content_hash
-            && event
-                .raw
-                .pointer("/payload/outcome")
-                .and_then(Value::as_str)
-                .is_some_and(|outcome| DECONTAMINATION_ADJUDICATING_OUTCOMES.contains(&outcome))
-    }) {
-        return Err(decontamination_refusal(
-            "covered",
-            &format!(
-                "no_completed_decontamination_covers_target_version (run {}, outcome {})",
-                completion.review_id().unwrap_or("unknown"),
-                completion
-                    .raw
-                    .pointer("/payload/outcome")
-                    .and_then(Value::as_str)
-                    .unwrap_or("unknown")
-            ),
-            "refused_already_completed",
-        ));
-    }
-    let basis = request.basis.as_deref();
-    if basis.is_none_or(|basis| !LEGACY_BASES.contains(&basis)) {
-        return Err(decontamination_refusal(
-            "not derived",
-            &format!(
-                "accepted_legacy_basis_provided (--basis {})",
-                LEGACY_BASES.join("|")
-            ),
-            "refused_not_legacy_eligible",
-        ));
-    }
-    if basis == Some("routed-review") {
-        let valid_reference = request.basis_ref.as_deref().is_some_and(|identity| {
-            events.iter().any(|event| {
-                event.event_id == identity
-                    && matches!(event.kind, EventKind::ReviewDisposition { .. })
-            })
-        });
-        if !valid_reference {
-            return Err(decontamination_refusal(
-                "not derived",
-                "routed_review_basis_cites_existing_review_disposition (--basis-ref <event-id>)",
-                "refused_not_legacy_eligible",
-            ));
-        }
-    } else if matches!(basis, Some("audit-history" | "imported"))
-        && request.basis_note.as_deref().is_none_or(str::is_empty)
-    {
-        return Err(decontamination_refusal(
-            "not derived",
-            &format!(
-                "{}_basis_describes_provenance (--basis-note)",
-                basis.expect("matched basis").replace('-', "_")
-            ),
-            "refused_not_legacy_eligible",
-        ));
-    }
-    if let Some(completion) = completions.iter().find(|event| {
-        event
-            .raw
-            .pointer("/payload/outcome")
-            .and_then(Value::as_str)
-            .is_some_and(|outcome| DECONTAMINATION_ADJUDICATING_OUTCOMES.contains(&outcome))
-    }) && basis != Some("routed-review")
-    {
-        return Err(decontamination_refusal(
-            "covered",
-            &format!(
-                "legacy_baseline_already_adjudicated (run {}, outcome {}); a changed target re-enters only through an evidence-backed routed-review basis",
-                completion.review_id().unwrap_or("unknown"),
-                completion
-                    .raw
-                    .pointer("/payload/outcome")
-                    .and_then(Value::as_str)
-                    .unwrap_or("unknown")
-            ),
-            "refused_already_completed",
-        ));
-    }
-    if let Some(completion) = completions.iter().find(|event| {
-        event.target_content_hash == hash.content_hash
-            && event
-                .raw
-                .pointer("/payload/outcome")
-                .and_then(Value::as_str)
-                == Some("blocked_no_valid_test")
-    }) && request.basis_note.as_deref().is_none_or(str::is_empty)
-    {
-        return Err(decontamination_refusal(
-            "blocked_rerun",
-            &format!(
-                "blocked_rerun_names_new_corpus_material (run {} was blocked_no_valid_test on this same version; --basis-note must name the newly available corpus material)",
-                completion.review_id().unwrap_or("unknown")
-            ),
-            "refused_not_legacy_eligible",
-        ));
-    }
-    Ok((events, hash, status))
-}
-
-fn legacy_basis_payload(request: &DecontaminationEligibilityRequest) -> Value {
-    serde_json::json!({
-        "basis": request.basis,
-        "ref": request.basis_ref,
-        "note": request.basis_note
-    })
-}
-
-fn decontamination_refusal(state: &str, condition: &str, outcome: &str) -> Error {
-    refusal(format!(
-        "Legacy Skill Decontamination not eligible.\nGate: {state}.\nFailed condition: {condition}.\nNo target analysis or modification performed.\nTerminal outcome: {outcome}."
-    ))
-}
-
 fn authorize_evolution(
     target: &TargetContext,
     inputs: &DerivationInputs,
@@ -1955,23 +1234,6 @@ fn find_review_start<'a>(
         .ok_or_else(|| {
             refusal(format!(
                 "No review_started event found for review {review_id}. Nothing done."
-            ))
-        })
-}
-
-fn find_decontamination_start<'a>(
-    events: &'a [EvidenceEvent],
-    run_id: &str,
-) -> Result<&'a EvidenceEvent, Error> {
-    events
-        .iter()
-        .find(|event| {
-            matches!(event.kind, EventKind::DecontaminationStarted { .. })
-                && event.review_id() == Some(run_id)
-        })
-        .ok_or_else(|| {
-            refusal(format!(
-                "No decontamination_started event found for run {run_id}. Nothing done."
             ))
         })
 }
@@ -2685,29 +1947,6 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
             ),
             ("note", encoded_json(&payload["note"])),
         ]),
-        Some("decontamination_started") => {
-            let basis = &payload["legacy_basis"];
-            let basis = ordered_json_object(&[
-                ("basis", encoded_json(&basis["basis"])),
-                ("ref", encoded_json(&basis["ref"])),
-                ("note", encoded_json(&basis["note"])),
-            ]);
-            ordered_json_object(&[
-                ("review_id", encoded_json(&payload["review_id"])),
-                ("target_hash", encoded_json(&payload["target_hash"])),
-                ("legacy_basis", basis),
-                (
-                    "provisional_trial_count",
-                    encoded_json(&payload["provisional_trial_count"]),
-                ),
-                ("risk_rationale", encoded_json(&payload["risk_rationale"])),
-            ])
-        }
-        Some("decontamination_completed") => ordered_json_object(&[
-            ("review_id", encoded_json(&payload["review_id"])),
-            ("outcome", encoded_json(&payload["outcome"])),
-            ("note", encoded_json(&payload["note"])),
-        ]),
         Some(event_type) => {
             return Err(unsafe_failure(format!(
                 "Cannot serialize unsupported lifecycle event type {event_type}."
@@ -2791,35 +2030,27 @@ struct TargetContext {
     evidence_directory: PathBuf,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LifecycleWorkflow {
-    Evolution,
-    Decontamination,
-}
-
+/// Resolves the target a lifecycle command names, refusing when it is the very
+/// package the running workflow is defined by.
+///
+/// Skill Evolution is the only workflow left that writes lifecycle events, so
+/// the refusal has one shape. This took a `LifecycleWorkflow` selector while
+/// Legacy Skill Decontamination also wrote them.
 fn lifecycle_target_context(
     root: &Path,
     target: &Path,
     operator_skill: &Path,
-    workflow: LifecycleWorkflow,
 ) -> Result<TargetContext, Error> {
     let target = target_context(root, target)?;
     if fs::canonicalize(operator_skill)
         .ok()
         .is_some_and(|operator_real| operator_real == target.target_real)
     {
-        return Err(match workflow {
-            LifecycleWorkflow::Evolution => evolution_refusal(
-                "not derived (self-target)",
-                "operator_skill_path != target_skill_path",
-                "refused_self_target",
-            ),
-            LifecycleWorkflow::Decontamination => decontamination_refusal(
-                "not derived (self-target)",
-                "operator_skill_path != target_skill_path",
-                "refused_self_target",
-            ),
-        });
+        return Err(evolution_refusal(
+            "not derived (self-target)",
+            "operator_skill_path != target_skill_path",
+            "refused_self_target",
+        ));
     }
     Ok(target)
 }
@@ -3705,8 +2936,7 @@ fn prepare_validated_landing(
         })
         .ok_or_else(|| {
             refusal(format!(
-                "No accepted validation_completed event exists for {} {}. Landing refused.",
-                policy.owner_kind.noun(),
+                "No accepted validation_completed event exists for review {}. Landing refused.",
                 policy.owner_id
             ))
         })?;
@@ -3730,9 +2960,8 @@ fn prepare_validated_landing(
     }
     if policy.backup_directory.exists() {
         return Err(refusal(format!(
-            "Backup already exists at {}; a prior land attempt ran for this {}. Inspect before retrying.",
-            policy.backup_directory.display(),
-            policy.owner_kind.noun()
+            "Backup already exists at {}; a prior land attempt ran for this review. Inspect before retrying.",
+            policy.backup_directory.display()
         )));
     }
     Ok(ValidatedLandingPreparation {

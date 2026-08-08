@@ -96,10 +96,6 @@ pub enum SkillsCommand {
         #[command(subcommand)]
         command: Box<SkillEvolutionCommand>,
     },
-    Decontamination {
-        #[command(subcommand)]
-        command: Box<SkillDecontaminationCommand>,
-    },
     MethodGapResearchStatus(MethodGapResearchStatusArgs),
     EvolutionStatus(EvolutionStatusArgs),
 }
@@ -160,15 +156,6 @@ pub enum SkillEvolutionCommand {
     RecordValidation(EvolutionRecordValidationArgs),
     Land(EvolutionLandArgs),
     Close(EvolutionCloseArgs),
-}
-
-#[derive(Debug, Subcommand)]
-pub enum SkillDecontaminationCommand {
-    Preflight(DecontaminationPreflightArgs),
-    Claim(DecontaminationClaimArgs),
-    RecordValidation(DecontaminationRecordValidationArgs),
-    Land(DecontaminationLandArgs),
-    Complete(DecontaminationCompleteArgs),
 }
 
 #[derive(Debug, Args)]
@@ -249,76 +236,6 @@ pub struct EvolutionCloseArgs {
     note: Option<String>,
     #[arg(long)]
     adjudicate: Vec<String>,
-}
-
-#[derive(Debug, Args)]
-pub struct DecontaminationPreflightArgs {
-    #[command(flatten)]
-    context: LifecycleContextArgs,
-    #[arg(long)]
-    basis: Option<String>,
-    #[arg(long)]
-    basis_ref: Option<String>,
-    #[arg(long)]
-    basis_note: Option<String>,
-}
-
-#[derive(Debug, Args)]
-pub struct DecontaminationClaimArgs {
-    #[command(flatten)]
-    event: LifecycleEventArgs,
-    #[arg(long)]
-    run_id: Option<String>,
-    #[arg(long)]
-    basis: Option<String>,
-    #[arg(long)]
-    basis_ref: Option<String>,
-    #[arg(long)]
-    basis_note: Option<String>,
-    #[arg(long, default_value = "5")]
-    trials: String,
-    #[arg(long)]
-    risk_rationale: Option<String>,
-}
-
-#[derive(Debug, Args)]
-pub struct DecontaminationRecordValidationArgs {
-    #[command(flatten)]
-    event: LifecycleEventArgs,
-    #[arg(long)]
-    run_id: Option<String>,
-    #[arg(long)]
-    decision: Option<String>,
-    #[arg(long)]
-    candidate: Option<PathBuf>,
-    #[arg(long)]
-    trials: Option<String>,
-    #[arg(long)]
-    artifacts: Option<String>,
-    #[arg(long)]
-    summary: Option<String>,
-}
-
-#[derive(Debug, Args)]
-pub struct DecontaminationLandArgs {
-    #[command(flatten)]
-    event: LifecycleEventArgs,
-    #[arg(long)]
-    run_id: Option<String>,
-    #[arg(long)]
-    candidate: Option<PathBuf>,
-}
-
-#[derive(Debug, Args)]
-pub struct DecontaminationCompleteArgs {
-    #[command(flatten)]
-    event: LifecycleEventArgs,
-    #[arg(long)]
-    run_id: Option<String>,
-    #[arg(long)]
-    outcome: Option<String>,
-    #[arg(long)]
-    note: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -404,9 +321,6 @@ fn dispatch(command: SkillsCommand, host: &Host, out: &mut impl Write) -> Result
     match command {
         SkillsCommand::Evidence { command } => run_skill_evidence(*command, host, out),
         SkillsCommand::Evolution { command } => run_skill_evolution(*command, host, out),
-        SkillsCommand::Decontamination { command } => {
-            run_skill_decontamination(*command, host, out)
-        }
         SkillsCommand::MethodGapResearchStatus(args) => {
             run_method_gap_research_status(args, host, out)
         }
@@ -444,115 +358,6 @@ fn run_method_gap_research_status(
     // accident. Compacting it would move emitted bytes.
     write_report(&report, out, ReportRendering::Indented);
     Ok(Exit::Success)
-}
-
-fn run_skill_decontamination(
-    command: SkillDecontaminationCommand,
-    host: &Host,
-    out: &mut impl Write,
-) -> Result<Exit, CliError> {
-    match command {
-        SkillDecontaminationCommand::Preflight(args) => {
-            let DecontaminationPreflightArgs {
-                context,
-                basis,
-                basis_ref,
-                basis_note,
-            } = args;
-            let (root, target, inputs) =
-                lifecycle_context_inputs(context, "legacy-skill-decontamination", host)?;
-            let request = crate::DecontaminationEligibilityRequest {
-                basis,
-                basis_ref,
-                basis_note,
-            };
-            let receipt = crate::decontamination_preflight(&root, &target, &request, &inputs)?;
-            Ok(print_successful_report(&receipt, out))
-        }
-        SkillDecontaminationCommand::Claim(args) => {
-            let DecontaminationClaimArgs {
-                event,
-                run_id,
-                basis,
-                basis_ref,
-                basis_note,
-                trials,
-                risk_rationale,
-            } = args;
-            let (root, target, inputs) =
-                lifecycle_event_inputs(event, "legacy-skill-decontamination", host)?;
-            let request = crate::DecontaminationClaimRequest {
-                run_id: run_id.unwrap_or_default(),
-                eligibility: crate::DecontaminationEligibilityRequest {
-                    basis,
-                    basis_ref,
-                    basis_note,
-                },
-                trials,
-                risk_rationale,
-            };
-            let receipt = crate::decontamination_claim(&root, &target, &request, &inputs)?;
-            Ok(print_successful_report(&receipt, out))
-        }
-        SkillDecontaminationCommand::RecordValidation(args) => {
-            let DecontaminationRecordValidationArgs {
-                event,
-                run_id,
-                decision,
-                candidate,
-                trials,
-                artifacts,
-                summary,
-            } = args;
-            let (root, target, inputs) =
-                lifecycle_event_inputs(event, "legacy-skill-decontamination", host)?;
-            let candidate = required_lifecycle_skill_path(candidate)?;
-            let request = crate::DecontaminationValidationRequest {
-                run_id: run_id.unwrap_or_default(),
-                decision: decision.unwrap_or_default(),
-                candidate,
-                trials: trials.unwrap_or_default(),
-                artifacts: artifacts.unwrap_or_default(),
-                summary,
-            };
-            let receipt =
-                crate::decontamination_record_validation(&root, &target, &request, &inputs)?;
-            Ok(print_successful_report(&receipt, out))
-        }
-        SkillDecontaminationCommand::Land(args) => {
-            let DecontaminationLandArgs {
-                event,
-                run_id,
-                candidate,
-            } = args;
-            let (root, target, inputs) =
-                lifecycle_event_inputs(event, "legacy-skill-decontamination", host)?;
-            let candidate = required_lifecycle_skill_path(candidate)?;
-            let request = crate::DecontaminationLandRequest {
-                run_id: run_id.unwrap_or_default(),
-                candidate,
-            };
-            let receipt = crate::decontamination_land(&root, &target, &request, &inputs)?;
-            Ok(print_successful_report(&receipt, out))
-        }
-        SkillDecontaminationCommand::Complete(args) => {
-            let DecontaminationCompleteArgs {
-                event,
-                run_id,
-                outcome,
-                note,
-            } = args;
-            let (root, target, inputs) =
-                lifecycle_event_inputs(event, "legacy-skill-decontamination", host)?;
-            let request = crate::DecontaminationCompleteRequest {
-                run_id: run_id.unwrap_or_default(),
-                outcome: outcome.unwrap_or_default(),
-                note: note.unwrap_or_default(),
-            };
-            let receipt = crate::decontamination_complete(&root, &target, &request, &inputs)?;
-            Ok(print_successful_report(&receipt, out))
-        }
-    }
 }
 
 fn run_skill_evolution(
