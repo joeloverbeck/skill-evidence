@@ -44,6 +44,104 @@ fn clean_record(root: &Path, task_label: &str, session_id: &str) -> Command {
     command
 }
 
+/// The capture reply is the surface an operator sees on every single use, so it is
+/// where a half-told story does the most damage. Once a blocked close retires a
+/// cluster, the reply still counts those incidents as open while having no cluster
+/// left to name — it must say where they went rather than trail off into an empty
+/// symptom list.
+#[test]
+fn capture_reply_names_evidence_retired_by_a_blocked_close() {
+    let fixture = repository_with_demo_skill();
+    let hash = "8fd064beeb351b7698023277ac023aa2dfd2cca632a069018a6e1c739316e5bf";
+    let target = json!({
+        "name": "demo-skill",
+        "repo_relative_path": ".claude/skills/demo-skill",
+        "content_hash": hash,
+        "repo_head": "fixture-head"
+    });
+    let triggers = ["evt_1", "evt_2", "evt_3"];
+    let mut events = triggers
+        .iter()
+        .enumerate()
+        .map(|(index, event_id)| {
+            json!({
+                "schema_version": 1,
+                "event_id": event_id,
+                "event_type": "use_recorded",
+                "recorded_at": format!("2026-01-02T0{index}:00:00Z"),
+                "operator_workflow": "skill-evidence-capture",
+                "target": target,
+                "top_level_session_id": format!("session-{index}"),
+                "payload": {
+                    "qualifying_use": true,
+                    "retrospective": false,
+                    "task_label": event_id,
+                    "task_fingerprint": event_id,
+                    "outcome": "friction",
+                    "symptom_key": "execution",
+                    "expected": "expected",
+                    "observed": "observed",
+                    "consequence": "consequence",
+                    "workaround_taken": Value::Null,
+                    "evidence_refs": [],
+                    "same_run_group": event_id
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+    events.push(json!({
+        "schema_version": 1,
+        "event_id": "evt_review_started",
+        "event_type": "review_started",
+        "recorded_at": "2026-01-02T10:00:00Z",
+        "operator_workflow": "skill-evolution",
+        "target": target,
+        "top_level_session_id": "review-session",
+        "payload": {"review_id": "rev_blocked"}
+    }));
+    events.push(json!({
+        "schema_version": 1,
+        "event_id": "evt_review_disposition",
+        "event_type": "review_disposition",
+        "recorded_at": "2026-01-02T11:00:00Z",
+        "operator_workflow": "skill-evolution",
+        "target": target,
+        "top_level_session_id": "review-session",
+        "payload": {
+            "review_id": "rev_blocked",
+            "disposition": "blocked_no_valid_test",
+            "adjudicated_event_ids": triggers
+        }
+    }));
+    let evidence_directory = fixture.path().join("reports/skill-evidence/demo-skill");
+    fs::create_dir_all(&evidence_directory).expect("create evidence directory");
+    fs::write(
+        evidence_directory.join("events.jsonl"),
+        events
+            .iter()
+            .map(Value::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n",
+    )
+    .expect("write seeded event stream");
+
+    let output = clean_record(fixture.path(), "Task after blocked close", "later-session")
+        .arg("--human")
+        .output()
+        .expect("run skill-evidence record");
+    assert!(output.status.success());
+    let reply = String::from_utf8(output.stdout).expect("human reply UTF-8");
+    assert!(
+        !reply.contains("independent by symptom: )"),
+        "an empty symptom list tells the operator nothing: reply={reply}"
+    );
+    assert!(
+        reply.contains("retired as untestable: 3"),
+        "the reply must account for the incidents it still counts as open: reply={reply}"
+    );
+}
+
 #[test]
 fn skill_evidence_hash_is_stable_and_read_only() {
     let fixture = repository_with_demo_skill();

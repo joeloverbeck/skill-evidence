@@ -150,6 +150,10 @@ Every close records the trigger events the review covered in `adjudicated_event_
 
 `blocked_no_valid_test` and `superseded_by_target_version` are non-adjudicating dispositions: their payload still records the trigger coverage, but those IDs do not retire from the active set because the review reached no conclusion. Do not pass `--adjudicate` with either disposition; the compiled command refuses that combination. Trigger events stay in `events.jsonl` forever, and the gate projection combines the disposition with the coverage list to decide retirement.
 
+`blocked_no_valid_test` is further **instrument-limited**: closing it asserts that this instrument cannot test the evidence it covered, so the projection retires that evidence from the *evolution gate* while leaving it open and unadjudicated in the ledger. Those incidents stop clustering and can no longer reach a threshold, and the projection names them in `instrument_limited_incident_ids` — which the preflight evidence packet carries too, so the packet's open-incident count and its clusters still reconcile.
+
+Retirement covers the whole open cluster of every symptom the close touched, not only the listed trigger IDs, because a sibling incident on the same symptom shares the binding constraint the instrument could not vary. It stops there: anything recorded after the close is new evidence and drives the gate normally. So reach for this disposition only when you have named the binding constraint and established that no trial can vary it — not to quiet a cluster you have simply not tested yet, because you are retiring the whole cluster and there is no route back for it. A contemporaneous severe incident is never retired this way: it authorizes on its own and keeps doing so. A retrospective one is retired like any other covered evidence, because it never fires that trigger — it only counts toward a cluster. `superseded_by_target_version` retires nothing; the target moved, and nothing was established about testability.
+
 Then write the review report at `reviews/<review-id>.md` — required for every claimed review, with unreached sections marked `not reached — <disposition>`:
 
 ```markdown
