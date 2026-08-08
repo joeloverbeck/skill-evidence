@@ -60,6 +60,11 @@ cargo publish --dry-run
 `assets/` are contract, and a consumer that receives the library without them has machinery and
 no operator for it.
 
+CI runs the last two on every push, diffing the file list against
+`.github/expected-package-files.txt`. When the shipped set legitimately changes — a new skill
+package, a new schema — that file is what you update; it carries no comments because it is
+compared byte-for-byte against `cargo package --list` output.
+
 ## 4. Publish and tag
 
 ```console

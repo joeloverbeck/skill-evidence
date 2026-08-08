@@ -1,0 +1,24 @@
+# Only the actions ecosystem is watched, and the omission of `cargo` is a
+# decision rather than an oversight.
+#
+# This crate is a library. Consumers resolve their own dependency versions from
+# the caret ranges in Cargo.toml, so the committed Cargo.lock governs nothing
+# but this repository's own `--locked` builds, and an advisory fixed above a
+# floor here already reaches every consumer through their own lock file. A
+# monthly Cargo PR would move a file no consumer reads, at a real cost to the
+# one maintainer.
+#
+# `actions/checkout` is the only third-party code that executes with this
+# repository's credentials, which makes it the one dependency where an
+# automated notification carries a signal worth the maintenance. Grouped and
+# monthly, because it moves about once a year.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns:
+          - "*"

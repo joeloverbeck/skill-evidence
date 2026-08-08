@@ -293,7 +293,7 @@ pub fn run(args: SkillsArgs, host: &Host, out: &mut impl Write, err: &mut impl W
 /// Runs one `skills` subcommand this crate owns, for a host that mixes them
 /// with its own.
 ///
-/// ```ignore
+/// ```text
 /// #[derive(clap::Subcommand)]
 /// enum SkillsCommand {
 ///     Inspect { … },              // the host's own

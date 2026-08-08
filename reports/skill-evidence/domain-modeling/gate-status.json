@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-08T09:47:01.913283462Z",
+  "target_content_hash": "97f7208528885b6bf219d45525f5e086b45291c8b1f66090915d6e8bd6709dc8",
+  "qualifying_uses_on_current_hash": 1,
+  "open_incident_ids": [
+    "evt_4833594e-7e25-4a2f-a94a-278e6e3b9e86"
+  ],
+  "candidate_clusters": [
+    {
+      "symptom_key": "output",
+      "open_event_ids": [
+        "evt_4833594e-7e25-4a2f-a94a-278e6e3b9e86"
+      ],
+      "independent_incidents": 1,
+      "max_severity": "friction"
+    }
+  ],
+  "state": "collecting",
+  "authorized_workflow": null,
+  "authorization_reason": null,
+  "trigger_event_ids": [],
+  "threshold_session_id": null,
+  "not_before": null,
+  "active_review_id": null,
+  "last_completed_review_id": null,
+  "review_reentry_basis": null,
+  "target_name": "domain-modeling",
+  "target_repo_relative_path": ".claude/skills/domain-modeling",
+  "derivation_session_id": "2cea9ae9-5919-47c6-9a14-aa8d48242ca3"
+}

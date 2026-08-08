@@ -29,6 +29,13 @@ jobs:
         run: cargo clippy --all-targets --locked -- -D warnings
       - name: Test
         run: cargo test --all-targets --locked
+      # docs.rs is the public face of a published crate and builds from these
+      # same sources, with no chance to fix a warning after the version is
+      # immutable. Denying them here is the only place that check can bite.
+      - name: Build the documentation
+        run: cargo doc --no-deps --all-features --locked
+        env:
+          RUSTDOCFLAGS: -D warnings
       # The library half must keep building without clap or uuid, or a host that
       # drives the lifecycle from something other than clap finds out late.
       - name: Check the library without the command surface
@@ -40,3 +47,28 @@ jobs:
         run: |
           cargo run --locked --quiet -- skills evidence install --root .
           git diff --exit-code -- .claude schemas .agents
+
+  # Separate from `verify` because both steps below refuse on a dirty tree, and
+  # `verify` deliberately dirties its own by running the installer.
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+      # `include` in Cargo.toml decides what a consumer actually receives, and
+      # its leading slashes are load-bearing: without them a bare `README.md`
+      # matched at every depth and shipped two fixture READMEs describing
+      # corpora this crate does not publish. Nothing in `cargo publish` objects
+      # to shipping too much, so the file set is committed and compared.
+      - name: Prove the shipped file set is exactly what is committed
+        run: |
+          cargo package --list --locked --quiet > "$RUNNER_TEMP/packaged-files.txt"
+          diff -u .github/expected-package-files.txt "$RUNNER_TEMP/packaged-files.txt"
+      # Every skill package and schema under assets/ is embedded with
+      # include_str!, so a package that drops one does not ship incomplete — it
+      # fails to compile in every consumer. The dry run builds from the packaged
+      # tarball, which is the only place that surfaces before release day.
+      - name: Dry-run the publish
+        run: cargo publish --dry-run --locked

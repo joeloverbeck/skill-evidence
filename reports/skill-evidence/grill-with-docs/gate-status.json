@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-08T10:28:31.123052792Z",
+  "target_content_hash": "50ae74251f72b370e4b226fa12169ffaa18cac49a814ca5a5725460fe4e3063a",
+  "qualifying_uses_on_current_hash": 2,
+  "open_incident_ids": [
+    "evt_fd4e5936-9eef-43ed-8eeb-5e9b2b77ebc7",
+    "evt_0b0ffe4a-1507-4051-876d-41c802c0351b"
+  ],
+  "candidate_clusters": [
+    {
+      "symptom_key": "execution",
+      "open_event_ids": [
+        "evt_fd4e5936-9eef-43ed-8eeb-5e9b2b77ebc7"
+      ],
+      "independent_incidents": 1,
+      "max_severity": "material_failure"
+    },
+    {
+      "symptom_key": "coordination",
+      "open_event_ids": [
+        "evt_0b0ffe4a-1507-4051-876d-41c802c0351b"
+      ],
+      "independent_incidents": 1,
+      "max_severity": "friction"
+    }
+  ],
+  "state": "collecting",
+  "authorized_workflow": null,
+  "authorization_reason": null,
+  "trigger_event_ids": [],
+  "threshold_session_id": null,
+  "not_before": null,
+  "active_review_id": null,
+  "last_completed_review_id": null,
+  "review_reentry_basis": null,
+  "target_name": "grill-with-docs",
+  "target_repo_relative_path": ".claude/skills/grill-with-docs",
+  "derivation_session_id": "00704b34-a33a-41ac-bb9a-5c94ea4509e3"
+}
