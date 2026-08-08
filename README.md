@@ -1,8 +1,7 @@
 # skill-evidence
 
 The skill-evidence lifecycle, as a crate: use records, gate projections,
-evolution reviews, legacy decontamination, and the four skill packages that
-drive them.
+evolution reviews, and the four skill packages that drive them.
 
 A repository that works this way needs all of it — the machinery, the command
 surface, and the Markdown packages an agent actually reads. Keeping them in one
@@ -75,18 +74,31 @@ it.
 ## Using it without a host binary
 
 ```console
-cargo install --git https://github.com/joeloverbeck/skill-evidence
+cargo install skill-evidence
 skill-evidence skills evidence install --root .
 ```
 
 ## Library only
 
 ```toml
-skill-evidence = { git = "…", tag = "…", default-features = false }
+skill-evidence = { version = "0.1", default-features = false }
 ```
 
 Drops `clap` and `uuid`, and with them `cli`. The lifecycle API and the
 installer remain.
+
+## Versioning
+
+Three surfaces reach a consumer independently, and Cargo's SemVer protects only
+the first: the Rust API, the installed assets under `.claude/skills/` and
+`schemas/`, and the append-only `events.jsonl` a consumer accumulates. That last
+one cannot be rolled back by pinning an older version, because the data is
+already written.
+
+The rules are in [`docs/principles/consumer-contract.md`](docs/principles/consumer-contract.md);
+the procedure for cutting a release and bringing a consumer forward — including
+the fact that the installer has no uninstall — is in
+[`docs/releasing.md`](docs/releasing.md).
 
 ## Verification
 

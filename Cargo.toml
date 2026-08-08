@@ -5,14 +5,19 @@ edition = "2024"
 rust-version = "1.93"
 license = "MIT"
 authors = ["Joel Overbeck"]
-description = "The skill-evidence lifecycle: use records, gate projections, evolution reviews, and the skill package that drives them."
+description = "The skill-evidence lifecycle: use records, gate projections, evolution reviews, and the four skill packages that drive them."
 repository = "https://github.com/joeloverbeck/skill-evidence"
+readme = "README.md"
 keywords = ["agent", "skills", "evidence", "lifecycle"]
 categories = ["development-tools"]
-# The skill package this crate installs is part of its contract, not incidental
+# The skill packages this crate installs are part of its contract, not incidental
 # data: a host that gets the library without the skills has the machinery and no
 # operator for it.
-include = ["src/**/*", "assets/**/*", "README.md", "LICENSE"]
+#
+# The leading slashes are load-bearing. These are gitignore-style patterns, so a
+# bare `README.md` matches at every depth and shipped the fixture READMEs — two
+# orphan files describing corpora that are not themselves published.
+include = ["src/**/*", "assets/**/*", "/README.md", "/LICENSE"]
 
 [features]
 default = ["cli"]

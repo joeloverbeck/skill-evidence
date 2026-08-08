@@ -22,7 +22,9 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 └── src/
 ```
 
-Neither `CONTEXT.md` nor `docs/adr/` exists yet. Nothing should look for a `CONTEXT-MAP.md`: this repo is single-context, and there is no per-context `src/<context>/docs/adr/`. If the crate ever splits into bounded contexts, add `CONTEXT-MAP.md` at the root then, pointing at one `CONTEXT.md` per context.
+Both `CONTEXT.md` and `docs/adr/` exist. Nothing should look for a `CONTEXT-MAP.md`: this repo is single-context, and there is no per-context `src/<context>/docs/adr/`. If the crate ever splits into bounded contexts, add `CONTEXT-MAP.md` at the root then, pointing at one `CONTEXT.md` per context.
+
+`CONTEXT.md` opens with a deference rule: governance, compatibility, and authority language belongs to [`../principles/`](../principles/), and the glossary holds only the lifecycle vocabulary layered on top. It is also upstream for `playbench`, `mundifold`, and `what-we-bring-home`, whose glossaries defer here for lifecycle terms rather than redefining them.
 
 ## Use the glossary's vocabulary
 

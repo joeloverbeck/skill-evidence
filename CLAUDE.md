@@ -1,5 +1,16 @@
 # skill-evidence
 
+## Before proposing work here
+
+This crate is depended on by `playbench`, `mundifold`, and `what-we-bring-home`, which between them hold over a thousand append-only recorded events that no release can regenerate. Read [`docs/principles/`](docs/principles/) before proposing anything that changes the public API, the installed skill packages, the published schemas, or the shape of a recorded event.
+
+Two things that catch people out:
+
+- **Cargo SemVer protects the Rust API and nothing else.** Adding an optional field to a recorded event is a compatible change by every Cargo rule and can still invalidate a consumer's history. See [`docs/principles/consumer-contract.md`](docs/principles/consumer-contract.md).
+- **The installer has no uninstall.** Retiring or renaming an installed package strands it in every consumer forever. See [`docs/releasing.md`](docs/releasing.md).
+
+This repository has no value stream of its own — everything here is enabling work for a consumer. Its own issue count is not progress.
+
 ## Agent skills
 
 ### Issue tracker
