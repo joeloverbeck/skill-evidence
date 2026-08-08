@@ -15,7 +15,7 @@ Arguments: the path of the skill that was exercised (required). Optional: a shor
 
 - Identity only: never modify the target, semantically inspect it for defects, or compare it against repository conventions; never read target prose beyond what this session already loaded.
 - No diagnosis: never name a root cause, propose a repair or new rule, point at an edit site, or claim two incidents share a cause.
-- No escalation: never invoke Skill Evolution or Legacy Skill Decontamination, encourage an early review, or run repo-wide audits, Git-history investigations, or empirical-claim sweeps.
+- No escalation: never invoke Skill Evolution, encourage an early review, or run repo-wide audits, Git-history investigations, or empirical-claim sweeps.
 - Evidence is immutable: never hand-edit `events.jsonl` or `gate-status.json`, and never delete, rewrite, or mark evidence consumed. All writes go through the compiled command.
 - Rust-only production path: invoke only the compiled `skill-evidence skills evidence` commands for record, derive, and hash behavior.
 - No receipt without a qualifying use; the user's curiosity, anxiety, or wish to improve a skill is not an incident.
@@ -25,7 +25,7 @@ Arguments: the path of the skill that was exercised (required). Optional: a shor
 
 ### 1. Apply the qualifying-use gate
 
-A use qualifies only when all hold: the target was exercised as the operating contract, not merely loaded, mentioned, or consulted for one isolated fact; at least one of its instructions materially governed an action, decision, repository change, or user-facing deliverable; the run reached a terminal outcome (terminal failure included); and it was not an abort before substantive work or a premature gate refusal. A retry or continuation of the same failed task is part of the same use, not another one. Substantive authorized Skill Evolution or Legacy Skill Decontamination runs qualify like any other skill use.
+A use qualifies only when all hold: the target was exercised as the operating contract, not merely loaded, mentioned, or consulted for one isolated fact; at least one of its instructions materially governed an action, decision, repository change, or user-facing deliverable; the run reached a terminal outcome (terminal failure included); and it was not an abort before substantive work or a premature gate refusal. A retry or continuation of the same failed task is part of the same use, not another one. Substantive authorized Skill Evolution runs qualify like any other skill use.
 
 If the use does not qualify: write nothing, do not analyze why capture was invoked, reply exactly `No receipt recorded: preceding use was not qualifying.` and stop. If several uses coexist and the supplied task label cannot disambiguate which one is meant, ask for the minimum disambiguation instead of guessing.
 
@@ -72,4 +72,4 @@ One run is the whole operation: the compiled Rust command hashes the target, val
 
 Never record clean or friction uses of Skill Evidence Capture itself. A self-targeted receipt is allowed only for an actual failed capture attempt — `material_failure` or worse, citing concrete evidence references; the compiled command enforces this. The recording invocation itself earns no receipt, and no diagnosis or self-edit follows.
 
-No report file is produced for ordinary capture; markdown reports belong to evolution and decontamination runs. Maintainers only, never loaded during capture: the design contract and source workflow live in the repository that authors this skill set, as `archive/workflows/00_shared-skill-evolution-contract.md` and `archive/workflows/01_skill-evidence-capture-workflow.md`. They are absent in a repository that only consumes the skill.
+No report file is produced for ordinary capture; markdown reports belong to evolution runs. Maintainers only, never loaded during capture: the design contract and source workflow live in the repository that authors this skill set, as `archive/workflows/00_shared-skill-evolution-contract.md` and `archive/workflows/01_skill-evidence-capture-workflow.md`. They are absent in a repository that only consumes the skill.
