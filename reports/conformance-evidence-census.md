@@ -125,7 +125,34 @@ This points at a defect in **capture**, not in evolution's acceptance gate: the 
 conflates *observed no harm* with *did not look*. Those want different tokens. That is a separate
 issue from #1 and #2.
 
-## 4. The instrument for option (b) cannot be built for this population
+## 4. These are one defect, not fourteen
+
+Classifying each incident's `expected` field by whether the obligation falls at the end of the
+skill's flow — *Step 5 aggregation*, *before final handoff*, *before finish*, *the closing recap*,
+*the Done gate* — against the harm-established incidents as a control:
+
+| Group | Late-step obligations |
+|---|---:|
+| **Unverifiable-consequence** | **13 of 14 — 93%** |
+| Harm-established (control) | 11 of 80 — 14% |
+
+These are not scattered compliance lapses whose harm happens to be unmeasurable. They are one
+recurring design defect: **a verification obligation placed at the end of a long run is dropped
+there.** It appears in five different skills, so it is a pattern in how skills are written rather
+than one skill's bug.
+
+**This is decidable without any harm data.** `code-review` drops its Step 5 gate in 5 of its 6
+material incidents, across independent sessions and at the same position every time. A skill whose
+final step is skipped 83% of the time has a design defect whether or not any individual instance
+caused damage. Recurrence across independent sessions is exactly what the gate exists to detect.
+
+*Caveat.* The 93/14 split is partly entangled with the group's definition: verification steps are
+terminal by nature, and skipping a detector destroys evidence by nature, so the two properties are
+not independent. The late-step classifier is also a keyword match over prose, not a parse. What
+survives both caveats is the part that is not definitional — the recurrence rate and the cross-skill
+span — and those carry the conclusion on their own.
+
+## 5. The instrument for option (b) cannot be built for this population
 
 Every one of these incidents that records a `run_condition` names accumulated volume or elapsed run
 length as the binding condition:
@@ -140,31 +167,55 @@ Not one is a discrete short step. Every one is a **late-in-a-long-run omission**
 executor starting fresh and short-context cannot express regardless of what it measures. Three
 records carry no `run_condition` and neither support nor weaken this.
 
-## 5. What the evidence supports
+## 6. What the evidence supports
 
-- **Against (a).** Two reasons now. It would disarm the assurance-producing skills specifically
-  (83% of `code-review`'s material evidence), and it would reward concealment: the more completely
-  a check is skipped, the cleaner the record reads.
+- **Against (a).** Two reasons. It would disarm the assurance-producing skills specifically (83% of
+  `code-review`'s material evidence), and it would reward concealment: the more completely a check
+  is skipped, the cleaner the record reads.
 - **Against (b) as conceived.** The binding constraint in every measured case is accumulated
   context, which no fresh-executor trial can hold.
 - **For (c), as necessary but not sufficient.** It stops the projection reporting retained
   inconclusive evidence as handled. It supplies no exit.
 
-The evolution instrument has no way to test late-in-long-run conformance failures. That is a
-property of the instrument, not a defect in the evidence — and adopted text then decides the rest:
-a gate satisfiable only by evidence its own structure prevents from existing is a trap, and the
-answer is an honest exit. That exit is #1's option **(B)**, paired with **(c)** here.
+### A fourth option the issue did not frame
 
-## 6. What this census does not settle
+Section 4 changes what follows. The gate *should* act on this evidence — the recurrence and
+positional concentration diagnose a real, fixable defect — but the **acceptance test** is what has
+to change, not the grading.
 
-The values question, correctly stated. It is **not** "do you want a system that acts on deviations
-absent demonstrated harm" — that framing was an artifact of the classification error above. It is:
+**(d) Diagnose from accumulated evidence; validate longitudinally.**
 
-> **Do you want a system that acts when a deviation destroyed the evidence of its own
-> consequences?**
+1. **The blind trial is the wrong instrument for this class.** For a late-in-long-run conformance
+   failure, the evidence needed to authorize a fix is already in the store. This census is the
+   existence proof: a positional and recurrence analysis over recorded incidents produced the
+   diagnosis that no fresh-context trial could have reached, at the cost of an afternoon rather than
+   a harness.
+2. **The acceptance test is longitudinal, not comparative.** A candidate is accepted when the
+   omission rate drops in subsequent real runs on the revised skill — measured from the same
+   evidence stream that produced the diagnosis. Slower than a blind trial, and it cannot be forced;
+   it accrues as the skill is used.
+3. This keeps `evidence-substrate-integrity.md`'s requirement that a candidate prove itself on
+   delivered work, while dropping the assumption that the proof must come from synthetic trials.
 
-That is a different question and a much easier one, because the alternative rewards exactly the
-runs that leave the least trace.
+Cost, stated plainly: acceptance stops being same-session. A revision would land provisionally and
+earn its disposition over subsequent use. That is a real change to what "validated" means and is not
+a small decision.
+
+Against **(d)**: it has no precedent here, the longitudinal signal is confounded by everything else
+that changes between runs, and it cannot distinguish "the fix worked" from "nobody ran a long
+session lately." Those are genuine, and they are why this is a proposal rather than a
+recommendation to implement immediately.
+
+## 7. What this census does not settle
+
+Whether **(d)** is worth building, and whether provisional landing is acceptable. Those are
+judgment calls the evidence informs but does not make.
+
+What it *does* settle: the values question this census originally posed — *"do you want a system
+that acts when a deviation destroyed the evidence of its own consequences?"* — **does not need
+answering.** Section 4 shows the defect is diagnosable from recurrence and position without any
+harm data at all. The question was an artifact of reading `consequence` fields as though they were
+observations.
 
 ## Method and limits
 
