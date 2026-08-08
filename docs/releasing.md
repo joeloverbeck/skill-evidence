@@ -125,11 +125,19 @@ what-we-bring-home.
 
 `skills evidence install` writes and refuses to clobber. **It has no uninstall and no prune.**
 
-A skill package retired or renamed upstream stays in the consumer's `.claude/skills/` forever,
-where agents will keep discovering and offering it, and nothing this crate ships can reach it.
+A skill package retired or renamed upstream stays in the consumer's `.claude/skills/` until
+somebody deletes it by hand. Nothing this crate ships can reach it, so every consumer pays that
+cost separately.
 
-This is not hypothetical. `legacy-skill-decontamination` was retired before `v0.1.0` was cut and
-is still installed in playbench.
+This is not hypothetical. Retiring `legacy-skill-decontamination` cost playbench a hand-written
+deletion of 228 lines across three files, inside its own migration commit `8cbc1573`. **And that
+was not the end of it**: `git rm` removes tracked files but not the directories holding them, so
+two empty directories survived, untracked and therefore invisible to `git status`, until they were
+found and `rmdir`-ed on 2026-08-08.
+
+So the cleanup line in a release note needs to say `rm -rf <dir>`, not "delete the files" — and a
+consumer who deletes the files individually should expect to check for empty directories
+afterwards.
 
 Until the installer can withdraw what it wrote, a retirement is a two-part release: the code
 change here, and a line in the release note telling every consumer which directory to `rm -rf`.

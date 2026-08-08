@@ -64,11 +64,15 @@ exactly the change that invalidates history if the optionality is got wrong on t
 
 `skills evidence install` writes packages and refuses to clobber a locally edited file. It has
 no uninstall and no prune. **A skill package that is retired or renamed upstream stays in every
-consumer's `.claude/skills/` indefinitely**, where agents will keep discovering it, and nothing
-this repository ships can reach it.
+consumer's `.claude/skills/` until somebody deletes it by hand**, and nothing this repository
+ships can reach it.
 
-This has already happened once. It is a real property of the distribution mechanism, not a
-hypothetical.
+This has already happened once, and the cleanup fell to the consumer: retiring the decontamination
+package required a hand-written deletion of 228 lines inside playbench's own migration commit,
+because nothing upstream could reach it. Even that was not enough: `git rm` removes tracked files
+but not the directories holding them, so two empty directories survived the very commit meant to
+remove them — untracked, therefore invisible to `git status`, and found only by a later inspection
+that went looking. It is a real property of the distribution mechanism, not a hypothetical.
 
 Until the installer can remove what it previously wrote:
 
