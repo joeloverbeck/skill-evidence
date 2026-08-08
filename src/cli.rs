@@ -87,7 +87,7 @@ pub struct SkillsArgs {
 }
 
 #[derive(Debug, Subcommand)]
-enum SkillsCommand {
+pub enum SkillsCommand {
     Evidence {
         #[command(subcommand)]
         command: Box<SkillEvidenceCommand>,
@@ -105,7 +105,7 @@ enum SkillsCommand {
 }
 
 #[derive(Debug, Args)]
-struct MethodGapResearchStatusArgs {
+pub struct MethodGapResearchStatusArgs {
     family: String,
     #[arg(long)]
     root: Option<PathBuf>,
@@ -114,7 +114,7 @@ struct MethodGapResearchStatusArgs {
 }
 
 #[derive(Debug, Args)]
-struct EvolutionStatusArgs {
+pub struct EvolutionStatusArgs {
     #[arg(long)]
     root: Option<PathBuf>,
     #[arg(long)]
@@ -124,7 +124,7 @@ struct EvolutionStatusArgs {
 }
 
 #[derive(Debug, Subcommand)]
-enum SkillEvidenceCommand {
+pub enum SkillEvidenceCommand {
     Derive {
         #[arg(long)]
         target: PathBuf,
@@ -145,7 +145,7 @@ enum SkillEvidenceCommand {
 }
 
 #[derive(Debug, Args)]
-struct InstallArgs {
+pub struct InstallArgs {
     #[arg(long)]
     root: Option<PathBuf>,
     /// Overwrite packages that already differ from the ones shipped here.
@@ -154,7 +154,7 @@ struct InstallArgs {
 }
 
 #[derive(Debug, Subcommand)]
-enum SkillEvolutionCommand {
+pub enum SkillEvolutionCommand {
     Preflight(LifecycleContextArgs),
     Claim(EvolutionClaimArgs),
     RecordValidation(EvolutionRecordValidationArgs),
@@ -163,7 +163,7 @@ enum SkillEvolutionCommand {
 }
 
 #[derive(Debug, Subcommand)]
-enum SkillDecontaminationCommand {
+pub enum SkillDecontaminationCommand {
     Preflight(DecontaminationPreflightArgs),
     Claim(DecontaminationClaimArgs),
     RecordValidation(DecontaminationRecordValidationArgs),
@@ -172,7 +172,7 @@ enum SkillDecontaminationCommand {
 }
 
 #[derive(Debug, Args)]
-struct LifecycleContextArgs {
+pub struct LifecycleContextArgs {
     #[arg(long)]
     target: Option<PathBuf>,
     #[arg(long)]
@@ -188,7 +188,7 @@ struct LifecycleContextArgs {
 }
 
 #[derive(Debug, Args)]
-struct LifecycleEventArgs {
+pub struct LifecycleEventArgs {
     #[command(flatten)]
     context: LifecycleContextArgs,
     #[arg(long)]
@@ -198,7 +198,7 @@ struct LifecycleEventArgs {
 }
 
 #[derive(Debug, Args)]
-struct EvolutionClaimArgs {
+pub struct EvolutionClaimArgs {
     #[command(flatten)]
     event: LifecycleEventArgs,
     #[arg(long)]
@@ -208,7 +208,7 @@ struct EvolutionClaimArgs {
 }
 
 #[derive(Debug, Args)]
-struct EvolutionRecordValidationArgs {
+pub struct EvolutionRecordValidationArgs {
     #[command(flatten)]
     event: LifecycleEventArgs,
     #[arg(long)]
@@ -228,7 +228,7 @@ struct EvolutionRecordValidationArgs {
 }
 
 #[derive(Debug, Args)]
-struct EvolutionLandArgs {
+pub struct EvolutionLandArgs {
     #[command(flatten)]
     event: LifecycleEventArgs,
     #[arg(long)]
@@ -238,7 +238,7 @@ struct EvolutionLandArgs {
 }
 
 #[derive(Debug, Args)]
-struct EvolutionCloseArgs {
+pub struct EvolutionCloseArgs {
     #[command(flatten)]
     event: LifecycleEventArgs,
     #[arg(long)]
@@ -252,7 +252,7 @@ struct EvolutionCloseArgs {
 }
 
 #[derive(Debug, Args)]
-struct DecontaminationPreflightArgs {
+pub struct DecontaminationPreflightArgs {
     #[command(flatten)]
     context: LifecycleContextArgs,
     #[arg(long)]
@@ -264,7 +264,7 @@ struct DecontaminationPreflightArgs {
 }
 
 #[derive(Debug, Args)]
-struct DecontaminationClaimArgs {
+pub struct DecontaminationClaimArgs {
     #[command(flatten)]
     event: LifecycleEventArgs,
     #[arg(long)]
@@ -282,7 +282,7 @@ struct DecontaminationClaimArgs {
 }
 
 #[derive(Debug, Args)]
-struct DecontaminationRecordValidationArgs {
+pub struct DecontaminationRecordValidationArgs {
     #[command(flatten)]
     event: LifecycleEventArgs,
     #[arg(long)]
@@ -300,7 +300,7 @@ struct DecontaminationRecordValidationArgs {
 }
 
 #[derive(Debug, Args)]
-struct DecontaminationLandArgs {
+pub struct DecontaminationLandArgs {
     #[command(flatten)]
     event: LifecycleEventArgs,
     #[arg(long)]
@@ -310,7 +310,7 @@ struct DecontaminationLandArgs {
 }
 
 #[derive(Debug, Args)]
-struct DecontaminationCompleteArgs {
+pub struct DecontaminationCompleteArgs {
     #[command(flatten)]
     event: LifecycleEventArgs,
     #[arg(long)]
@@ -322,7 +322,7 @@ struct DecontaminationCompleteArgs {
 }
 
 #[derive(Debug, Args)]
-struct SkillEvidenceRecordArgs {
+pub struct SkillEvidenceRecordArgs {
     #[arg(long)]
     target: PathBuf,
     #[arg(long)]
@@ -357,10 +357,44 @@ struct SkillEvidenceRecordArgs {
 
 /// Runs one parsed `skills` invocation and reports its status.
 ///
-/// The host owns the streams and the exit-code mapping; this returns the
-/// meaning, having already written whatever the operator should see.
+/// For a host whose whole `skills` group is this one — see
+/// `src/bin/skill-evidence.rs`:
+///
+/// ```ignore
+/// enum Command {
+///     Skills(cli::SkillsArgs),
+/// }
+/// # let exit = cli::run(args, &host(), &mut out, &mut err);
+/// ```
+///
+/// A host with `skills` subcommands of its own flattens [`SkillsCommand`] into
+/// its own enum and calls [`run_command`] instead.
 pub fn run(args: SkillsArgs, host: &Host, out: &mut impl Write, err: &mut impl Write) -> Exit {
-    match dispatch(*args.command, host, out) {
+    run_command(*args.command, host, out, err)
+}
+
+/// Runs one `skills` subcommand this crate owns, for a host that mixes them
+/// with its own.
+///
+/// ```ignore
+/// #[derive(clap::Subcommand)]
+/// enum SkillsCommand {
+///     Inspect { … },              // the host's own
+///     #[command(flatten)]
+///     Shared(cli::SkillsCommand), // every subcommand this crate owns
+/// }
+/// ```
+///
+/// Flattening is why the argument types here are public. They are a command
+/// surface, not an API to build on: a host names [`SkillsCommand`] and nothing
+/// below it.
+pub fn run_command(
+    command: SkillsCommand,
+    host: &Host,
+    out: &mut impl Write,
+    err: &mut impl Write,
+) -> Exit {
+    match dispatch(command, host, out) {
         Ok(exit) => exit,
         Err(error) => error.report(err, host),
     }

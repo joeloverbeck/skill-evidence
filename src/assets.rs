@@ -1,7 +1,7 @@
 //! The skill packages and schemas this crate ships, and the command that writes
 //! them into a repository.
 //!
-//! The lifecycle machinery is useless without the four skill packages that
+//! The lifecycle machinery is useless without the five skill packages that
 //! drive it, and those packages were duplicated by hand across repositories for
 //! as long as the machinery was. They travel here instead: compiled into the
 //! binary, rendered with the host's own names, and written out on request.
@@ -69,6 +69,13 @@ const ASSETS: &[Asset] = &[
     skill_asset!("method-gap-research-status/SKILL.md"),
     skill_asset!("method-gap-research-status/agents/openai.yaml"),
     skill_asset!("method-gap-research-status/references/selection-rules.md"),
+    // The operator package for `skills decontamination`. It ships here for the
+    // same reason the other four do: the commands are this crate's, and a host
+    // that gets them without their operator has a refusal
+    // (`refused_self_target`) with nothing to refuse against.
+    skill_asset!("legacy-skill-decontamination/SKILL.md"),
+    skill_asset!("legacy-skill-decontamination/agents/openai.yaml"),
+    skill_asset!("legacy-skill-decontamination/references/eligible-run.md"),
     schema_asset!("event.v1.schema.json"),
     schema_asset!("gate-status.v1.schema.json"),
 ];
@@ -306,7 +313,7 @@ mod tests {
         let root = tempfile::tempdir().expect("temporary repository root");
         let receipt = install(root.path(), &host(), false).expect("install into an empty root");
         let names = skill_package_names();
-        assert_eq!(names.len(), 4, "the four packages this crate ships");
+        assert_eq!(names.len(), 5, "the five packages this crate ships");
 
         #[cfg(unix)]
         {

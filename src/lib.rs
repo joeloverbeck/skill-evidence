@@ -3559,6 +3559,28 @@ fn canonical_directory(path: &Path, label: &str) -> Result<PathBuf, Error> {
     Ok(canonical)
 }
 
+/// Finds the skill directory `target` names, under `root` if it can.
+///
+/// A relative target is tried against `root` first and the working directory
+/// second. The order matters only when both exist, and then `root` is the one
+/// the operator named — explicitly with `--root`, or implicitly as the git
+/// toplevel that the working directory sits inside. Preferring the working
+/// directory there means auditing a nested copy while writing evidence to the
+/// named repository's store, which is a wrong answer that looks like a right
+/// one.
+///
+/// The opposite order was inherited, not chosen: the JavaScript helper this was
+/// ported from in GitHub #116 wrote `resolve(process.cwd(), target),
+/// resolve(root, target)`, and the port preserved it along with everything else
+/// under that issue's compatibility boundary. No skill package documents it —
+/// all four say "from the repository root", where the two candidates agree —
+/// and across 980 recorded events in the two repositories that carried this
+/// code, no target ever resolved to anything but a top-level
+/// `.claude/skills/<name>`.
+///
+/// The working-directory candidate is kept rather than dropped, so a relative
+/// path that is *only* meaningful from where the operator stands still
+/// resolves.
 fn resolve_target(root: &Path, target: &Path) -> Result<PathBuf, Error> {
     let mut candidates = Vec::new();
     if target.is_absolute() {
@@ -3567,8 +3589,8 @@ fn resolve_target(root: &Path, target: &Path) -> Result<PathBuf, Error> {
         let current = std::env::current_dir().map_err(|error| {
             unsafe_failure(format!("Could not resolve current directory: {error}"))
         })?;
-        candidates.push(current.join(target));
         candidates.push(root.join(target));
+        candidates.push(current.join(target));
     }
     for candidate in candidates {
         if !candidate.is_dir() {

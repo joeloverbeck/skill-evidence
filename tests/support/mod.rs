@@ -25,21 +25,16 @@ pub fn repository_root() -> PathBuf {
 /// that moved both sides identically, and would stop holding the exit-code
 /// contract still.
 ///
-/// The working directory is load-bearing, not tidiness. `resolve_target` tries
-/// a relative `--target` against the current directory *before* `--root`, so a
-/// suite that runs from a directory holding `.claude/skills/` silently audits
-/// this repository instead of its fixture. That was invisible while these
-/// suites lived in a nested CLI package whose own directory had no skills; here
-/// the package root is the repository root, and it is not invisible at all.
-/// `tests/` has no `.claude/skills/`, so the root-relative candidate wins,
-/// which is the resolution these suites have always been exercising.
+/// The working directory is deliberately left alone. Cargo runs these from the
+/// package root, which here is the repository root and does hold
+/// `.claude/skills/` — so every suite that passes `--root <fixture> --target
+/// .claude/skills/<name>` is, incidentally, exercising the precedence that
+/// `target_resolution.rs` pins: the named repository wins.
 ///
-/// Cases that are *about* current-directory behavior override this with their
-/// own `current_dir`.
+/// Pinning the directory instead would hide that, and hiding it is how the
+/// inverted precedence survived this long.
 pub fn skill_evidence() -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_skill-evidence"));
-    command.current_dir(repository_root().join("tests"));
-    command
+    Command::new(env!("CARGO_BIN_EXE_skill-evidence"))
 }
 
 /// The identity the reference binary declares, mirrored for the library suites.
