@@ -1,19 +1,21 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-08T13:20:33.931604748Z",
+  "generated_at": "2026-08-08T15:56:26.859926106Z",
   "target_content_hash": "2785481265152dec4b7c8cf4e756bd4c232e0d836bb5d03dd5cec16b588958a9",
-  "qualifying_uses_on_current_hash": 1,
+  "qualifying_uses_on_current_hash": 2,
   "open_incident_ids": [
-    "evt_a660a6dd-97d4-4e5f-9eb8-4018f673dac0"
+    "evt_a660a6dd-97d4-4e5f-9eb8-4018f673dac0",
+    "evt_49479ad7-9a58-4139-a1ef-197454401e8c"
   ],
   "candidate_clusters": [
     {
       "symptom_key": "execution",
       "open_event_ids": [
-        "evt_a660a6dd-97d4-4e5f-9eb8-4018f673dac0"
+        "evt_a660a6dd-97d4-4e5f-9eb8-4018f673dac0",
+        "evt_49479ad7-9a58-4139-a1ef-197454401e8c"
       ],
-      "independent_incidents": 1,
-      "max_severity": "friction"
+      "independent_incidents": 2,
+      "max_severity": "material_failure"
     }
   ],
   "state": "collecting",
@@ -27,5 +29,5 @@
   "review_reentry_basis": null,
   "target_name": "implement",
   "target_repo_relative_path": ".claude/skills/implement",
-  "derivation_session_id": "d83ec248-1fe4-4849-994e-9fe9edc7c099"
+  "derivation_session_id": "2a94f437-50df-40c1-9f41-5dfd396eb9a7"
 }
