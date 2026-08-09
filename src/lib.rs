@@ -566,6 +566,23 @@ enum ThresholdReason {
 }
 
 impl ThresholdReason {
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "severe" => Some(Self::Severe),
+            "ten_use_unresolved" => Some(Self::TenUseUnresolved),
+            _ => value
+                .strip_prefix("material_recurrence:")
+                .filter(|symptom| !symptom.is_empty())
+                .map(|symptom| Self::MaterialRecurrence(symptom.to_owned()))
+                .or_else(|| {
+                    value
+                        .strip_prefix("friction_recurrence:")
+                        .filter(|symptom| !symptom.is_empty())
+                        .map(|symptom| Self::FrictionRecurrence(symptom.to_owned()))
+                }),
+        }
+    }
+
     fn as_string(&self) -> String {
         match self {
             Self::Severe => "severe".to_owned(),
@@ -2525,12 +2542,9 @@ fn derive_gate(
     // What an instrument-limited close retires, and how far.
     //
     // The trigger list is frozen when the threshold fires, so incidents that arrive while
-    // the review runs are never in it — and a `material_recurrence` list never contains
-    // the cluster's merely-frictional siblings at all. Those share the symptom whose
-    // binding constraint the instrument could not vary, so retiring only the listed IDs
-    // would leave the next review a lower bar than the first one faced, permanently in the
-    // friction-sibling case. Retirement therefore reaches the whole covered cluster, and
-    // stops at the close: evidence recorded afterwards is new, and drives the gate.
+    // the review runs are never in it. Retirement re-evaluates the review's own
+    // authorization reason at the close: it can reach later members of the authorized set,
+    // but not incidents that could never have contributed to that authorization.
     //
     // Restricted to closes whose review ran against the current hash. A finding about what
     // this instrument cannot test says nothing about a target that has since changed.
@@ -2560,7 +2574,19 @@ fn derive_gate(
                 .iter()
                 .filter_map(|identity| recorded_symptoms.get(identity).copied())
                 .collect::<HashSet<_>>();
-            Some((index, covered, symptoms))
+            let authorizing_reason = review_starts
+                .iter()
+                .find(|(started_id, _)| {
+                    *started_id == event.review_id().expect("review disposition identity")
+                })
+                .and_then(|(_, start)| {
+                    start
+                        .raw
+                        .pointer("/payload/authorizing_rule")
+                        .and_then(Value::as_str)
+                })
+                .and_then(ThresholdReason::parse);
+            Some((index, covered, symptoms, authorizing_reason))
         })
         .collect::<Vec<_>>();
     let started = events
@@ -2630,16 +2656,34 @@ fn derive_gate(
             recorded.outcome == Outcome::SevereIncident && !recorded.retrospective;
         let instrument_limited_incident = open_incident
             && !authorizes_on_its_own
-            && instrument_limited_closes
-                .iter()
-                .any(|(close, covered, symptoms)| {
+            && instrument_limited_closes.iter().any(
+                |(close, covered, symptoms, authorizing_reason)| {
                     covered.contains(event.event_id.as_str())
                         || (event_index < *close
-                            && recorded
-                                .symptom_key
-                                .as_deref()
-                                .is_some_and(|symptom| symptoms.contains(symptom)))
-                });
+                            && match authorizing_reason {
+                                Some(ThresholdReason::Severe) => false,
+                                Some(ThresholdReason::TenUseUnresolved) => {
+                                    !recorded.retrospective
+                                        && recorded
+                                            .symptom_key
+                                            .as_deref()
+                                            .is_some_and(|symptom| symptoms.contains(symptom))
+                                }
+                                Some(ThresholdReason::MaterialRecurrence(symptom)) => {
+                                    recorded.symptom_key.as_deref() == Some(symptom.as_str())
+                                        && recorded.outcome.severity()
+                                            >= Outcome::MaterialFailure.severity()
+                                }
+                                Some(ThresholdReason::FrictionRecurrence(symptom)) => {
+                                    recorded.symptom_key.as_deref() == Some(symptom.as_str())
+                                }
+                                None => recorded
+                                    .symptom_key
+                                    .as_deref()
+                                    .is_some_and(|symptom| symptoms.contains(symptom)),
+                            })
+                },
+            );
         if open_incident {
             status.open_incident_ids.push(event.event_id.clone());
         }

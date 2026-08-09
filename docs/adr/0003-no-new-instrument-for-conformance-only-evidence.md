@@ -2,6 +2,8 @@
 
 Status: accepted (2026-08-08, GitHub [#2](https://github.com/joeloverbeck/skill-evidence/issues/2))
 
+Amended: 2026-08-09, GitHub [#16](https://github.com/joeloverbeck/skill-evidence/issues/16) — retirement consequences now defer to ADR 0002's reason-scoped reach rather than describing every instrument-limited close as whole-cluster retirement. No instrument decision changed.
+
 Skill Evidence Capture's ladder is disjunctive. Two of the four things that reach `material_failure`
 are outcome claims — *"material rework required"*, *"wrong work caught before consequential
 reliance"* — and two can be satisfied by **conformance** alone: *"an expected output contract
@@ -170,9 +172,10 @@ The ground is simply that the owner declined it, with the parking already fixed.
   and closes `blocked_no_valid_test`.** That review costs a session and produces a report and a
   disposition, not a repair. The cost is accepted here for the second time, with the census's
   measurement of how often it falls due: about one review in ten.
-- **Retiring the cluster remains the price of that close.** ADR 0002 retires the whole covered
-  cluster, so the symptom goes quiet after one review rather than reappearing. Nothing added here
-  brings it back, and no route back is being built.
+- **ADR 0002 owns the retirement cost of that close.** Retirement reaches what the close's own
+  authorization reason names at close, subject to ADR 0002's current bounds; this ADR neither
+  widens nor narrows that reach. Nothing added here brings retired evidence back, and no route back
+  is being built.
 - **Nothing changes on any of the three consumer surfaces.** No recorded-event shape, no published
   schema, no installed package, and no Rust API. This decision is documentation only, needs no
   release, and needs nothing of any consumer. `consumer-contract.md`'s three surfaces are untouched

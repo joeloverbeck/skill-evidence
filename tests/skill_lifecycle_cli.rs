@@ -1368,7 +1368,7 @@ fn shared_landing_restores_the_baseline_when_landed_byte_verification_fails() {
 }
 
 #[test]
-fn skill_evolution_instrument_limited_close_reports_its_retirement_reach() {
+fn skill_evolution_material_recurrence_close_reports_its_narrow_retirement_reach() {
     let clustered = repository_with_demo_skill();
     let friction = record_outcome(
         clustered.path(),
@@ -1414,7 +1414,7 @@ fn skill_evolution_instrument_limited_close_reports_its_retirement_reach() {
     );
     let receipt: Value = serde_json::from_slice(&close.stdout).expect("close receipt JSON");
     let coverage = vec![material_one.clone(), material_two.clone()];
-    let reach = vec![friction, material_one, material_two, post_claim];
+    let reach = vec![material_one, material_two];
     assert_eq!(
         receipt["adjudicated_event_ids"],
         serde_json::to_value(&coverage).expect("coverage JSON")
@@ -1423,9 +1423,15 @@ fn skill_evolution_instrument_limited_close_reports_its_retirement_reach() {
         receipt["retired_from_gate_event_ids"],
         serde_json::to_value(&reach).expect("retirement reach JSON")
     );
+    let projection = gate(clustered.path());
     assert_eq!(
         receipt["retired_from_gate_event_ids"],
-        gate(clustered.path())["instrument_limited_incident_ids"]
+        projection["instrument_limited_incident_ids"]
+    );
+    assert_eq!(
+        projection["candidate_clusters"][0]["open_event_ids"],
+        serde_json::json!([friction, post_claim]),
+        "friction siblings the material authorization reason could not name remain open and clustering"
     );
     let stream = fs::read_to_string(
         clustered
@@ -1453,6 +1459,13 @@ fn skill_evolution_instrument_limited_close_reports_its_retirement_reach() {
 #[test]
 fn skill_evolution_instrument_limited_close_reports_empty_reach_for_a_severe_incident() {
     let severe = repository_with_demo_skill();
+    let friction = record_outcome(
+        severe.path(),
+        "same-symptom friction sibling",
+        "friction-session",
+        "execution",
+        "friction",
+    );
     record_outcome(
         severe.path(),
         "lone severe incident",
@@ -1480,6 +1493,11 @@ fn skill_evolution_instrument_limited_close_reports_empty_reach_for_a_severe_inc
         "an empty retirement reach is meaningful and must remain present"
     );
     assert_eq!(receipt["state"], "quarantined_eligible");
+    let projection = gate(severe.path());
+    assert_eq!(
+        projection["candidate_clusters"][0]["open_event_ids"][0], friction,
+        "a severe authorization reason cannot retire a friction sibling"
+    );
 }
 
 #[test]

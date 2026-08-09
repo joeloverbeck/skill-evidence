@@ -147,15 +147,21 @@ fn installed_skill_evolution_reference_requires_pre_close_reach_bound_review() {
 
     assert!(
         reference.contains(
-            "Before a `blocked_no_valid_test` close, read the coverage list from the claim receipt"
+            "Before a `blocked_no_valid_test` close, read the authorization reason and coverage list from the claim receipt"
         ),
-        "the immutable claim receipt must supply the coverage list"
+        "the immutable claim receipt must supply both inputs to the reason-specific reach bound"
     );
     assert!(
         reference.contains(
-            "For every symptom that coverage list touches, read the live candidate cluster in the gate projection"
+            "Re-evaluate that authorization reason against the live candidate clusters in the gate projection"
         ),
-        "the live projection must supply each symptom's reach bound"
+        "the live projection must supply the reason-specific reach bound"
+    );
+    assert!(
+        reference.contains(
+            "`material_recurrence` names only material-or-worse incidents in its symptom cluster"
+        ),
+        "the vouch must not silently widen a material authorization to friction siblings"
     );
     assert!(
         reference.contains(
@@ -165,7 +171,7 @@ fn installed_skill_evolution_reference_requires_pre_close_reach_bound_review() {
     );
     assert!(
         reference.contains(
-            "This reach bound can name incidents the close will not retire: a contemporaneous severe incident stays in its cluster but is never retired because it authorizes on its own"
+            "This reason-specific reach bound can name incidents the close will not retire: a contemporaneous severe incident is never retired because it authorizes on its own"
         ),
         "the safely over-stated bound must not be presented as an exact preview"
     );
@@ -183,9 +189,42 @@ fn installed_skill_evolution_reference_ties_mismatch_disclosure_to_unvouched_sib
 
     assert!(
         reference.contains(
-            "If you cannot vouch for a sibling, the symptom-keyed close still happens; state the mismatch in the review report and user-facing completion"
+            "Vouch only for incidents inside that reason-specific reach bound; same-symptom incidents outside it do not affect this close"
         ),
-        "an unvouched sibling changes disclosure, not the forced retirement behavior"
+        "the reviewer must not import symptom-wide vouching into the narrowed rule"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_status_describes_reason_scoped_retirement() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let status_skill = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution-status/SKILL.md"),
+    )
+    .expect("read installed skill-evolution-status package");
+
+    assert!(
+        status_skill.contains(
+            "Each instrument-limited close contributes only the open incidents its recorded authorization reason named at the close"
+        ),
+        "the standing set must be traced to reason-scoped per-close reaches"
+    );
+    assert!(
+        status_skill
+            .contains("`material_recurrence` leaves friction siblings outside the retired set"),
+        "status readers must not infer the former symptom-wide material reach"
+    );
+    assert!(
+        status_skill.contains("`severe` contributes no retired incidents"),
+        "an empty severe reach must be legible at the standing-set surface"
+    );
+    assert!(
+        status_skill.contains(
+            "a missing or unrecognized authorizing rule uses the prior symptom-wide reach"
+        ),
+        "historical fallback must be visible to status readers"
     );
 }
 

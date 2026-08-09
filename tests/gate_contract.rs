@@ -101,6 +101,18 @@ impl Fixture {
         ]
     }
 
+    fn review_with_authorizing_rule(
+        &self,
+        review_id: &str,
+        disposition: &str,
+        covered: &[&str],
+        authorizing_rule: &str,
+    ) -> [Value; 2] {
+        let mut review = self.review(review_id, disposition, covered);
+        review[0]["payload"]["authorizing_rule"] = json!(authorizing_rule);
+        review
+    }
+
     fn use_event(
         &self,
         serial: usize,
@@ -497,6 +509,35 @@ fn a_blocked_close_retires_frictional_siblings_a_material_trigger_list_cannot_na
     );
     assert_eq!(status.authorization_reason, None);
     assert_eq!(status.state, "collecting");
+}
+
+#[test]
+fn a_ten_use_blocked_close_leaves_retrospective_incidents_in_the_anchor_cluster() {
+    let fixture = Fixture::new();
+    let mut events = vec![fixture.use_event(1, "friction", Some("cost"), "session-1")];
+    let mut retrospective = fixture.use_event(2, "friction", Some("cost"), "session-2");
+    retrospective["payload"]["retrospective"] = json!(true);
+    retrospective["payload"]["evidence_refs"] = json!(["logs/retrospective-cost.txt"]);
+    events.push(retrospective);
+    events.extend(
+        (3..=10)
+            .map(|serial| fixture.use_event(serial, "clean", None, &format!("session-{serial}"))),
+    );
+    events.extend(fixture.review_with_authorizing_rule(
+        "review-blocked",
+        "blocked_no_valid_test",
+        &["evt_1"],
+        "ten_use_unresolved",
+    ));
+    fixture.write_events(&events);
+
+    let status = fixture.derive("fresh-session", 1_767_398_400_000);
+    assert_eq!(status.instrument_limited_incident_ids, ["evt_1"]);
+    assert_eq!(
+        status.candidate_clusters[0].open_event_ids,
+        ["evt_2"],
+        "ten-use retirement names only contemporaneous incidents in the anchor cluster"
+    );
 }
 
 /// Evidence recorded after an instrument-limited close is new evidence, whatever its
