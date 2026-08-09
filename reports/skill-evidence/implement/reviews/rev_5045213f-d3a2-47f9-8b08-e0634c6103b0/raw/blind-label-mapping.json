@@ -1,0 +1,16 @@
+{
+ "run-01": "candidate/t3",
+ "run-02": "candidate/t5",
+ "run-03": "current/t4",
+ "run-04": "current/t1c",
+ "run-05": "current/t1",
+ "run-06": "current/t3",
+ "run-07": "candidate/t4",
+ "run-08": "candidate/t1c",
+ "run-09": "current/t5",
+ "run-10": "candidate/t1b",
+ "run-11": "candidate/t1",
+ "run-12": "current/t1b",
+ "run-13": "current/t2",
+ "run-14": "candidate/t2"
+}

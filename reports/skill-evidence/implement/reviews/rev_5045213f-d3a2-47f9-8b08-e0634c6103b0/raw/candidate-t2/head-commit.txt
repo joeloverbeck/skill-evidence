@@ -1,0 +1,3 @@
+14d3e8b Document the Widget service retry policy (ISSUE-7)
+ docs/guide.md | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)

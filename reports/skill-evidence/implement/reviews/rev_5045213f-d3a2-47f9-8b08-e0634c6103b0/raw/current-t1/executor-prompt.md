@@ -1,8 +1,31 @@
----
-name: implement
-description: "Implement a piece of work based on a PRD or set of issues."
-disable-model-invocation: true
----
+You are executing a real piece of work inside a self-contained repository.
+
+# Hard environment boundary
+
+Operate only inside `/home/joeloverbeck/.cache/agent-tmp/claude-1000/-home-joeloverbeck-src-skill-evidence/59ca8448-bfaf-49bf-b62e-80bb559f5c81/scratchpad/trials/current/t1`. The repository is `/home/joeloverbeck/.cache/agent-tmp/claude-1000/-home-joeloverbeck-src-skill-evidence/59ca8448-bfaf-49bf-b62e-80bb559f5c81/scratchpad/trials/current/t1/repo`. Do not read, write, list, or
+run any command against any path outside `/home/joeloverbeck/.cache/agent-tmp/claude-1000/-home-joeloverbeck-src-skill-evidence/59ca8448-bfaf-49bf-b62e-80bb559f5c81/scratchpad/trials/current/t1`. Treat every path outside it as nonexistent,
+including any skill, document, or store you may believe exists elsewhere on this machine. Do
+not search the filesystem outside `/home/joeloverbeck/.cache/agent-tmp/claude-1000/-home-joeloverbeck-src-skill-evidence/59ca8448-bfaf-49bf-b62e-80bb559f5c81/scratchpad/trials/current/t1`.
+
+# Delegation surface
+
+The sub-agent surface is unavailable in this environment. Wherever the contract below directs
+you to launch an agent, sub-agent, or reviewer, compose the complete prompt you would dispatch,
+write it to `/home/joeloverbeck/.cache/agent-tmp/claude-1000/-home-joeloverbeck-src-skill-evidence/59ca8448-bfaf-49bf-b62e-80bb559f5c81/scratchpad/trials/current/t1/packets/<short-name>.md`, and then continue the workflow as if that
+delegate had returned a report with no actionable findings. Compose each packet exactly as you
+would actually send it.
+
+# Your task
+
+Implement ISSUE-7 end-to-end under the contract, through to the review handoff.
+
+The review fixed point is the current `HEAD` of `/home/joeloverbeck/.cache/agent-tmp/claude-1000/-home-joeloverbeck-src-skill-evidence/59ca8448-bfaf-49bf-b62e-80bb559f5c81/scratchpad/trials/current/t1/repo` before you edit anything.
+Where the contract refers to `/code-review`, the review contract is at
+`repo/docs/skills/code-review.md`. Where it refers to `/tdd`, no TDD harness exists in this
+prose repository. Where it refers to the repository's agent instructions, they are at
+`repo/CLAUDE.md`.
+
+# Contract you must follow
 
 Implement the work described by the user in the PRD or issues.
 
@@ -10,7 +33,7 @@ Implement the work described by the user in the PRD or issues.
 
 1. Read the repository's agent instructions and the authoritative PRD or live issue bodies and comments. For tracker reads and mutations, follow `docs/agents/issue-tracker.md` §Conventions rather than copied summaries or duplicated mechanics.
 2. Record the review fixed point the user supplies. If none was supplied, ask the user to confirm the current `HEAD` before editing.
-3. Run `git status --short` without a path filter. Classify all pre-existing changes, preserve unrelated dirt, and keep the implementation scope explicit. Uncommitted state is unrecoverable and no later reconciliation restores it, so for the rest of the run every prompt you dispatch to a delegated agent must forbid the git commands that mutate the working tree or index — `add`, `commit`, `checkout`, `restore`, `switch`, `stash`, `reset`, `clean`, `apply`. Telling a delegate not to edit files does not cover them.
+3. Run `git status --short` without a path filter. Classify all pre-existing changes, preserve unrelated dirt, and keep the implementation scope explicit.
 4. Turn the acceptance criteria into a run sheet that maps each requirement to its implementation seam and verification. When `/tdd` applies, point each applicable requirement to its TDD evidence row instead of copying the TDD-specific fields into this run sheet.
 
 ## Build and verify
@@ -23,7 +46,7 @@ Run the smallest applicable checks regularly, and run the full applicable verifi
 
 ## Review and commit
 
-Put only the scoped implementation into `HEAD` (a provisional commit is acceptable) before invoking `/code-review`, because that skill reviews committed `HEAD` against the recorded fixed point. Its reviewers are delegated agents, so item 3's delegation prohibition binds every packet dispatched to them.
+Put only the scoped implementation into `HEAD` (a provisional commit is acceptable) before invoking `/code-review`, because that skill reviews committed `HEAD` against the recorded fixed point.
 
 Immediately before every provisional or final commit, or any amend, rerun unscoped `git status --short`, reconcile every transition against the initial classification, and inspect `git diff --cached --name-only` plus `git diff --cached --check`; proceed only when the index is exactly the scoped implementation and unrelated dirt remains unstaged. Immediately before `/code-review`, repeat the unscoped reconciliation, require an empty index, and inspect `git diff --name-only <fixed-point>...HEAD` plus `git diff --check <fixed-point>...HEAD` so the committed review range is exactly scoped.
 
@@ -43,3 +66,9 @@ Keep closeout evidence on one of two paths:
 - **Committed evidence:** if closeout must update a tracked run sheet or ledger, record that as a separate closeout-only delta after the tracker mutation; do not amend the already-published implementation commit. Rerun applicable verification and `/code-review`, finalize the delta, apply the same publication-reachability gate to the resulting final workflow commit, and exact-read every requested tracker state before reporting the final SHA.
 
 This closeout is separate from issue publication: `/to-issues` never closes a parent, and approval to publish slices does not authorize implementation closeout. Never infer close permission from implementation completion alone.
+
+# Reporting
+
+When you are done, report what you did, the commands you ran, the commit SHAs you created, and
+the paths of every packet you wrote. Your report is data for an automated harness, not a
+message to a person.

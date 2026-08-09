@@ -1,16 +1,10 @@
----
-name: implement
-description: "Implement a piece of work based on a PRD or set of issues."
-disable-model-invocation: true
----
-
 Implement the work described by the user in the PRD or issues.
 
 ## Before editing
 
 1. Read the repository's agent instructions and the authoritative PRD or live issue bodies and comments. For tracker reads and mutations, follow `docs/agents/issue-tracker.md` §Conventions rather than copied summaries or duplicated mechanics.
 2. Record the review fixed point the user supplies. If none was supplied, ask the user to confirm the current `HEAD` before editing.
-3. Run `git status --short` without a path filter. Classify all pre-existing changes, preserve unrelated dirt, and keep the implementation scope explicit. Uncommitted state is unrecoverable and no later reconciliation restores it, so for the rest of the run every prompt you dispatch to a delegated agent must forbid the git commands that mutate the working tree or index — `add`, `commit`, `checkout`, `restore`, `switch`, `stash`, `reset`, `clean`, `apply`. Telling a delegate not to edit files does not cover them.
+3. Run `git status --short` without a path filter. Classify all pre-existing changes, preserve unrelated dirt, and keep the implementation scope explicit.
 4. Turn the acceptance criteria into a run sheet that maps each requirement to its implementation seam and verification. When `/tdd` applies, point each applicable requirement to its TDD evidence row instead of copying the TDD-specific fields into this run sheet.
 
 ## Build and verify
@@ -23,7 +17,7 @@ Run the smallest applicable checks regularly, and run the full applicable verifi
 
 ## Review and commit
 
-Put only the scoped implementation into `HEAD` (a provisional commit is acceptable) before invoking `/code-review`, because that skill reviews committed `HEAD` against the recorded fixed point. Its reviewers are delegated agents, so item 3's delegation prohibition binds every packet dispatched to them.
+Put only the scoped implementation into `HEAD` (a provisional commit is acceptable) before invoking `/code-review`, because that skill reviews committed `HEAD` against the recorded fixed point.
 
 Immediately before every provisional or final commit, or any amend, rerun unscoped `git status --short`, reconcile every transition against the initial classification, and inspect `git diff --cached --name-only` plus `git diff --cached --check`; proceed only when the index is exactly the scoped implementation and unrelated dirt remains unstaged. Immediately before `/code-review`, repeat the unscoped reconciliation, require an empty index, and inspect `git diff --name-only <fixed-point>...HEAD` plus `git diff --check <fixed-point>...HEAD` so the committed review range is exactly scoped.
 

@@ -1,0 +1,13 @@
+== rev-parse HEAD
+cd511cf94e735e4365be211ac98e5b56adb29cd2
+== status --porcelain
+ M data/events.jsonl
+ M src/parser.py
+?? notes.txt
+== stash list
+== file hashes
+f7cb37cf9ae04311eb427da1d2c71b7036981acca1188a667cf68033518e3c8a  ./CODING_STANDARDS.md
+b96069a65d63817f8165c057ab45f56016cff0af689965c2b07495cec9cfe77e  ./README.md
+f3c1e84f12baafab63ce04e81f434cdf69d2b15eb2b856bd55d33788bcc97fa1  ./data/events.jsonl
+97f426023c59747ca1a8bb3daa1304dd00d90be483589d8422a59c05c5ae3868  ./notes.txt
+da7f864dc5eb6b97ae5007e499a8862ab84e18bfa9f47010016acf974cb58398  ./src/parser.py

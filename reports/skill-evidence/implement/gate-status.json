@@ -1,50 +1,20 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-09T18:58:08.203546614Z",
-  "target_content_hash": "2785481265152dec4b7c8cf4e756bd4c232e0d836bb5d03dd5cec16b588958a9",
-  "qualifying_uses_on_current_hash": 9,
-  "open_incident_ids": [
-    "evt_a660a6dd-97d4-4e5f-9eb8-4018f673dac0",
-    "evt_49479ad7-9a58-4139-a1ef-197454401e8c",
-    "evt_4b11ec1e-8d0c-439b-b613-09f76352c5a9",
-    "evt_a4ad70af-4154-4a67-b04f-db04beb549e1",
-    "evt_f8206006-9ac8-4040-9d59-f9645db64d81",
-    "evt_c7282585-f6a9-46a0-9977-3171c4ca6a6d"
-  ],
-  "candidate_clusters": [
-    {
-      "symptom_key": "execution",
-      "open_event_ids": [
-        "evt_a660a6dd-97d4-4e5f-9eb8-4018f673dac0",
-        "evt_49479ad7-9a58-4139-a1ef-197454401e8c",
-        "evt_a4ad70af-4154-4a67-b04f-db04beb549e1",
-        "evt_f8206006-9ac8-4040-9d59-f9645db64d81",
-        "evt_c7282585-f6a9-46a0-9977-3171c4ca6a6d"
-      ],
-      "independent_incidents": 5,
-      "max_severity": "material_failure"
-    },
-    {
-      "symptom_key": "state",
-      "open_event_ids": [
-        "evt_4b11ec1e-8d0c-439b-b613-09f76352c5a9"
-      ],
-      "independent_incidents": 1,
-      "max_severity": "severe_incident"
-    }
-  ],
-  "state": "quarantined_eligible",
-  "authorized_workflow": "skill-evolution",
-  "authorization_reason": "severe",
-  "trigger_event_ids": [
-    "evt_4b11ec1e-8d0c-439b-b613-09f76352c5a9"
-  ],
-  "threshold_session_id": "1d50747f-e39a-4910-95a2-ccf4d839413c",
+  "generated_at": "2026-08-09 21:39:59+02:00",
+  "target_content_hash": "b4aaa5ea17450343dfa971ab4f08a9a4427c36b1f956579c96f270e90e3af9dd",
+  "qualifying_uses_on_current_hash": 0,
+  "open_incident_ids": [],
+  "candidate_clusters": [],
+  "state": "closed",
+  "authorized_workflow": null,
+  "authorization_reason": null,
+  "trigger_event_ids": [],
+  "threshold_session_id": null,
   "not_before": null,
   "active_review_id": null,
-  "last_completed_review_id": null,
-  "review_reentry_basis": "first_eligibility",
+  "last_completed_review_id": "rev_5045213f-d3a2-47f9-8b08-e0634c6103b0",
+  "review_reentry_basis": null,
   "target_name": "implement",
   "target_repo_relative_path": ".claude/skills/implement",
-  "derivation_session_id": "019fe7b2-9a85-7563-b87b-c09e4363e98b"
+  "derivation_session_id": "59ca8448-bfaf-49bf-b62e-80bb559f5c81"
 }
