@@ -36,10 +36,8 @@ Five **state** roles:
 - `ready-for-human` — needs human implementation
 - `wontfix` — will not be actioned
 
-This repo defines one additional state role:
-
-- `coordination` — an open parent or umbrella issue coordinating separately
-  `ready-for-agent` children; it is not independently grabbable
+This repo defines no additional state roles. In particular it has no umbrella state: see
+[`../../../docs/agents/triage-labels.md`](../../../docs/agents/triage-labels.md).
 
 For a PR, the same states read against the attached code: `ready-for-agent` means a brief is attached and an agent should take the next step on the diff; `ready-for-human` means it's ready for a human to merge.
 
@@ -47,7 +45,7 @@ Every triaged issue should carry exactly one category role and one state role. I
 
 These are canonical role names — the actual label strings used in the issue tracker may differ. The mapping should have been provided to you - run `/setup-matt-pocock-skills` if not.
 
-State transitions: an unlabeled issue normally goes to `needs-triage` first; from there it moves to `needs-info`, `ready-for-agent`, `ready-for-human`, or `wontfix`. `needs-info` returns to `needs-triage` once the reporter replies. Move an open parent from `ready-for-agent` to `coordination` only when the maintainer explicitly authorizes separately AFK-ready child issues; never use `coordination` as a generic holding state or for leaf work. The maintainer can override at any time — flag transitions that look unusual and ask before proceeding.
+State transitions: an unlabeled issue normally goes to `needs-triage` first; from there it moves to `needs-info`, `ready-for-agent`, `ready-for-human`, or `wontfix`. `needs-info` returns to `needs-triage` once the reporter replies. The maintainer can override at any time — flag transitions that look unusual and ask before proceeding.
 
 ## Invocation
 
@@ -89,7 +87,6 @@ Show counts and a one-line summary per item. Let the maintainer pick.
      - **Rejected (bug)** — polite explanation, then close.
      - **Rejected (enhancement)** — write to `.out-of-scope/`, link to it from a comment, then close ([OUT-OF-SCOPE.md](OUT-OF-SCOPE.md)).
    - `needs-triage` — apply the role. Optional comment if there's partial progress.
-   - `coordination` — keep the parent open without an agent brief; use only when its separately grabbable children carry the implementation work. Once every child is closed and you have verified the coordinated behavior, close the parent as *completed* — not `wontfix`, which is for declined work — commenting on what landed; its roles stay as the record of what it was.
 
 ## Quick state override
 
