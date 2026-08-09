@@ -63,9 +63,10 @@ exactly the change that invalidates history if the optionality is got wrong on t
 ## The installer never removes
 
 `skills evidence install` writes packages and refuses to clobber a locally edited file. It has
-no uninstall and no prune. **A skill package that is retired or renamed upstream stays in every
-consumer's `.claude/skills/` until somebody deletes it by hand**, and nothing this repository
-ships can reach it.
+no removal mode under any flag. **Removing a retired package is a separate, deliberate authority
+transition:** `skills evidence withdraw` acts only on the permanent retirement set and never on
+the current installed set. A consumer opts into withdrawal explicitly after an upgrade; install
+may report the orphan, but cannot remove it.
 
 This has already happened once, and the cleanup fell to the consumer: retiring the decontamination
 package required a hand-written deletion of 228 lines inside playbench's own migration commit,
@@ -74,27 +75,37 @@ but not the directories holding them, so two empty directories survived the very
 remove them — untracked, therefore invisible to `git status`, and found only by a later inspection
 that went looking. It is a real property of the distribution mechanism, not a hypothetical.
 
-Until the installer can remove what it previously wrote:
+Withdrawal closes that gap without weakening the installed-asset boundary:
 
 - Retiring or renaming an installed package is a **breaking change to the installed-asset
-  surface**, and the release that does it must name the directories each consumer has to delete
-  by hand.
+  surface**. The release must name the retired package and the minimum version whose retirement
+  set can withdraw it; consumers pinned below that version still require the exact manual removal
+  path.
 - Adding a package is additive. Renaming one is not — it is a remove plus an add, and it strands
-  the old directory.
+  the old directory until the consumer deliberately withdraws it.
 - A consumer upgrade is not complete when `cargo update` succeeds. See
   [`../releasing.md`](../releasing.md).
+- The retirement set retains each retired file's last-shipped template permanently. Withdrawal
+  renders it for the consumer's host, compares byte-for-byte, and refuses before the first removal
+  if a shipped path differs. An explicit force may remove that differing shipped path; it never
+  authorizes removal of a foreign file, link, or package.
+- Withdrawal removes a retired package's proven files, correct discovery link, and empty package
+  directories. It never touches the `.claude/skills/` or `.agents/skills/` roots and never reaches
+  `reports/skill-evidence/`.
 
-Closing this gap — an installer that tracks what it wrote and can withdraw it — is warranted
-work, but it is warranted because consumers keep accumulating orphans, not because the asymmetry
-is untidy.
+The retirement set is warranted because consumers accumulated an observed orphan, not because a
+general uninstall facility would be tidy. A current package remains outside withdrawal: the crate
+cannot remove a consumer-created package, selectively remove a live package, or forget a
+retirement on the assumption that all consumers have caught up.
 
 ## Shipped packages carry instructions, not executables
 
 **An installed skill package carries instructions, not executables.** A script inside a shipped
 package makes its runtime a dependency of every consumer's tree — arriving with a crate upgrade,
 installed by the same command that installs the instructions, and, per *the installer never
-removes* above, withdrawn by nothing. The consumer did not choose that runtime and cannot
-uninstall it.
+removes* above, unavailable to withdrawal while the package remains current. The consumer did not
+choose that runtime and cannot remove it through this crate without the package itself first being
+retired.
 
 The shipped packages already satisfy this: no executable bit on any file, no script of any
 language. Writing the rule down changes nothing that ships today. What it changes is that the
