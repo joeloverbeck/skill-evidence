@@ -142,14 +142,26 @@ reached a conclusion about it. A *non-adjudicating* disposition closes the revie
 trigger evidence active, because no conclusion was reached.
 _Avoid_: terminal disposition, final disposition
 
+**Coverage list**:
+The event IDs a review records as covered when it closes — the trigger list frozen when the
+threshold fired, plus any events an adjudicating close explicitly names. It is what the close writes
+down, which is not the same as what the close costs.
+_Avoid_: adjudicated set, trigger list, covered events
+
 **Instrument-limited disposition**:
-A non-adjudicating disposition that nonetheless retires its covered evidence from the gate, because
-the review established that this instrument cannot test that evidence. It adjudicates nothing — the
-incidents stay open and unresolved in the ledger — but they stop clustering, so they can never again
-reach a threshold the review already proved untestable. The one such disposition is
-`blocked_no_valid_test`. See
+A non-adjudicating disposition that nonetheless retires evidence from the gate, because the review
+established that this instrument cannot test it. It adjudicates nothing — the incidents stay open and
+unresolved in the ledger — but they stop clustering, so they can never again reach a threshold the
+review already proved untestable. The one such disposition is `blocked_no_valid_test`. See
 [`docs/adr/0002-blocked-no-valid-test-retires-its-evidence-from-the-gate.md`](docs/adr/0002-blocked-no-valid-test-retires-its-evidence-from-the-gate.md).
 _Avoid_: dismissed, wontfix, closed-untestable
+
+**Retirement reach**:
+The open incidents one instrument-limited close moves out of the gate: its coverage list, plus every
+open incident sharing a symptom that list touched, bounded at the close. Wider than the coverage
+list, and distinct from the gate projection's standing retired set — a live per-hash view that later
+closes can grow or shrink. A close reports its own reach; the projection reports the standing set.
+_Avoid_: retired set, instrument-limited set, covered evidence
 
 **Landing**:
 The one authorized act that modifies a live target, carrying a baseline snapshot, a diff, and a
