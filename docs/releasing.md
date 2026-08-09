@@ -86,7 +86,9 @@ name, explicitly:
 - **Command-surface changes** — renamed flags, removed subcommands, changed exit-code meanings.
   These break operators and skill packages without breaking `cargo build`.
 - **Installed-package changes** — additions, and above all **retirements or renames**, with the
-  exact retired package names and the minimum crate version that can withdraw them. See §7.
+  exact retired package names, the minimum crate version that can withdraw them, and the exact
+  `.claude/skills/` and `.agents/skills/` directories an older consumer must delete manually for
+  each affected package. See §7.
 - **Schema changes** — and the reason they satisfy §2.
 
 ## 6. Bring a consumer forward

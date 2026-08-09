@@ -7,7 +7,10 @@ This crate is depended on by `playbench`, `mundifold`, and `what-we-bring-home`,
 Two things that catch people out:
 
 - **Cargo SemVer protects the Rust API and nothing else.** Adding an optional field to a recorded event is a compatible change by every Cargo rule and can still invalidate a consumer's history. See [`docs/principles/consumer-contract.md`](docs/principles/consumer-contract.md).
-- **The installer has no uninstall.** Retiring or renaming an installed package strands it in every consumer forever. See [`docs/releasing.md`](docs/releasing.md).
+- **Install never removes.** Retiring or renaming an installed package leaves it in every consumer
+  until the consumer deliberately runs `skills evidence withdraw`, or follows the release note's
+  exact manual fallback when pinned below the withdrawal version. See
+  [`docs/releasing.md`](docs/releasing.md).
 
 This repository has no value stream of its own — everything here is enabling work for a consumer. Its own issue count is not progress.
 
