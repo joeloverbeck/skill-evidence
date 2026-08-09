@@ -46,7 +46,13 @@ jobs:
       - name: Prove the committed packages match what install emits
         run: |
           cargo run --locked --quiet -- skills evidence install --root .
-          git diff --exit-code -- .claude schemas .agents
+          installed_asset_status="$(
+            git status --short --untracked-files=all --ignored=matching -- .claude schemas .agents
+          )"
+          if [ -n "$installed_asset_status" ]; then
+            printf '%s\n' "$installed_asset_status"
+            exit 1
+          fi
 
   # Separate from `verify` because both steps below refuse on a dirty tree, and
   # `verify` deliberately dirties its own by running the installer.
