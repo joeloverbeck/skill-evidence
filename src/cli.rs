@@ -138,6 +138,8 @@ pub enum SkillEvidenceCommand {
     Record(Box<SkillEvidenceRecordArgs>),
     /// Writes this crate's skill packages and schemas into a repository.
     Install(InstallArgs),
+    /// Removes packages this crate shipped and has since retired.
+    Withdraw(WithdrawArgs),
 }
 
 #[derive(Debug, Args)]
@@ -145,6 +147,15 @@ pub struct InstallArgs {
     #[arg(long)]
     root: Option<PathBuf>,
     /// Overwrite packages that already differ from the ones shipped here.
+    #[arg(long)]
+    force: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct WithdrawArgs {
+    #[arg(long)]
+    root: Option<PathBuf>,
+    /// Remove retired files that differ from their last shipped contents.
     #[arg(long)]
     force: bool,
 }
@@ -545,6 +556,11 @@ fn run_skill_evidence(
         SkillEvidenceCommand::Install(args) => {
             let root = selected_root(args.root);
             let receipt = crate::assets::install(&root, host, args.force)?;
+            Ok(print_successful_report(&receipt, out))
+        }
+        SkillEvidenceCommand::Withdraw(args) => {
+            let root = selected_root(args.root);
+            let receipt = crate::assets::withdraw(&root, host, args.force)?;
             Ok(print_successful_report(&receipt, out))
         }
         SkillEvidenceCommand::Record(args) => {

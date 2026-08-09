@@ -182,6 +182,12 @@ A skill package still present in a consumer that this crate no longer ships. Dis
 the consumer created under the same directory, which was never this crate's to remove.
 _Avoid_: stale package, leftover, residue, dead skill
 
+**Withdrawal**:
+The deliberate removal of every retired package the crate can still prove it shipped, including
+its discovery link and empty package directories. It refuses before the first removal when a
+shipped file differs, and never treats a foreign path as its own authority.
+_Avoid_: uninstall, prune, cleanup
+
 **Consumer**:
 A repository that runs this lifecycle through a published version. A repository carrying a vendored
 copy is not a consumer; it is a fork, and the contract does not reach it.

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Legacy Skill Decontamination"
+  short_description: "One-time simplification of an audit-accreted skill"
+  default_prompt: "Use $legacy-skill-decontamination with the target skill's path; it refuses unless the target is legacy-eligible and lands only a blind-validated noninferior candidate."
+
+policy:
+  allow_implicit_invocation: false

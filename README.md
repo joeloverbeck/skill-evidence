@@ -52,12 +52,16 @@ has an engine and no driver.
 ```console
 cargo install skill-evidence
 skill-evidence skills evidence install --root .
+skill-evidence skills evidence withdraw --root .
 ```
 
 That writes the four packages under `.claude/skills/`, their `.agents/skills/` discovery links, and
 two versioned schemas under `schemas/skill-evidence/`. It **refuses rather than clobbering** a file
 that differs from what it ships, naming every one and writing nothing; `--force` replaces them.
-Running it without `--force` is therefore a free preview of what an upgrade would change.
+Running it without `--force` is therefore a free preview of what an upgrade would change. The
+install receipt also names any package this crate has retired but still finds in the repository;
+`withdraw` removes those packages in a separate, deliberate operation with the same refusal
+discipline. Neither command touches recorded evidence.
 
 ## Mounting it in your own CLI
 
@@ -111,7 +115,7 @@ working — it means authority was absent and nothing was written.
 ## Command surface
 
 ```
-skills evidence     derive | hash | record | install
+skills evidence     derive | hash | record | install | withdraw
 skills evolution    preflight | claim | record-validation | land | close
 skills evolution-status
 skills method-gap-research-status <family-selector>
@@ -123,15 +127,17 @@ skills method-gap-research-status <family-selector>
 skill-evidence = { version = "0.1", default-features = false }
 ```
 
-Drops the `cli` feature, and with it `clap` and `uuid`. The lifecycle API and the installer remain.
+Drops the `cli` feature, and with it `clap` and `uuid`. The lifecycle API, installer, and
+withdrawal entry point remain.
 
 ## Versioning and compatibility
 
 Three surfaces reach a consumer independently, and Cargo's SemVer protects only the first:
 
 - **the Rust API** — ordinary SemVer, breakage is loud and at compile time;
-- **the installed assets** under `.claude/skills/` and `schemas/` — recoverable, but the installer
-  has no uninstall, so a package retired upstream strands its directory in your repository;
+- **the installed assets** under `.claude/skills/` and `schemas/` — recoverable; `install` never
+  removes, while a separate `withdraw` command can remove packages this crate has retired and can
+  still identify byte-for-byte;
 - **the recorded evidence** in `events.jsonl` — **not recoverable.** Pinning an older version rolls
   back the reader, not the history that is already written to disk.
 

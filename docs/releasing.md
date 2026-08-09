@@ -85,8 +85,8 @@ name, explicitly:
 - **Breaking Rust API changes** — what a consumer's build will complain about.
 - **Command-surface changes** — renamed flags, removed subcommands, changed exit-code meanings.
   These break operators and skill packages without breaking `cargo build`.
-- **Installed-package changes** — additions, and above all **retirements or renames, with the
-  exact directories each consumer must delete by hand**. See §7.
+- **Installed-package changes** — additions, and above all **retirements or renames**, with the
+  exact retired package names and the minimum crate version that can withdraw them. See §7.
 - **Schema changes** — and the reason they satisfy §2.
 
 ## 6. Bring a consumer forward
@@ -109,11 +109,12 @@ cargo test --all-targets --locked
 #    Resolve the second kind first, then:
 <host-command> skills evidence install --root . --force
 
-# 5. Review what actually landed.
-git diff
+# 5. Withdraw packages the install receipt named as retired. Without --force,
+#    a locally edited retired file refuses the whole operation and removes nothing.
+<host-command> skills evidence withdraw --root .
 
-# 6. Delete any directories the release note named as retired. Nothing upstream
-#    can do this for you — see §7.
+# 6. Review what actually changed.
+git diff
 
 # 7. Re-derive each evidence store and confirm history is untouched.
 git status --short reports/skill-evidence/    # events.jsonl must not appear
@@ -121,20 +122,30 @@ git status --short reports/skill-evidence/    # events.jsonl must not appear
 
 Step 3 is the useful one. Because `install` decides every write before the first byte lands and
 refuses atomically, running it *without* `--force` is a free, side-effect-free preview of exactly
-which files the upgrade will change.
+which files the upgrade will change. It also reports any retired package still present, but never
+removes one under any flag.
+
+Step 5 is deliberately separate. `withdraw` compares every retired file with the last copy this
+crate shipped and decides every removal before the first one occurs. A difference refuses the
+whole operation; after confirming that the differing file is an edited copy of a retired file the
+crate shipped, re-run with `--force`. A foreign file or discovery link stays in place even under
+`--force`, and the receipt names why it was retained.
 
 Step 7 is the one that matters. A projection may legitimately change; `events.jsonl` may not.
 
 Host commands: `playbench` for playbench, `mundifold` for mundifold, and
 `cargo run --locked -p developer-tools --` for what-we-bring-home.
 
-## 7. The orphan problem
+## 7. Withdrawing retired packages
 
-`skills evidence install` writes and refuses to clobber. **It has no uninstall and no prune.**
+`skills evidence install` only writes and reports. It never removes, including under `--force`.
+`skills evidence withdraw` is its deliberate inverse for whole packages this crate has retired.
 
-A skill package retired or renamed upstream stays in the consumer's `.claude/skills/` until
-somebody deletes it by hand. Nothing this crate ships can reach it, so every consumer pays that
-cost separately.
+The crate permanently retains the last-shipped templates for every retired package. That lets
+`withdraw` render them with the consumer's host names, compare each installed file byte-for-byte,
+and remove only what the crate can prove it shipped. It also removes the correct
+`.agents/skills/` discovery link and empty directories below the retired package, including the
+package directory itself. The `.claude/skills/` and `.agents/skills/` roots are never removed.
 
 This is not hypothetical. Retiring `legacy-skill-decontamination` cost playbench a hand-written
 deletion of 228 lines across three files, inside its own migration commit `8cbc1573`. **And that
@@ -142,13 +153,22 @@ was not the end of it**: `git rm` removes tracked files but not the directories 
 two empty directories survived, untracked and therefore invisible to `git status`, until they were
 found and `rmdir`-ed on 2026-08-08.
 
-So the cleanup line in a release note needs to say `rm -rf <dir>`, not "delete the files" — and a
-consumer who deletes the files individually should expect to check for empty directories
-afterwards.
+That history fixes the release rule: a retirement is still a breaking installed-asset change, its
+templates stay in the retirement set permanently, and the release note tells consumers to run:
 
-Until the installer can withdraw what it wrote, a retirement is a two-part release: the code
-change here, and a line in the release note telling every consumer which directory to `rm -rf`.
-Both parts, or the retirement is not done.
+```console
+<host-command> skills evidence withdraw --root .
+```
+
+For a consumer pinned to a version that predates `withdraw` or the relevant retirement entry, the
+manual fallback remains explicit and package-granular:
+
+```console
+rm -rf .claude/skills/<retired-package> .agents/skills/<retired-package>
+```
+
+Deleting individual files is not an adequate fallback: it can reproduce the empty-directory
+orphan that motivated this command.
 
 ## 8. A consumer that stays behind
 

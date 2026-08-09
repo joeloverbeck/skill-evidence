@@ -4,6 +4,9 @@ Cargo.toml
 Cargo.toml.orig
 LICENSE
 README.md
+assets/retired-skills/legacy-skill-decontamination/SKILL.md
+assets/retired-skills/legacy-skill-decontamination/agents/openai.yaml
+assets/retired-skills/legacy-skill-decontamination/references/eligible-run.md
 assets/schemas/event.v1.schema.json
 assets/schemas/gate-status.v1.schema.json
 assets/skills/method-gap-research-status/SKILL.md
