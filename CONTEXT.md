@@ -177,6 +177,11 @@ machinery with no operator. That directory also holds skills this crate does not
 it does not make one a skill package, and a package may not cite one.
 _Avoid_: skill, asset, template, bundle
 
+**Orphaned package**:
+A skill package still present in a consumer that this crate no longer ships. Distinct from a skill
+the consumer created under the same directory, which was never this crate's to remove.
+_Avoid_: stale package, leftover, residue, dead skill
+
 **Consumer**:
 A repository that runs this lifecycle through a published version. A repository carrying a vendored
 copy is not a consumer; it is a fork, and the contract does not reach it.
