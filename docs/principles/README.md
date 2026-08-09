@@ -23,7 +23,8 @@ manufacture the human acceptance an authority transition requires.
   significant pre-existing artifacts, and its non-goals.
 - [`consumer-contract.md`](consumer-contract.md) — the three surfaces a change can reach a
   consumer through, how each is versioned, the forward-only evidence rule, the installer's
-  missing removal path, and the one-way direction of upgrade authority.
+  missing removal path, the instructions-not-executables rule for shipped packages, and the
+  one-way direction of upgrade authority.
 - [`evidence-substrate-integrity.md`](evidence-substrate-integrity.md) — what may and may not
   happen to recorded evidence, why structural validity is not semantic acceptance, why evidence
   authorizes only the claim it bears, and the discipline required of side effects on a consumer's
@@ -97,6 +98,11 @@ not automatic amendment.
 
 Adopted 2026-08-08 by the repository owner, at the exact text of this revision, as a set, against
 the repository as of `df86c2f`.
+
+Amended 2026-08-09 by the repository owner, at the exact text and placement of §*Shipped packages
+carry instructions, not executables* in [`consumer-contract.md`](consumer-contract.md), against
+the repository as of `82f2ce4`. No other clause changed; the constitutional-documents list above
+names the new rule.
 
 Adoption of these documents does not by itself adopt any future schema version, installer redesign,
 distribution change, or resolution of an open issue. In particular it does not settle the open

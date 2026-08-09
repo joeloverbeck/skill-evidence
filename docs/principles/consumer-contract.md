@@ -88,6 +88,22 @@ Closing this gap — an installer that tracks what it wrote and can withdraw it 
 work, but it is warranted because consumers keep accumulating orphans, not because the asymmetry
 is untidy.
 
+## Shipped packages carry instructions, not executables
+
+**An installed skill package carries instructions, not executables.** A script inside a shipped
+package makes its runtime a dependency of every consumer's tree — arriving with a crate upgrade,
+installed by the same command that installs the instructions, and, per *the installer never
+removes* above, withdrawn by nothing. The consumer did not choose that runtime and cannot
+uninstall it.
+
+The shipped packages already satisfy this: no executable bit on any file, no script of any
+language. Writing the rule down changes nothing that ships today. What it changes is that the
+next package wanting a script argues with this clause rather than with someone's recollection
+of an ADR.
+
+A private skill in this repository is a different surface. It is not installed, it reaches no
+consumer, and this clause does not reach it — a scope boundary, not a permission.
+
 ## What is contract and what is internal
 
 Contract: the public Rust API, the `cli` feature boundary, the mounted command surface and its

@@ -72,7 +72,9 @@ cites `technical-boundaries.md` §Domain sovereignty and *"world or character se
 `playbench` cites P30 and *"game semantics"*) — and [`../../src/assets.rs`](../../src/assets.rs)
 states the test itself: *"a package that needed a third token would be a sign the package, not the
 template, has the wrong boundary."* It would make Node 20+ a runtime dependency of a Rust crate's
-installed surface for every consumer. And it would break all three consumers' next install until
+installed surface for every consumer — the constraint that
+[`../principles/consumer-contract.md`](../principles/consumer-contract.md) §*Shipped packages carry
+instructions, not executables* now states. And it would break all three consumers' next install until
 `--force`, where `--force` overwrites `mundifold`'s correct localization with no uninstall to undo
 it. The observed pressure is for the *skill*, not for its *distribution*: all three consumers
 already obtained it by hand-copy and none is blocked.
