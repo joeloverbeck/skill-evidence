@@ -2,6 +2,8 @@
 
 Status: accepted (2026-08-08, GitHub [#1](https://github.com/joeloverbeck/skill-evidence/issues/1))
 
+Amended: 2026-08-09, GitHub [#13](https://github.com/joeloverbeck/skill-evidence/issues/13) — reporting now distinguishes one close's retirement reach from the projection's standing retired set.
+
 A Skill Evolution review that closes `blocked_no_valid_test` reached no conclusion, so it adjudicates
 nothing and its trigger evidence stays open. That close still laid a watermark, and the watermark
 deferred the very evidence that opened the gate — labelled `queued_pre_close_evidence`, as though a
@@ -87,10 +89,14 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
   which is a worse failure than the trap. Retirement also applies only to closes whose review ran
   against the current target hash — a finding about what this instrument cannot test says nothing
   about a target that has since changed.
-- The projection names what it retired, in the optional `instrument_limited_incident_ids` field, and
-  `skills evolution-status` reports those targets under **Retired as untestable** rather than folding
-  them into the omitted count next to skills that never recorded an incident. Retiring evidence
-  silently would trade one dishonest projection for another.
+- **The close receipt and the projection name retirement at their distinct scopes.** A
+  `blocked_no_valid_test` receipt carries `retired_from_gate_event_ids`, the retirement reach of that
+  close, even when the list is empty; every non-instrument-limited close omits the key. The projection
+  keeps `instrument_limited_incident_ids` as the standing per-hash retired set, which can include
+  earlier closes and can shrink after later adjudication. `skills evolution-status` reports targets
+  carrying that standing set under **Retired as untestable** rather than folding them into the omitted
+  count next to skills that never recorded an incident. Retiring evidence silently at either surface
+  would trade one dishonest projection for another.
 - Evidence a blocked close did not cover, still deferred behind its watermark, now reports
   `queued_behind_instrument_limited_review` instead of `queued_pre_close_evidence`.
 - **A contemporaneous severe incident is never retired this way.** It authorizes from

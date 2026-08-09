@@ -154,6 +154,8 @@ Every close records the trigger events the review covered in `adjudicated_event_
 
 Retirement covers the whole open cluster of every symptom the close touched, not only the listed trigger IDs, because a sibling incident on the same symptom shares the binding constraint the instrument could not vary. It stops there: anything recorded after the close is new evidence and drives the gate normally. So reach for this disposition only when you have named the binding constraint and established that no trial can vary it — not to quiet a cluster you have simply not tested yet, because you are retiring the whole cluster and there is no route back for it. A contemporaneous severe incident is never retired this way: it authorizes on its own and keeps doing so. A retrospective one is retired like any other covered evidence, because it never fires that trigger — it only counts toward a cluster. `superseded_by_target_version` retires nothing; the target moved, and nothing was established about testability.
 
+Read `retired_from_gate_event_ids` from the close receipt whenever it is present. It names the retirement reach of this close, including an empty reach; the projection's `instrument_limited_incident_ids` is instead the standing per-hash set and can include retirements from earlier reviews. Copy the receipt's list into the review report and state that retirement reach in the user-facing completion. A non-instrument-limited close omits the key and has no retirement reach to report.
+
 Then write the review report at `reviews/<review-id>.md` — required for every claimed review, with unreached sections marked `not reached — <disposition>`:
 
 ```markdown
@@ -191,9 +193,10 @@ Then write the review report at `reviews/<review-id>.md` — required for every 
 - Landed: yes/no
 - Target after hash or unchanged hash:
 - Final disposition:
+- Retirement reach event IDs:
 ```
 
-The user-facing completion is concise, links the report, and states whether the live skill changed.
+The user-facing completion is concise, links the report, states whether the live skill changed, and, when the close receipt carries `retired_from_gate_event_ids`, states that retirement reach exactly, including an empty list.
 
 *Done when the disposition event exists, the report is written, and the completion was delivered.*
 

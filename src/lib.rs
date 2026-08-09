@@ -1084,15 +1084,16 @@ pub fn evolution_close(
         matches!(event.kind, EventKind::ChangeLanded { .. })
             && event.review_id() == Some(request.review_id.as_str())
     });
-    if landed {
+    let before = if landed {
         if request.disposition != "resolved_by_change" {
             return Err(refusal(
                 "A change already landed for this review; the only valid disposition is resolved_by_change."
                     .to_owned(),
             ));
         }
+        None
     } else {
-        require_active_ownership(
+        let before = require_active_ownership(
             &target,
             &events,
             &hash,
@@ -1106,7 +1107,8 @@ pub fn evolution_close(
                     .to_owned(),
             ));
         }
-    }
+        Some(before)
+    };
     if request.disposition == "candidate_rejected_validation" {
         let latest = events.iter().rfind(|event| {
             matches!(event.kind, EventKind::ValidationCompleted { .. })
@@ -1156,12 +1158,32 @@ pub fn evolution_close(
         inputs,
     );
     let after = append_lifecycle_event(&target, &hash, &mut events, event, &derivation_inputs)?;
-    Ok(serde_json::json!({
+    let mut receipt = serde_json::json!({
         "closed": request.review_id,
         "disposition": request.disposition,
         "adjudicated_event_ids": adjudicated,
         "state": after.state
-    }))
+    });
+    if EVOLUTION_INSTRUMENT_LIMITED_DISPOSITIONS.contains(&request.disposition.as_str()) {
+        let previously_retired = before
+            .as_ref()
+            .map(|status| {
+                status
+                    .instrument_limited_incident_ids
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<HashSet<_>>()
+            })
+            .unwrap_or_default();
+        let retirement_reach = after
+            .instrument_limited_incident_ids
+            .iter()
+            .filter(|identity| !previously_retired.contains(identity.as_str()))
+            .cloned()
+            .collect::<Vec<_>>();
+        receipt["retired_from_gate_event_ids"] = serde_json::json!(retirement_reach);
+    }
+    Ok(receipt)
 }
 
 fn authorize_evolution(

@@ -112,6 +112,30 @@ fn snapshot_tree(root: &std::path::Path) -> BTreeMap<String, Vec<u8>> {
 }
 
 #[test]
+fn installed_skill_evolution_reference_reports_the_close_retirement_reach() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains("Read `retired_from_gate_event_ids` from the close receipt"),
+        "the reviewer must read the per-close retirement reach from the irreversible action's receipt"
+    );
+    assert!(
+        reference.contains("state that retirement reach in the user-facing completion"),
+        "the receipt needs an operator-visible reader"
+    );
+    assert!(
+        reference.contains("- Retirement reach event IDs:"),
+        "the durable review report needs a home for the close's retirement reach"
+    );
+}
+
+#[test]
 fn install_reports_a_retired_package_without_writing_or_removing_it() {
     let root = tempfile::tempdir().expect("temporary repository root");
     let retired_skill = root

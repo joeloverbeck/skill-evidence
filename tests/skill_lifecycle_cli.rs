@@ -109,7 +109,7 @@ fn record_incident(root: &Path, label: &str, session: &str) {
     record_outcome(root, label, session, "execution", "friction");
 }
 
-fn record_outcome(root: &Path, label: &str, session: &str, symptom: &str, outcome: &str) {
+fn record_outcome(root: &Path, label: &str, session: &str, symptom: &str, outcome: &str) -> String {
     let output = skill_evidence()
         .args(["skills", "evidence", "record", "--root"])
         .arg(root)
@@ -142,6 +142,10 @@ fn record_outcome(root: &Path, label: &str, session: &str, symptom: &str, outcom
         "record failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+    serde_json::from_slice::<Value>(&output.stdout).expect("record receipt JSON")["event_id"]
+        .as_str()
+        .expect("record receipt event id")
+        .to_owned()
 }
 
 fn claim_evolution(root: &Path) -> Value {
@@ -152,6 +156,20 @@ fn claim_evolution(root: &Path) -> Value {
 }
 
 fn claim_existing_evolution(root: &Path) -> Value {
+    claim_existing_evolution_as(
+        root,
+        "evt_evolution_claim",
+        "rev_fixture",
+        "lock_evolution_claim",
+    )
+}
+
+fn claim_existing_evolution_as(
+    root: &Path,
+    event_id: &str,
+    review_id: &str,
+    lock_owner: &str,
+) -> Value {
     let mut command = skill_evidence();
     command
         .args(["skills", "evolution", "claim", "--root"])
@@ -160,13 +178,13 @@ fn claim_existing_evolution(root: &Path) -> Value {
             "--target",
             ".claude/skills/demo-skill",
             "--event-id",
-            "evt_evolution_claim",
+            event_id,
             "--review-id",
-            "rev_fixture",
+            review_id,
             "--repository-head",
             "fixture-head",
         ]);
-    lifecycle_clock(&mut command, "lock_evolution_claim");
+    lifecycle_clock(&mut command, lock_owner);
     let output = command.output().expect("claim Skill Evolution review");
     assert!(
         output.status.success(),
@@ -273,6 +291,16 @@ fn run_evolution_close(
     disposition: &str,
     note: Option<&str>,
 ) -> std::process::Output {
+    run_evolution_close_for_review(root, event_id, "rev_fixture", disposition, note)
+}
+
+fn run_evolution_close_for_review(
+    root: &Path,
+    event_id: &str,
+    review_id: &str,
+    disposition: &str,
+    note: Option<&str>,
+) -> std::process::Output {
     let mut command = skill_evidence();
     command
         .args(["skills", "evolution", "close", "--root"])
@@ -285,7 +313,7 @@ fn run_evolution_close(
             "--repository-head",
             "fixture-head",
             "--review-id",
-            "rev_fixture",
+            review_id,
             "--disposition",
             disposition,
         ]);
@@ -1336,6 +1364,274 @@ fn shared_landing_restores_the_baseline_when_landed_byte_verification_fails() {
         )
         .expect("read event stream")
         .contains("evt_failed_landing")
+    );
+}
+
+#[test]
+fn skill_evolution_instrument_limited_close_reports_its_retirement_reach() {
+    let clustered = repository_with_demo_skill();
+    let friction = record_outcome(
+        clustered.path(),
+        "frictional sibling",
+        "session-a",
+        "execution",
+        "friction",
+    );
+    let material_one = record_outcome(
+        clustered.path(),
+        "material one",
+        "session-b",
+        "execution",
+        "material_failure",
+    );
+    let material_two = record_outcome(
+        clustered.path(),
+        "material two",
+        "session-c",
+        "execution",
+        "material_failure",
+    );
+    claim_existing_evolution(clustered.path());
+    let post_claim = record_outcome(
+        clustered.path(),
+        "post-claim sibling",
+        "session-d",
+        "execution",
+        "friction",
+    );
+
+    let close = run_evolution_close(
+        clustered.path(),
+        "evt_blocked_close_reach",
+        "blocked_no_valid_test",
+        Some("no fresh trial can vary the binding run length"),
+    );
+
+    assert!(
+        close.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&close.stderr)
+    );
+    let receipt: Value = serde_json::from_slice(&close.stdout).expect("close receipt JSON");
+    let coverage = vec![material_one.clone(), material_two.clone()];
+    let reach = vec![friction, material_one, material_two, post_claim];
+    assert_eq!(
+        receipt["adjudicated_event_ids"],
+        serde_json::to_value(&coverage).expect("coverage JSON")
+    );
+    assert_eq!(
+        receipt["retired_from_gate_event_ids"],
+        serde_json::to_value(&reach).expect("retirement reach JSON")
+    );
+    assert_eq!(
+        receipt["retired_from_gate_event_ids"],
+        gate(clustered.path())["instrument_limited_incident_ids"]
+    );
+    let stream = fs::read_to_string(
+        clustered
+            .path()
+            .join("reports/skill-evidence/demo-skill/events.jsonl"),
+    )
+    .expect("read event stream");
+    let disposition: Value = stream
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("event JSON"))
+        .find(|event| event["event_id"] == "evt_blocked_close_reach")
+        .expect("review_disposition event");
+    assert_eq!(
+        disposition["payload"],
+        serde_json::json!({
+            "review_id": "rev_fixture",
+            "disposition": "blocked_no_valid_test",
+            "adjudicated_event_ids": coverage,
+            "note": "no fresh trial can vary the binding run length"
+        }),
+        "the receipt-only retirement reach must not change recorded history"
+    );
+}
+
+#[test]
+fn skill_evolution_instrument_limited_close_reports_empty_reach_for_a_severe_incident() {
+    let severe = repository_with_demo_skill();
+    record_outcome(
+        severe.path(),
+        "lone severe incident",
+        "severe-session",
+        "execution",
+        "severe_incident",
+    );
+    claim_existing_evolution(severe.path());
+    let close = run_evolution_close(
+        severe.path(),
+        "evt_blocked_close_severe",
+        "blocked_no_valid_test",
+        Some("the instrument cannot vary the binding constraint"),
+    );
+
+    assert!(
+        close.status.success(),
+        "severe close failed: {}",
+        String::from_utf8_lossy(&close.stderr)
+    );
+    let receipt: Value = serde_json::from_slice(&close.stdout).expect("severe close receipt JSON");
+    assert_eq!(
+        receipt["retired_from_gate_event_ids"],
+        serde_json::json!([]),
+        "an empty retirement reach is meaningful and must remain present"
+    );
+    assert_eq!(receipt["state"], "quarantined_eligible");
+}
+
+#[test]
+fn skill_evolution_non_instrument_limited_close_omits_retirement_reach_after_a_blocked_close() {
+    let fixture = repository_with_demo_skill();
+    claim_evolution(fixture.path());
+    let blocked = run_evolution_close(
+        fixture.path(),
+        "evt_first_blocked_close",
+        "blocked_no_valid_test",
+        Some("the first cluster cannot be tested by this instrument"),
+    );
+    assert!(
+        blocked.status.success(),
+        "blocked close failed: {}",
+        String::from_utf8_lossy(&blocked.stderr)
+    );
+    let blocked: Value =
+        serde_json::from_slice(&blocked.stdout).expect("blocked close receipt JSON");
+    let earlier_reach = blocked["retired_from_gate_event_ids"]
+        .as_array()
+        .expect("blocked close retirement reach")
+        .clone();
+    assert!(!earlier_reach.is_empty());
+
+    record_outcome(
+        fixture.path(),
+        "later output one",
+        "session-d",
+        "output",
+        "friction",
+    );
+    record_outcome(
+        fixture.path(),
+        "later output two",
+        "session-e",
+        "output",
+        "friction",
+    );
+    record_outcome(
+        fixture.path(),
+        "later output three",
+        "session-f",
+        "output",
+        "friction",
+    );
+    claim_existing_evolution_as(
+        fixture.path(),
+        "evt_later_claim",
+        "rev_later",
+        "lock_later_claim",
+    );
+    let later = run_evolution_close_for_review(
+        fixture.path(),
+        "evt_later_close",
+        "rev_later",
+        "monitor_for_recurrence",
+        Some("the current arm reproduced the condition without the failure"),
+    );
+
+    assert!(
+        later.status.success(),
+        "later close failed: {}",
+        String::from_utf8_lossy(&later.stderr)
+    );
+    let receipt: Value = serde_json::from_slice(&later.stdout).expect("later close receipt JSON");
+    assert!(
+        receipt.get("retired_from_gate_event_ids").is_none(),
+        "a later adjudicating close must not report an earlier close's retirement: {receipt}"
+    );
+    assert_eq!(
+        gate(fixture.path())["instrument_limited_incident_ids"],
+        Value::Array(earlier_reach),
+        "the omission must hold while the standing retired set remains non-empty"
+    );
+}
+
+#[test]
+fn skill_evolution_instrument_limited_close_reports_only_its_own_retirement_reach() {
+    let fixture = repository_with_demo_skill();
+    claim_evolution(fixture.path());
+    let first = run_evolution_close(
+        fixture.path(),
+        "evt_first_instrument_limited_close",
+        "blocked_no_valid_test",
+        Some("the execution cluster cannot be tested by this instrument"),
+    );
+    assert!(
+        first.status.success(),
+        "first close failed: {}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let first: Value = serde_json::from_slice(&first.stdout).expect("first close receipt JSON");
+    let first_reach = first["retired_from_gate_event_ids"]
+        .as_array()
+        .expect("first retirement reach")
+        .clone();
+
+    let second_reach = vec![
+        record_outcome(
+            fixture.path(),
+            "output one",
+            "session-d",
+            "output",
+            "friction",
+        ),
+        record_outcome(
+            fixture.path(),
+            "output two",
+            "session-e",
+            "output",
+            "friction",
+        ),
+        record_outcome(
+            fixture.path(),
+            "output three",
+            "session-f",
+            "output",
+            "friction",
+        ),
+    ];
+    claim_existing_evolution_as(
+        fixture.path(),
+        "evt_second_instrument_limited_claim",
+        "rev_second_instrument_limited",
+        "lock_second_instrument_limited_claim",
+    );
+    let second = run_evolution_close_for_review(
+        fixture.path(),
+        "evt_second_instrument_limited_close",
+        "rev_second_instrument_limited",
+        "blocked_no_valid_test",
+        Some("the output cluster cannot be tested by this instrument"),
+    );
+
+    assert!(
+        second.status.success(),
+        "second close failed: {}",
+        String::from_utf8_lossy(&second.stderr)
+    );
+    let receipt: Value = serde_json::from_slice(&second.stdout).expect("second close receipt JSON");
+    assert_eq!(
+        receipt["retired_from_gate_event_ids"],
+        serde_json::to_value(&second_reach).expect("second reach JSON"),
+        "the receipt names this close's retirement reach, not the standing retired set"
+    );
+    let mut standing = first_reach;
+    standing.extend(second_reach.into_iter().map(Value::String));
+    assert_eq!(
+        gate(fixture.path())["instrument_limited_incident_ids"],
+        Value::Array(standing),
+        "the projection remains the standing per-hash retired set"
     );
 }
 
