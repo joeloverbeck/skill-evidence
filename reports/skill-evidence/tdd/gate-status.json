@@ -1,12 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-09T11:16:38.606038752Z",
+  "generated_at": "2026-08-09T12:35:46.523979001Z",
   "target_content_hash": "fa4587c9947cd3836cebbf6ebda49196f0b9fb0cef1b7b7ff5d03fc01f20d31f",
-  "qualifying_uses_on_current_hash": 5,
+  "qualifying_uses_on_current_hash": 6,
   "open_incident_ids": [
     "evt_5930fbff-7cbc-4cdd-a64e-0f312b2488eb",
     "evt_ff458eea-8b9a-44f3-bc37-c3b0c9c035ab",
-    "evt_a1cbfef5-700a-4f2f-9164-0f736c7fd3c3"
+    "evt_a1cbfef5-700a-4f2f-9164-0f736c7fd3c3",
+    "evt_7f3f617f-c0df-4bd7-aa8b-5c72ddf752c8"
   ],
   "candidate_clusters": [
     {
@@ -18,6 +19,14 @@
       ],
       "independent_incidents": 3,
       "max_severity": "material_failure"
+    },
+    {
+      "symptom_key": "output",
+      "open_event_ids": [
+        "evt_7f3f617f-c0df-4bd7-aa8b-5c72ddf752c8"
+      ],
+      "independent_incidents": 1,
+      "max_severity": "friction"
     }
   ],
   "state": "eligible",
@@ -34,5 +43,5 @@
   "review_reentry_basis": "first_eligibility",
   "target_name": "tdd",
   "target_repo_relative_path": ".claude/skills/tdd",
-  "derivation_session_id": "019fe56c-5586-77c0-bf5b-7fc85c05d157"
+  "derivation_session_id": "019fe63f-66d9-70a1-bd68-fc8d41720628"
 }
