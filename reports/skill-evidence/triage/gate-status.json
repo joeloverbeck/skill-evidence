@@ -1,11 +1,22 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-09T15:10:22+02:00",
+  "generated_at": "2026-08-09T17:44:18.773688656Z",
   "target_content_hash": "5bc32c8a31d750428f7a914248487ce1c884f6b87f112a2d3fff1c087cd31596",
-  "qualifying_uses_on_current_hash": 4,
-  "open_incident_ids": [],
-  "candidate_clusters": [],
-  "state": "closed",
+  "qualifying_uses_on_current_hash": 5,
+  "open_incident_ids": [
+    "evt_1ab35d2e-cffa-4aaa-b141-a5dc471d68f9"
+  ],
+  "candidate_clusters": [
+    {
+      "symptom_key": "execution",
+      "open_event_ids": [
+        "evt_1ab35d2e-cffa-4aaa-b141-a5dc471d68f9"
+      ],
+      "independent_incidents": 1,
+      "max_severity": "material_failure"
+    }
+  ],
+  "state": "collecting",
   "authorized_workflow": null,
   "authorization_reason": null,
   "trigger_event_ids": [],
@@ -16,5 +27,5 @@
   "review_reentry_basis": null,
   "target_name": "triage",
   "target_repo_relative_path": ".claude/skills/triage",
-  "derivation_session_id": "019fe68c-fdf6-7093-9776-6a00b1858c11"
+  "derivation_session_id": "215514b4-1da7-4c41-b7c9-1a617bd07336"
 }

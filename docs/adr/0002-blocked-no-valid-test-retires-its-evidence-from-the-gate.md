@@ -6,6 +6,8 @@ Amended: 2026-08-09, GitHub [#13](https://github.com/joeloverbeck/skill-evidence
 
 Amended: 2026-08-09, GitHub [#14](https://github.com/joeloverbeck/skill-evidence/issues/14) — reviewers now vouch for the live reach bound before an instrument-limited close; a preview command was rejected because existing artifacts already supply that bound.
 
+Amended: 2026-08-09, GitHub [#16](https://github.com/joeloverbeck/skill-evidence/issues/16) — retirement now reaches only what the close's own authorization reason could name; the friction-sibling justification below was measured wrong for `material_recurrence` and is corrected. A correction path for an erroneous vouch is recorded as declined rather than left open.
+
 A Skill Evolution review that closes `blocked_no_valid_test` reached no conclusion, so it adjudicates
 nothing and its trigger evidence stays open. That close still laid a watermark, and the watermark
 deferred the very evidence that opened the gate — labelled `queued_pre_close_evidence`, as though a
@@ -80,17 +82,42 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
 - Evidence covered by a `blocked_no_valid_test` close stays in `open_incident_ids` — nothing was
   adjudicated — but leaves `candidate_clusters`, so it cannot reach a threshold again. Re-firing that
   cluster requires enough genuinely new incidents to meet the threshold on their own.
-- **Retirement reaches the covered clusters, not just the listed IDs, and stops at the close.** The
-  trigger list is frozen when the threshold fires, so an incident arriving while the review runs is
-  never in it, and a `material_recurrence` list never names the cluster's merely-frictional siblings
-  at all. Those share the symptom whose binding constraint the instrument could not vary. Retiring
-  only the listed IDs would hand the next review a lower bar than the first one faced — two new
-  incidents where the threshold takes three, and permanently so in the friction-sibling case, which
-  is the treadmill wearing a different hat. The bound matters as much as the reach: evidence recorded
-  *after* the close is new evidence and drives the gate, or the symptom would be silenced forever,
-  which is a worse failure than the trap. Retirement also applies only to closes whose review ran
-  against the current target hash — a finding about what this instrument cannot test says nothing
-  about a target that has since changed.
+- **Retirement reaches what the close's own authorization reason could name, and stops at the close.**
+  The trigger list is frozen when the threshold fires, so an incident arriving while the review runs
+  is never in it even though the reviewer can see it in the live projection and vouches for it.
+  Retiring only the listed IDs would hand the next review a lower bar than the first one faced — two
+  new incidents where the threshold takes three — which is the treadmill wearing a different hat. So
+  the reach is the authorization reason re-evaluated at the moment of the close: `friction_recurrence`
+  and `ten_use_unresolved` name their whole cluster and so retire it, `material_recurrence` names
+  only its material-or-worse subset and retires only that, and `severe` names one incident that is
+  itself never retired, so it retires nothing.
+  **The original text reached the whole symptom under every rule, and the argument for that was
+  wrong in two places.** It said a `material_recurrence` list "never names the cluster's merely
+  frictional siblings at all," which is true, and inferred that those siblings must therefore be
+  retired — but a friction sibling cannot lower a `material_recurrence` bar, which counts only
+  material-or-worse incidents, so it takes nothing from the next review of that rule. It also said
+  the lower bar was "permanently so in the friction-sibling case"; it is not, because a later
+  `friction_recurrence` close names the whole cluster and sweeps those siblings, so the cost was one
+  extra review session rather than a permanent discount. Widening past that reason bought
+  that session at the price of retiring evidence the review never examined, keyed on a symptom the
+  glossary defines as never diagnostic.
+  The bound matters as much as the reach: evidence recorded *after* the close is new evidence and
+  drives the gate, or the symptom would be silenced forever, which is a worse failure than the trap.
+  Retirement also applies only to closes whose review ran against the current target hash — a finding
+  about what this instrument cannot test says nothing about a target that has since changed.
+- **The narrowing was measured before it was adopted, and it moves no gate.** Across the six live
+  stores in this repository, `playbench`, and `mundifold`, 27 incidents stood retired: 22 named in a
+  coverage list, and 5 reached only by the symptom-wide rule. The new reach frees 2 of those 5, all
+  in one store, and every affected cluster stays below its threshold — no consumer's gate state
+  changes on upgrade. What changes is future: a freed incident counts toward the next threshold, so
+  a symptom can reopen on less new evidence than before. The remaining 3 are late arrivals the
+  reviewer saw and vouched for, and they stay retired.
+- **The derivation reads `authorizing_rule` off the `review_started` event, which `event.v1` does
+  not require.** Every `review_started` this crate has ever written carries it, and all 91 across
+  the three stores do. It is still an unvalidated field, so a stream lacking it — or carrying a rule
+  this version does not recognize — falls back to the previous symptom-wide reach rather than
+  failing or narrowing on a guess. Requiring the field in the published schema is a separate
+  contract decision and is not taken here.
 - **The close receipt and the projection name retirement at their distinct scopes.** A
   `blocked_no_valid_test` receipt carries `retired_from_gate_event_ids`, the retirement reach of that
   close, even when the list is empty; every non-instrument-limited close omits the key. The projection
@@ -153,3 +180,21 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
   preview command was considered and rejected: these existing artifacts already bound the reach,
   while a new flag beside the irreversible close would change a command surface consumers invoke by
   name and hypothetical derivation would add machinery without improving the decision.
+- **A wrong vouch stays wrong: there is no correction, supersession, or unretirement event, and
+  none is being built.** The reach is mechanical, but the judgment that authorizes it — that this
+  instrument cannot vary the named binding constraint — is semantic, and nothing in the stream can
+  check it. `joeloverbeck/skill-evidence#16` recorded a real instance: one covered incident's
+  expected and observed facts were a static repository condition a fresh fixture could vary, while
+  the close asserted a single untestable long-run constraint over every incident it reached.
+  Three grounds for declining the repair, in the order they bind. An event saying *the earlier
+  vouch was wrong* is prose written into a record so the system can read it back as truth, which is
+  the shape the considered options above reject three times over and which
+  [`../principles/evidence-substrate-integrity.md`](../principles/evidence-substrate-integrity.md)
+  forbids as *records are generated, never authored*. With the reach narrowed to the authorizing
+  rule, a wrong vouch can no longer take evidence the review never had reason to examine — the rule
+  that opened the gate is the rule that bounds the loss. And an honest exit already exists and is
+  the one this decision has relied on since it was accepted: evidence recorded after the close
+  drives the gate, and editing the target clears the hash. The residue is that a testable incident
+  already on disk can stay out of the gate on the strength of a judgment that was wrong, and that
+  is accepted here rather than overlooked. What would reopen it is a close whose reach is disputed
+  *after* the vouch step has shipped and been used — every instance measured for #16 predates it.

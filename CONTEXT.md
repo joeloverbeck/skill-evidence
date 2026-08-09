@@ -102,7 +102,10 @@ _Avoid_: group, bucket, batch
 Why a gate authorizes a workflow right now, recorded alongside which workflow is authorized.
 Distinct from the gate state, which says only where the target stands, and distinct from the
 re-entry basis, which is specifically about becoming actionable again after a completed review.
-_Avoid_: trigger, cause, justification
+One value, carried under two field names — `authorizing_rule` on the recorded event and
+`authorization_reason` on the projection — so name the concept this way in prose whichever field
+is in hand.
+_Avoid_: trigger, cause, justification, authorizing rule
 
 **Re-entry basis**:
 The recorded ground on which a target becomes actionable again after a completed review on the same
@@ -157,16 +160,17 @@ review already proved untestable. The one such disposition is `blocked_no_valid_
 _Avoid_: dismissed, wontfix, closed-untestable
 
 **Retirement reach**:
-The open incidents one instrument-limited close moves out of the gate: its coverage list, plus every
-open incident sharing a symptom that list touched, bounded at the close. Wider than the coverage
-list, and distinct from the gate projection's standing retired set — a live per-hash view that later
-closes can grow or shrink. A close reports its own reach; the projection reports the standing set.
+The open incidents one instrument-limited close moves out of the gate: the ones its review's own
+authorization reason still names when re-evaluated at the close. Wider than the coverage list,
+because that list froze when the threshold fired, and never wider than what opened the gate. Distinct
+from the gate projection's standing retired set — a live per-hash view that later closes can grow or
+shrink. A close reports its own reach; the projection reports the standing set.
 _Avoid_: retired set, instrument-limited set, covered evidence
 
 **Reach bound**:
 The widest set a prospective instrument-limited close could retire, as the gate projection shows it
-before the close: every open incident clustered under a symptom the coverage list touches. It bounds
-the retirement reach from above and never from below — a contemporaneous severe incident sits in that
+before the close: every open incident the review's authorization reason would name there and then. It
+bounds the reach from above and never from below — a contemporaneous severe incident sits in that
 cluster and is never retired — so it is what a reviewer must be able to vouch for before closing, not
 a prediction of what the close will name.
 _Avoid_: predicted reach, dry-run reach, projected reach

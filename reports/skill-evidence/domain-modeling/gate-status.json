@@ -1,23 +1,25 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-09T12:46:14.038196302Z",
+  "generated_at": "2026-08-09T17:51:17.097125565Z",
   "target_content_hash": "97f7208528885b6bf219d45525f5e086b45291c8b1f66090915d6e8bd6709dc8",
-  "qualifying_uses_on_current_hash": 5,
+  "qualifying_uses_on_current_hash": 6,
   "open_incident_ids": [
     "evt_4833594e-7e25-4a2f-a94a-278e6e3b9e86",
     "evt_2aabfe78-d93c-48c4-b54e-346b838bfb83",
     "evt_92d00622-339f-4004-86c9-60fbeb50d218",
     "evt_cade3ab8-7454-490e-9e60-9ed1e974d9d9",
-    "evt_599a36b0-d0c4-408d-9ef3-30a806c8ca86"
+    "evt_599a36b0-d0c4-408d-9ef3-30a806c8ca86",
+    "evt_94dcf11b-22ca-4d83-afd5-32b877b83799"
   ],
   "candidate_clusters": [
     {
       "symptom_key": "output",
       "open_event_ids": [
-        "evt_4833594e-7e25-4a2f-a94a-278e6e3b9e86"
+        "evt_4833594e-7e25-4a2f-a94a-278e6e3b9e86",
+        "evt_94dcf11b-22ca-4d83-afd5-32b877b83799"
       ],
-      "independent_incidents": 1,
-      "max_severity": "friction"
+      "independent_incidents": 2,
+      "max_severity": "material_failure"
     }
   ],
   "state": "collecting",
@@ -31,7 +33,7 @@
   "review_reentry_basis": null,
   "target_name": "domain-modeling",
   "target_repo_relative_path": ".claude/skills/domain-modeling",
-  "derivation_session_id": "019fe688-8d0a-7ce2-a472-e0fcbcde88f1",
+  "derivation_session_id": "215514b4-1da7-4c41-b7c9-1a617bd07336",
   "instrument_limited_incident_ids": [
     "evt_2aabfe78-d93c-48c4-b54e-346b838bfb83",
     "evt_92d00622-339f-4004-86c9-60fbeb50d218",

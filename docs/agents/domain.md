@@ -37,3 +37,29 @@ If the concept you need isn't in the glossary yet, that's a signal — either yo
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
 > _Contradicts ADR-0007 (event-sourced orders) — but worth reopening because…_
+
+## Amending an accepted ADR: this repo's revision identifier
+
+`/domain-modeling`'s ADR-format reference prescribes an `Amended: <date> (<revision>) — <what changed>`
+line, and a companion note "wherever this repo already records the revision (the changelog or
+iteration report that drove it)." Neither clause lands here as written, and that gap is what this
+section closes — the skill arrived by wholesale copy and will arrive that way again, so recording the
+localization here rather than editing the skill is the point. Editing it would also change
+`domain-modeling`'s target content hash and discard the evidence accumulated against the current one.
+
+- **The revision identifier is the GitHub issue that drove the amendment.** This repo has no changelog,
+  no iteration report, and no revision number; its ADRs are anchored by acceptance date and issue.
+  The established line form, used throughout
+  [`../adr/0002-blocked-no-valid-test-retires-its-evidence-from-the-gate.md`](../adr/0002-blocked-no-valid-test-retires-its-evidence-from-the-gate.md), is:
+
+  > `Amended: <date>, GitHub [#N](https://github.com/joeloverbeck/skill-evidence/issues/N) — <what changed>.`
+
+  Do not invent a version or revision number to fill the reference's `(<revision>)` slot.
+- **The companion note is vacuous here and needs no substitute.** It is conditional on the repo
+  *already* recording the revision somewhere. This one does not, and
+  [`../principles/consumer-contract.md`](../principles/consumer-contract.md) lists a maintained
+  changelog among the obligations this repository does not accept — a courtesy, never a duty — so
+  there is no destination to write to and none should be created for the sake of the line.
+
+Amending in place still applies only when the decision stands. An actual reversal or replacement gets
+a new ADR that supersedes the old one, per the reference.
