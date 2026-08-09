@@ -6,13 +6,15 @@ principles win and this document is what gets fixed.
 
 ## What is actually at stake
 
-Recorded evidence in the consuming repositories, at the time of writing:
+Recorded evidence in the consuming repositories, as of 2026-08-09. A dated snapshot, not a figure
+to maintain — it drifts every time a consumer records anything, and the order of magnitude is the
+part that matters.
 
 | Consumer | Evidence stores | Recorded events | How it depends |
 |---|---|---|---|
-| `playbench` | 32 | 1002 | `skill-evidence = "0.1"`; host command `playbench` |
-| `mundifold` | 15 | 75 | **vendored fork** at `crates/skill-evidence` — see §8 |
-| `what-we-bring-home` | 5 | 8 | `skill-evidence = "0.1"`; host command `cargo run --locked -p developer-tools --` |
+| `playbench` | 32 | 1038 | `skill-evidence = "0.1"`; host command `playbench` |
+| `mundifold` | 16 | 118 | `skill-evidence = "0.1.2"`; host command `mundifold` |
+| `what-we-bring-home` | 7 | 18 | `skill-evidence = "0.1"`; host command `cargo run --locked -p developer-tools --` |
 
 Over a thousand append-only events that no release can regenerate. That is the number to have in
 mind when deciding whether a change is really additive.
@@ -123,8 +125,8 @@ which files the upgrade will change.
 
 Step 7 is the one that matters. A projection may legitimately change; `events.jsonl` may not.
 
-Host commands: `playbench` for playbench, `cargo run --locked -p developer-tools --` for
-what-we-bring-home.
+Host commands: `playbench` for playbench, `mundifold` for mundifold, and
+`cargo run --locked -p developer-tools --` for what-we-bring-home.
 
 ## 7. The orphan problem
 
@@ -155,4 +157,5 @@ that obliges anyone.
 
 A consumer that *vendors* a copy is a different matter — it has left the contract entirely, gets
 no compatibility guarantee, and a defect reported against its line numbers is a report about that
-fork until it is reproduced against a published version. `mundifold` is currently in this state.
+fork until it is reproduced against a published version. Which consumers resolve a published
+version is recorded once, in the table under *What is actually at stake*.
