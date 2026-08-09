@@ -104,6 +104,13 @@ carry instructions, not executables* in [`consumer-contract.md`](consumer-contra
 the repository as of `82f2ce4`. No other clause changed; the constitutional-documents list above
 names the new rule.
 
+Amended 2026-08-09 by the repository owner, at the exact text in commit `8a1dc64` changing
+§*The installer never removes* and its cross-reference in §*Shipped packages carry instructions,
+not executables* in [`consumer-contract.md`](consumer-contract.md), against the repository as of
+`8a1dc64`. No other clause changed. The amendment separates install from explicit withdrawal,
+permanently bounds withdrawal to the retirement set, and preserves the breaking-change status of
+package retirement and rename.
+
 Adoption of these documents does not by itself adopt any future schema version, installer redesign,
 distribution change, or resolution of an open issue. In particular it does not settle the open
 question in `joeloverbeck/skill-evidence#2`; it supplies the clause that question is decided

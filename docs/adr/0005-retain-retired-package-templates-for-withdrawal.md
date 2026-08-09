@@ -54,7 +54,8 @@ and is structurally unreachable from `install`.
   side-effect-free preview with respect to retirement.
 - A withdrawal receipt names removed files, forced files, removed directories, removed discovery
   links, and every retained path with its reason. Refusal remains exit code `3`; a mid-operation
-  I/O failure remains unsafe failure `1`.
+  I/O failure remains unsafe failure `1` and carries a serialized partial receipt naming every
+  effect completed before the failure.
 - A foreign file legitimately keeps its containing retired package directory alive. A later run
   completes withdrawal after the consumer resolves that file.
 - No recorded-event type, schema, reader, writer, fixture, or evidence-store path changes.

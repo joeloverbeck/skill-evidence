@@ -242,6 +242,53 @@ fn withdraw_cli_refuses_an_edited_retired_file_without_changing_the_tree() {
     assert_eq!(snapshot_tree(root.path()), before);
 }
 
+#[cfg(unix)]
+#[test]
+fn withdrawal_unsafe_failure_reports_every_effect_already_applied() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = tempfile::tempdir().expect("temporary repository root");
+    write_reference_host_retired_package(root.path());
+    let package = root
+        .path()
+        .join(".claude/skills/legacy-skill-decontamination");
+    let blocked_directory = package.join("agents");
+    fs::set_permissions(&blocked_directory, fs::Permissions::from_mode(0o500))
+        .expect("make the later removal fail");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_skill-evidence"))
+        .args(["skills", "evidence", "withdraw", "--root"])
+        .arg(root.path())
+        .output()
+        .expect("run compiled withdrawal with a later I/O failure");
+
+    fs::set_permissions(&blocked_directory, fs::Permissions::from_mode(0o700))
+        .expect("restore directory permissions for cleanup");
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert!(
+        !package.join("SKILL.md").exists(),
+        "the first removal happened"
+    );
+    assert!(
+        package.join("agents/openai.yaml").is_file(),
+        "the failing removal did not happen"
+    );
+    let stderr = String::from_utf8(output.stderr).expect("UTF-8 unsafe failure");
+    let (_, receipt) = stderr
+        .trim_end()
+        .split_once(" Partial withdrawal receipt: ")
+        .expect("unsafe failure carries an inspectable partial receipt");
+    let receipt: serde_json::Value =
+        serde_json::from_str(receipt).expect("partial withdrawal receipt JSON");
+    assert_eq!(
+        receipt["removed_files"],
+        serde_json::json!([".claude/skills/legacy-skill-decontamination/SKILL.md"])
+    );
+    assert_eq!(receipt["removed_links"], serde_json::json!([]));
+    assert_eq!(receipt["removed_directories"], serde_json::json!([]));
+}
+
 #[test]
 fn install_refusal_leaves_the_whole_tree_byte_identical() {
     let root = tempfile::tempdir().expect("temporary repository root");

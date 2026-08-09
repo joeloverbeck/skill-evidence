@@ -258,8 +258,8 @@ pub fn withdraw(root: &Path, host: &Host, force: bool) -> Result<WithdrawalRecei
         .iter()
         .map(|asset| PathBuf::from(asset.relative_path))
         .collect();
-    let mut removed_files = Vec::new();
-    let mut forced_files = Vec::new();
+    let mut files_to_remove = Vec::new();
+    let mut forced_files_to_remove = HashSet::new();
     let mut retained = Vec::new();
     let mut conflicts = Vec::new();
     let mut package_directories = Vec::new();
@@ -315,10 +315,10 @@ pub fn withdraw(root: &Path, host: &Host, force: bool) -> Result<WithdrawalRecei
             ))
         })?;
         if existing == render(asset.template, host).as_bytes() {
-            removed_files.push(asset.relative_path.to_owned());
+            files_to_remove.push(asset.relative_path.to_owned());
         } else if force {
-            removed_files.push(asset.relative_path.to_owned());
-            forced_files.push(asset.relative_path.to_owned());
+            files_to_remove.push(asset.relative_path.to_owned());
+            forced_files_to_remove.insert(asset.relative_path.to_owned());
         } else {
             conflicts.push(asset.relative_path.to_owned());
         }
@@ -367,32 +367,44 @@ pub fn withdraw(root: &Path, host: &Host, force: bool) -> Result<WithdrawalRecei
         )));
     }
 
-    for relative in &removed_files {
-        fs::remove_file(root.join(relative))
-            .map_err(|error| unsafe_failure(format!("Could not remove {relative}: {error}")))?;
-    }
-
-    let mut removed_links = Vec::new();
-    for relative in links_to_remove {
-        fs::remove_file(root.join(&relative)).map_err(|error| {
-            unsafe_failure(format!(
-                "Could not remove discovery link {}: {error}",
-                portable_path(&relative)
-            ))
-        })?;
-        removed_links.push(portable_path(&relative));
-    }
-
-    let removed_directories = remove_empty_package_directories(root, package_directories)?;
-
-    Ok(WithdrawalReceipt {
+    let mut receipt = WithdrawalReceipt {
         schema_version: 1,
-        removed_files,
-        forced_files,
-        removed_directories,
-        removed_links,
+        removed_files: Vec::new(),
+        forced_files: Vec::new(),
+        removed_directories: Vec::new(),
+        removed_links: Vec::new(),
         retained,
-    })
+    };
+
+    for relative in files_to_remove {
+        if let Err(error) = fs::remove_file(root.join(&relative)) {
+            return Err(partial_withdrawal_failure(
+                format!("Could not remove {relative}: {error}"),
+                &receipt,
+            ));
+        }
+        if forced_files_to_remove.contains(&relative) {
+            receipt.forced_files.push(relative.clone());
+        }
+        receipt.removed_files.push(relative);
+    }
+
+    for relative in links_to_remove {
+        if let Err(error) = fs::remove_file(root.join(&relative)) {
+            return Err(partial_withdrawal_failure(
+                format!(
+                    "Could not remove discovery link {}: {error}",
+                    portable_path(&relative)
+                ),
+                &receipt,
+            ));
+        }
+        receipt.removed_links.push(portable_path(&relative));
+    }
+
+    remove_empty_package_directories(root, package_directories, &mut receipt)?;
+
+    Ok(receipt)
 }
 
 fn inspect_foreign_package_entries(
@@ -488,7 +500,8 @@ fn safe_directory_boundary(
 fn remove_empty_package_directories(
     root: &Path,
     mut directories: Vec<PathBuf>,
-) -> Result<Vec<String>, Error> {
+    receipt: &mut WithdrawalReceipt,
+) -> Result<(), Error> {
     directories.sort_by(|left, right| {
         right
             .components()
@@ -497,21 +510,31 @@ fn remove_empty_package_directories(
             .then_with(|| left.cmp(right))
     });
 
-    let mut removed = Vec::new();
     for directory in directories {
         match fs::remove_dir(&directory) {
-            Ok(()) => removed.push(portable_relative(root, &directory)),
+            Ok(()) => receipt
+                .removed_directories
+                .push(portable_relative(root, &directory)),
             Err(error) if error.kind() == std::io::ErrorKind::DirectoryNotEmpty => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => {
-                return Err(unsafe_failure(format!(
-                    "Could not remove empty retired-package directory {}: {error}",
-                    portable_relative(root, &directory)
-                )));
+                return Err(partial_withdrawal_failure(
+                    format!(
+                        "Could not remove empty retired-package directory {}: {error}",
+                        portable_relative(root, &directory)
+                    ),
+                    receipt,
+                ));
             }
         }
     }
-    Ok(removed)
+    Ok(())
+}
+
+fn partial_withdrawal_failure(message: String, receipt: &WithdrawalReceipt) -> Error {
+    let receipt = serde_json::to_string(receipt)
+        .expect("serializing a withdrawal receipt containing only strings cannot fail");
+    unsafe_failure(format!("{message}. Partial withdrawal receipt: {receipt}"))
 }
 
 fn portable_relative(root: &Path, path: &Path) -> String {
