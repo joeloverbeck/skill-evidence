@@ -163,6 +163,14 @@ list, and distinct from the gate projection's standing retired set — a live pe
 closes can grow or shrink. A close reports its own reach; the projection reports the standing set.
 _Avoid_: retired set, instrument-limited set, covered evidence
 
+**Reach bound**:
+The widest set a prospective instrument-limited close could retire, as the gate projection shows it
+before the close: every open incident clustered under a symptom the coverage list touches. It bounds
+the retirement reach from above and never from below — a contemporaneous severe incident sits in that
+cluster and is never retired — so it is what a reviewer must be able to vouch for before closing, not
+a prediction of what the close will name.
+_Avoid_: predicted reach, dry-run reach, projected reach
+
 **Landing**:
 The one authorized act that modifies a live target, carrying a baseline snapshot, a diff, and a
 durable receipt. Landing is separate from acceptance: it applies a validated candidate, it does not
