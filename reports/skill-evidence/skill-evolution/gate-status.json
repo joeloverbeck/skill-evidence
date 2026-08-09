@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-09T13:14:44.899072886Z",
+  "target_content_hash": "d6cda1052ed23791971e5c376260bf8f396eabf87b08666751c861eff79e2ba0",
+  "qualifying_uses_on_current_hash": 2,
+  "open_incident_ids": [
+    "evt_504cd166-c6e9-4eda-842b-76065d3c45d1"
+  ],
+  "candidate_clusters": [
+    {
+      "symptom_key": "execution",
+      "open_event_ids": [
+        "evt_504cd166-c6e9-4eda-842b-76065d3c45d1"
+      ],
+      "independent_incidents": 1,
+      "max_severity": "severe_incident"
+    }
+  ],
+  "state": "quarantined_eligible",
+  "authorized_workflow": "skill-evolution",
+  "authorization_reason": "severe",
+  "trigger_event_ids": [
+    "evt_504cd166-c6e9-4eda-842b-76065d3c45d1"
+  ],
+  "threshold_session_id": "019fe688-8d0a-7ce2-a472-e0fcbcde88f1",
+  "not_before": null,
+  "active_review_id": null,
+  "last_completed_review_id": null,
+  "review_reentry_basis": "first_eligibility",
+  "target_name": "skill-evolution",
+  "target_repo_relative_path": ".claude/skills/skill-evolution",
+  "derivation_session_id": "019fe68c-fdf6-7093-9776-6a00b1858c11"
+}

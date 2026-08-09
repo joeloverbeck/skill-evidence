@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-09T09:01:30.063552016Z",
+  "generated_at": "2026-08-09T12:46:14.038196302Z",
   "target_content_hash": "97f7208528885b6bf219d45525f5e086b45291c8b1f66090915d6e8bd6709dc8",
   "qualifying_uses_on_current_hash": 5,
   "open_incident_ids": [
@@ -18,33 +18,24 @@
       ],
       "independent_incidents": 1,
       "max_severity": "friction"
-    },
-    {
-      "symptom_key": "execution",
-      "open_event_ids": [
-        "evt_2aabfe78-d93c-48c4-b54e-346b838bfb83",
-        "evt_92d00622-339f-4004-86c9-60fbeb50d218",
-        "evt_cade3ab8-7454-490e-9e60-9ed1e974d9d9",
-        "evt_599a36b0-d0c4-408d-9ef3-30a806c8ca86"
-      ],
-      "independent_incidents": 4,
-      "max_severity": "friction"
     }
   ],
-  "state": "eligible",
-  "authorized_workflow": "skill-evolution",
-  "authorization_reason": "friction_recurrence:execution",
-  "trigger_event_ids": [
-    "evt_2aabfe78-d93c-48c4-b54e-346b838bfb83",
-    "evt_92d00622-339f-4004-86c9-60fbeb50d218",
-    "evt_cade3ab8-7454-490e-9e60-9ed1e974d9d9"
-  ],
-  "threshold_session_id": "12b91ede-dc2d-4fea-8e07-b259702bc2b7",
+  "state": "collecting",
+  "authorized_workflow": null,
+  "authorization_reason": null,
+  "trigger_event_ids": [],
+  "threshold_session_id": null,
   "not_before": null,
   "active_review_id": null,
-  "last_completed_review_id": null,
-  "review_reentry_basis": "first_eligibility",
+  "last_completed_review_id": "5d1d35bb-95d9-4316-a36f-3c13559250ff",
+  "review_reentry_basis": null,
   "target_name": "domain-modeling",
   "target_repo_relative_path": ".claude/skills/domain-modeling",
-  "derivation_session_id": "6c8374b2-52de-4f02-bc2b-4c1c4b094d6c"
+  "derivation_session_id": "019fe688-8d0a-7ce2-a472-e0fcbcde88f1",
+  "instrument_limited_incident_ids": [
+    "evt_2aabfe78-d93c-48c4-b54e-346b838bfb83",
+    "evt_92d00622-339f-4004-86c9-60fbeb50d218",
+    "evt_cade3ab8-7454-490e-9e60-9ed1e974d9d9",
+    "evt_599a36b0-d0c4-408d-9ef3-30a806c8ca86"
+  ]
 }
