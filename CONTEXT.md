@@ -131,7 +131,9 @@ _Avoid_: root cause, precondition, trigger
 
 **Witness**:
 The observable in a finished run's own output that shows whether that run actually expressed the
-binding constraint. Fixed before any result exists; chosen afterwards, it is not evidence.
+binding constraint. Fixed before any result exists; chosen afterwards, it is not evidence. An
+observable that no finished run could make read unexpressed does not show *whether*, and is not a
+witness.
 _Avoid_: check, signal, indicator, assertion
 
 **Disposition**:
