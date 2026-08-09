@@ -1,11 +1,12 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-08T19:34:38.944925113Z",
+  "generated_at": "2026-08-09T02:29:28.666493841Z",
   "target_content_hash": "2785481265152dec4b7c8cf4e756bd4c232e0d836bb5d03dd5cec16b588958a9",
-  "qualifying_uses_on_current_hash": 3,
+  "qualifying_uses_on_current_hash": 4,
   "open_incident_ids": [
     "evt_a660a6dd-97d4-4e5f-9eb8-4018f673dac0",
-    "evt_49479ad7-9a58-4139-a1ef-197454401e8c"
+    "evt_49479ad7-9a58-4139-a1ef-197454401e8c",
+    "evt_4b11ec1e-8d0c-439b-b613-09f76352c5a9"
   ],
   "candidate_clusters": [
     {
@@ -16,18 +17,28 @@
       ],
       "independent_incidents": 2,
       "max_severity": "material_failure"
+    },
+    {
+      "symptom_key": "state",
+      "open_event_ids": [
+        "evt_4b11ec1e-8d0c-439b-b613-09f76352c5a9"
+      ],
+      "independent_incidents": 1,
+      "max_severity": "severe_incident"
     }
   ],
-  "state": "collecting",
-  "authorized_workflow": null,
-  "authorization_reason": null,
-  "trigger_event_ids": [],
-  "threshold_session_id": null,
+  "state": "quarantined_pending_cooldown",
+  "authorized_workflow": "skill-evolution",
+  "authorization_reason": "severe",
+  "trigger_event_ids": [
+    "evt_4b11ec1e-8d0c-439b-b613-09f76352c5a9"
+  ],
+  "threshold_session_id": "1d50747f-e39a-4910-95a2-ccf4d839413c",
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": null,
-  "review_reentry_basis": null,
+  "review_reentry_basis": "first_eligibility",
   "target_name": "implement",
   "target_repo_relative_path": ".claude/skills/implement",
-  "derivation_session_id": "019fe2aa-7017-7102-8c37-e05a5e823863"
+  "derivation_session_id": "1d50747f-e39a-4910-95a2-ccf4d839413c"
 }
