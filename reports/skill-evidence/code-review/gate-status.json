@@ -1,11 +1,12 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-09T19:14:56.058659Z",
+  "generated_at": "2026-08-09T23:27:48.033634376Z",
   "target_content_hash": "58ee690ec479d13e9ff51567f4e57087f319ac7a1aca6511d61c8628f5e43fa6",
-  "qualifying_uses_on_current_hash": 9,
+  "qualifying_uses_on_current_hash": 10,
   "open_incident_ids": [
     "evt_7814cfa8-ad78-4511-b202-f78ad96902d3",
-    "evt_d8187585-0e16-4fb6-b72d-380cdefb256d"
+    "evt_d8187585-0e16-4fb6-b72d-380cdefb256d",
+    "evt_734adee8-5bff-4703-ab93-7dc7392fb1e5"
   ],
   "candidate_clusters": [
     {
@@ -19,22 +20,26 @@
     {
       "symptom_key": "execution",
       "open_event_ids": [
-        "evt_d8187585-0e16-4fb6-b72d-380cdefb256d"
+        "evt_d8187585-0e16-4fb6-b72d-380cdefb256d",
+        "evt_734adee8-5bff-4703-ab93-7dc7392fb1e5"
       ],
-      "independent_incidents": 1,
+      "independent_incidents": 2,
       "max_severity": "material_failure"
     }
   ],
-  "state": "collecting",
-  "authorized_workflow": null,
-  "authorization_reason": null,
-  "trigger_event_ids": [],
-  "threshold_session_id": null,
+  "state": "eligible_pending_cooldown",
+  "authorized_workflow": "skill-evolution",
+  "authorization_reason": "ten_use_unresolved",
+  "trigger_event_ids": [
+    "evt_d8187585-0e16-4fb6-b72d-380cdefb256d",
+    "evt_734adee8-5bff-4703-ab93-7dc7392fb1e5"
+  ],
+  "threshold_session_id": "019fe8ad-5007-7aa1-ab38-849dba1a40de",
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": "rev_cbbe933b-a491-416e-b0bf-080c3b5eefa1",
-  "review_reentry_basis": null,
+  "review_reentry_basis": "post_review_incident",
   "target_name": "code-review",
   "target_repo_relative_path": ".claude/skills/code-review",
-  "derivation_session_id": "ba3e0c87-74fc-4aff-a2ec-400042b7356a"
+  "derivation_session_id": "019fe8ad-5007-7aa1-ab38-849dba1a40de"
 }
