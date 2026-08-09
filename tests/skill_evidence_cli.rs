@@ -214,6 +214,76 @@ fn skill_evidence_hash_uses_legacy_forward_slashes_for_nested_paths() {
 }
 
 #[test]
+fn skill_evidence_derive_refuses_without_creating_a_missing_evidence_store() {
+    let fixture = repository_with_demo_skill();
+    let evidence_directory = fixture.path().join("reports/skill-evidence/demo-skill");
+    let events_path = evidence_directory.join("events.jsonl");
+
+    let output = skill_evidence()
+        .args(["skills", "evidence", "derive", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--session-id",
+            "derive-session",
+        ])
+        .output()
+        .expect("run skill-evidence derive without an event stream");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("UTF-8 refusal diagnostic"),
+        format!(
+            "Cannot derive a gate projection because the event stream does not exist: {}. Nothing modified.\n",
+            events_path.display()
+        )
+    );
+    assert!(!evidence_directory.exists());
+}
+
+#[test]
+fn skill_evidence_derive_accepts_an_empty_event_stream() {
+    let fixture = repository_with_demo_skill();
+    let evidence_directory = fixture.path().join("reports/skill-evidence/demo-skill");
+    fs::create_dir_all(&evidence_directory).expect("create evidence directory");
+    let events_path = evidence_directory.join("events.jsonl");
+    fs::write(&events_path, b"").expect("write empty event stream");
+
+    let output = skill_evidence()
+        .args(["skills", "evidence", "derive", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--session-id",
+            "derive-session",
+        ])
+        .output()
+        .expect("derive an empty event stream");
+
+    assert!(
+        output.status.success(),
+        "derive failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let status: Value = serde_json::from_slice(&output.stdout).expect("gate status JSON");
+    assert_eq!(status["state"], "closed");
+    assert_eq!(status["qualifying_uses_on_current_hash"], 0);
+    assert_eq!(
+        serde_json::from_slice::<Value>(
+            &fs::read(evidence_directory.join("gate-status.json"))
+                .expect("read persisted projection")
+        )
+        .expect("persisted projection JSON"),
+        status
+    );
+    assert_eq!(fs::read(events_path).expect("reread empty stream"), b"");
+}
+
+#[test]
 fn skill_evidence_derive_accepts_legacy_v1_stream_without_rewriting_events() {
     let fixture = repository_with_demo_skill();
     let evidence_directory = fixture.path().join("reports/skill-evidence/demo-skill");

@@ -713,15 +713,21 @@ pub fn derive_store(
 ) -> Result<GateStatus, Error> {
     validate_derivation_inputs(inputs)?;
     let target = target_context(root, target)?;
-    fs::create_dir_all(&target.evidence_directory).map_err(|error| {
-        unsafe_failure(format!(
-            "Could not create evidence directory {}: {error}",
-            target.evidence_directory.display()
-        ))
-    })?;
-    let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
-    let hash = hash_target_directory(&target.target_real)?;
     let events_path = target.evidence_directory.join("events.jsonl");
+    if !target.evidence_directory.exists() {
+        return Err(refusal(format!(
+            "Cannot derive a gate projection because the event stream does not exist: {}. Nothing modified.",
+            events_path.display()
+        )));
+    }
+    let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
+    if !events_path.is_file() {
+        return Err(refusal(format!(
+            "Cannot derive a gate projection because the event stream does not exist: {}. Nothing modified.",
+            events_path.display()
+        )));
+    }
+    let hash = hash_target_directory(&target.target_real)?;
     let (events, integrity_errors) = read_event_stream(&events_path)?;
     let status = derive_gate(
         &target,

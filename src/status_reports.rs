@@ -311,7 +311,9 @@ pub fn skill_evolution_status(
             .and_then(|name| name.to_str())
             .unwrap_or("unavailable")
             .to_owned();
-        let (events, errors) = match read_event_stream(&store.join("events.jsonl")) {
+        let events_path = store.join("events.jsonl");
+        let has_event_stream = events_path.is_file();
+        let (events, errors) = match read_event_stream(&events_path) {
             Ok(stream) => stream,
             Err(error) => {
                 indeterminate.push(EvolutionIndeterminateEntry {
@@ -329,11 +331,15 @@ pub fn skill_evolution_status(
             Err(error) => (None, Some(error)),
         };
         let target_path = event_target_path.or_else(|| {
-            projection
-                .as_ref()
-                .and_then(|value| value["target_repo_relative_path"].as_str())
-                .filter(|path| !path.is_empty())
-                .map(str::to_owned)
+            has_event_stream
+                .then(|| {
+                    projection
+                        .as_ref()
+                        .and_then(|value| value["target_repo_relative_path"].as_str())
+                        .filter(|path| !path.is_empty())
+                        .map(str::to_owned)
+                })
+                .flatten()
         });
         let Some(target_path) = target_path else {
             let has_stream_errors = !errors.is_empty();
@@ -342,7 +348,12 @@ pub fn skill_evolution_status(
                 reported_errors.push(error);
             }
             reported_errors.push(identity_error.unwrap_or_else(|| {
-                "no target path exists in events.jsonl or gate-status.json".to_owned()
+                if has_event_stream {
+                    "no target path exists in events.jsonl or gate-status.json".to_owned()
+                } else {
+                    "events.jsonl does not exist; a gate projection alone cannot identify an evidence store"
+                        .to_owned()
+                }
             }));
             indeterminate.push(EvolutionIndeterminateEntry {
                 kind: if has_stream_errors {

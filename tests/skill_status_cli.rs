@@ -1711,6 +1711,7 @@ fn skill_evolution_status_isolates_a_store_scan_failure() {
         .expect("create unreadable-as-file event path");
     let healthy_store = root.path().join("reports/skill-evidence/healthy");
     fs::create_dir_all(&healthy_store).expect("create healthy store");
+    fs::write(healthy_store.join("events.jsonl"), b"").expect("write empty event stream");
     fs::write(
         healthy_store.join("gate-status.json"),
         "{\n  \"target_repo_relative_path\": \".claude/skills/healthy\"\n}\n",
@@ -1861,6 +1862,7 @@ fn skill_evolution_status_uses_a_stored_projection_only_for_target_identity() {
     }
     let store = root.path().join("reports/skill-evidence/projection-only");
     fs::create_dir_all(&store).expect("create projection-only store");
+    fs::write(store.join("events.jsonl"), b"").expect("write empty event stream");
     fs::write(
         store.join("gate-status.json"),
         "{\n  \"schema_version\": 1,\n  \"target_name\": \"projection-only\",\n  \"target_repo_relative_path\": \".claude/skills/projection-only\",\n  \"state\": \"deliberately_stale_fixture\"\n}\n",
@@ -1882,6 +1884,105 @@ fn skill_evolution_status_uses_a_stored_projection_only_for_target_identity() {
     let report = String::from_utf8(output.stdout).expect("UTF-8 status report");
     assert!(report.contains("indeterminate: 0; omitted as not eligible: 1"));
     assert!(!report.contains("## Could not determine"));
+}
+
+#[test]
+fn skill_evolution_status_keeps_a_projection_only_directory_unidentified_after_derive_refuses() {
+    let root = tempfile::tempdir().expect("temporary repository");
+    for name in ["skill-evolution", "projection-only"] {
+        create_fixture_skill(root.path(), name);
+    }
+    let store = root.path().join("reports/skill-evidence/projection-only");
+    fs::create_dir_all(&store).expect("create projection-only directory");
+    let projection_path = store.join("gate-status.json");
+    fs::write(
+        &projection_path,
+        serde_json::to_vec_pretty(&json!({
+            "schema_version": 1,
+            "generated_at": "2026-07-25T12:00:00Z",
+            "target_content_hash": "stray-projection-hash",
+            "qualifying_uses_on_current_hash": 0,
+            "open_incident_ids": [],
+            "candidate_clusters": [],
+            "state": "closed",
+            "authorized_workflow": null,
+            "authorization_reason": null,
+            "trigger_event_ids": [],
+            "threshold_session_id": null,
+            "not_before": null,
+            "active_review_id": null,
+            "last_completed_review_id": null,
+            "review_reentry_basis": null,
+            "target_name": "projection-only",
+            "target_repo_relative_path": ".claude/skills/projection-only",
+            "derivation_session_id": null
+        }))
+        .expect("serialize valid stray projection"),
+    )
+    .expect("write valid stray projection");
+    let research_path = store.join("research-artifact.md");
+    fs::write(&research_path, "# Not an evidence stream\n").expect("write other store content");
+    let governed_paths = [projection_path, research_path];
+    let before_files = snapshot_files(&governed_paths);
+    let store_entries = || {
+        let mut names = fs::read_dir(&store)
+            .expect("read projection-only directory")
+            .map(|entry| entry.expect("read directory entry").file_name())
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    };
+    let before_entries = store_entries();
+    let status = || {
+        skill_evidence()
+            .args(["skills", "evolution-status", "--root"])
+            .arg(root.path())
+            .args([
+                "--now-epoch-milliseconds",
+                "1784980800000",
+                "--session-id",
+                "unavailable",
+            ])
+            .output()
+            .expect("run Skill Evolution Status")
+    };
+
+    let before = status();
+    assert!(before.status.success());
+    assert!(before.stderr.is_empty());
+    let report = String::from_utf8_lossy(&before.stdout);
+    assert!(report.contains("indeterminate: 1; omitted as not eligible: 0"));
+    assert!(report.contains(
+        "### evidence store projection-only\n\n- Status: `unidentified_store`.\n- events.jsonl does not exist"
+    ));
+
+    let derive = skill_evidence()
+        .args(["skills", "evidence", "derive", "--root"])
+        .arg(root.path())
+        .args([
+            "--target",
+            ".claude/skills/projection-only",
+            "--session-id",
+            "derive-session",
+        ])
+        .output()
+        .expect("attempt to derive without an event stream");
+    assert_eq!(derive.status.code(), Some(3));
+    assert!(derive.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(derive.stderr).expect("UTF-8 refusal diagnostic"),
+        format!(
+            "Cannot derive a gate projection because the event stream does not exist: {}. Nothing modified.\n",
+            store.join("events.jsonl").display()
+        )
+    );
+    assert_files_unchanged(&governed_paths, &before_files);
+    assert_eq!(store_entries(), before_entries);
+
+    let after = status();
+    assert!(after.status.success());
+    assert!(after.stderr.is_empty());
+    assert_eq!(after.stdout, before.stdout);
 }
 
 #[test]
