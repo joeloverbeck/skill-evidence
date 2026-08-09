@@ -4,6 +4,8 @@ Status: accepted (2026-08-08, GitHub [#1](https://github.com/joeloverbeck/skill-
 
 Amended: 2026-08-09, GitHub [#13](https://github.com/joeloverbeck/skill-evidence/issues/13) — reporting now distinguishes one close's retirement reach from the projection's standing retired set.
 
+Amended: 2026-08-09, GitHub [#14](https://github.com/joeloverbeck/skill-evidence/issues/14) — reviewers now vouch for the live reach bound before an instrument-limited close; a preview command was rejected because existing artifacts already supply that bound.
+
 A Skill Evolution review that closes `blocked_no_valid_test` reached no conclusion, so it adjudicates
 nothing and its trigger evidence stays open. That close still laid a watermark, and the watermark
 deferred the very evidence that opened the gate — labelled `queued_pre_close_evidence`, as though a
@@ -141,3 +143,13 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
 - Retiring a real cluster is now a consequence of choosing this disposition. The Skill Evolution
   reference says so at the point of choice, because a reviewer reaching for `blocked_no_valid_test`
   to quiet an untested cluster now costs that cluster its future.
+- **Before an instrument-limited close, the reviewer vouches for its reach bound.** The claim receipt
+  supplies the frozen coverage list; the live gate projection supplies every current candidate
+  cluster for the symptoms that list touches, including incidents recorded after the claim. The
+  reviewer confirms that the named binding constraint plausibly covers every open incident in that
+  bound. The bound deliberately errs upward because a contemporaneous severe incident remains in
+  its cluster while never retiring; if the reviewer cannot vouch for a sibling, the symptom-keyed
+  close still happens and the mismatch is disclosed in the report and completion. A pre-append
+  preview command was considered and rejected: these existing artifacts already bound the reach,
+  while a new flag beside the irreversible close would change a command surface consumers invoke by
+  name and hypothetical derivation would add machinery without improving the decision.

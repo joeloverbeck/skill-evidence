@@ -136,6 +136,60 @@ fn installed_skill_evolution_reference_reports_the_close_retirement_reach() {
 }
 
 #[test]
+fn installed_skill_evolution_reference_requires_pre_close_reach_bound_review() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains(
+            "Before a `blocked_no_valid_test` close, read the coverage list from the claim receipt"
+        ),
+        "the immutable claim receipt must supply the coverage list"
+    );
+    assert!(
+        reference.contains(
+            "For every symptom that coverage list touches, read the live candidate cluster in the gate projection"
+        ),
+        "the live projection must supply each symptom's reach bound"
+    );
+    assert!(
+        reference.contains(
+            "The projection is current as of the last recorded incident, so no extra derive run is required"
+        ),
+        "the reviewer must not invent an unnecessary pre-close command"
+    );
+    assert!(
+        reference.contains(
+            "This reach bound can name incidents the close will not retire: a contemporaneous severe incident stays in its cluster but is never retired because it authorizes on its own"
+        ),
+        "the safely over-stated bound must not be presented as an exact preview"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_ties_mismatch_disclosure_to_unvouched_sibling() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains(
+            "If you cannot vouch for a sibling, the symptom-keyed close still happens; state the mismatch in the review report and user-facing completion"
+        ),
+        "an unvouched sibling changes disclosure, not the forced retirement behavior"
+    );
+}
+
+#[test]
 fn install_reports_a_retired_package_without_writing_or_removing_it() {
     let root = tempfile::tempdir().expect("temporary repository root");
     let retired_skill = root
