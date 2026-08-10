@@ -376,6 +376,15 @@ fn installed_skill_evolution_reference_reports_the_close_retirement_reach() {
         reference.contains("- Retirement reach event IDs:"),
         "the durable review report needs a home for the close's retirement reach"
     );
+    assert!(
+        reference
+            .contains("reaches exactly the events an event-level `--instrument-limited` naming"),
+        "an event-level naming retires only the events it names, which the roster below does not cover"
+    );
+    assert!(
+        reference.contains("never the adjudication retirement"),
+        "gate retirement and adjudication retirement must not read as one reach"
+    );
 }
 
 #[test]

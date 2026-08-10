@@ -1,0 +1,10 @@
+DOC-1 = T1-B-run3
+DOC-2 = T1-A-run2
+DOC-3 = T1-B-run5
+DOC-4 = T1-A-run4
+DOC-5 = T1-B-run1
+DOC-6 = T1-A-run1
+DOC-7 = T1-B-run4
+DOC-8 = T1-A-run5
+DOC-9 = T1-B-run2
+DOC-10 = T1-A-run3

@@ -6,6 +6,8 @@ Amended: 2026-08-09, GitHub [#16](https://github.com/joeloverbeck/skill-evidence
 
 Amended: 2026-08-10, GitHub [#24](https://github.com/joeloverbeck/skill-evidence/issues/24) — this decision's routing now has a home in the text that executes it: the installed review reads each trigger's evidence class and bars the verdict per trigger rather than relying on the whole cluster being untestable. No instrument decision changed, and no classifier was built.
 
+Amended: 2026-08-10, GitHub [#28](https://github.com/joeloverbeck/skill-evidence/issues/28) — the declined routing option was re-raised with fresh evidence and re-declined; see *Considered options* below. The disclosure gap the re-raise did establish was never this decision's to decline, and is [#30](https://github.com/joeloverbeck/skill-evidence/issues/30). No instrument decision changed.
+
 Skill Evidence Capture's ladder is disjunctive. Two of the four things that reach `material_failure`
 are outcome claims — *"material rework required"*, *"wrong work caught before consequential
 reliance"* — and two can be satisfied by **conformance** alone: *"an expected output contract
@@ -165,6 +167,26 @@ pre-existing cross-reference defect worth its own issue, not a reason to decline
 naming it schedule anything: that same package shows the shape is *reporting* a result, which
 `inherited-prohibitions.md`'s *packages report results, they do not schedule each other* permits.
 The ground is simply that the owner declined it, with the parking already fixed.
+
+**Re-raised on 2026-08-10 and re-declined**
+([#28](https://github.com/joeloverbeck/skill-evidence/issues/28)). The evidence offered was a second
+review reaching this exit on one target: `triage`'s durability-drift-at-volume mechanism, ruled
+unable to be expressed by review `1a00f33c-19d3-4e28-ba1e-d17d8e61f205` after its predecessor
+`fce6031a-a8f1-44b9-93cc-5c27488a51d3` ran a fresh short-context reproduction whose current arm
+passed. That is the cost this decision accepted, observed once more — not a new kind of thing, and
+below the bar the last consequence sets. Two of the three routes the issue proposed are now
+foreclosed rather than merely declined: shipping the commission package was rejected by
+[ADR 0004](0004-method-gap-research-status-severs-its-commission-dependency.md) and is now barred
+outright by [`../principles/consumer-contract.md`](../principles/consumer-contract.md)
+§*Shipped packages carry instructions, not executables*, since that package carries a Node
+validator; and having the review describe the escalation generically is the same *lands somewhere*
+half declined above, differing only in not naming the destination. The issue's premise that gate
+retirement disposes of the evidence is answered by this ADR's own consequence — retired from the
+gate is not deleted, and a later instrument starts from a fuller corpus. What the re-raise did
+establish is narrower and real: a review that marks a mechanism unable to be expressed records
+nothing about the dead end, and the one report that made it legible improvised the section. This
+decision never declined *saying so*, only *routing* it, and the disclosure is
+[#30](https://github.com/joeloverbeck/skill-evidence/issues/30).
 
 **Build no new instrument; record the limit and close.** Chosen.
 
