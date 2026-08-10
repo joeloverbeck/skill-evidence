@@ -414,6 +414,28 @@ fn installed_skill_evolution_status_describes_reason_scoped_retirement() {
 }
 
 #[test]
+fn installed_skill_evolution_status_describes_deferred_review_bases_without_claiming_coverage() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let status_skill = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution-status/SKILL.md"),
+    )
+    .expect("read installed skill-evolution-status package");
+
+    assert!(
+        status_skill.contains(
+            "distinguishing evidence queued behind an instrument-limited close that reached no conclusion and could test nothing from evidence behind a concluded close where no threshold-supporting incident was recorded afterward; neither basis claims that the close covered the deferred evidence"
+        ),
+        "the queued bases must describe disposition and post-close evidence without claiming coverage"
+    );
+    assert!(
+        !status_skill.contains("evidence a review accounted for"),
+        "the deferred section must not describe either queued basis as accounted-for evidence"
+    );
+}
+
+#[test]
 fn install_reports_a_retired_package_without_writing_or_removing_it() {
     let root = tempfile::tempdir().expect("temporary repository root");
     let retired_skill = root
