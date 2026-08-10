@@ -75,6 +75,14 @@ does not let a downstream deadline authorize a change that breaks the other cons
 - **The frozen fixture corpora** under `fixtures/skill-evidence/*-v1/` are regression assets that
   stand in for consumer history. They are evidence, not examples, and they are not edited to make
   a change pass.
+  A corpus may also be frozen for a stream shape this repository has only just begun to write,
+  before any consumer holds one. Such a corpus guards that shape forward; it does not attest to
+  the change that introduced it, because the code under test wrote it and the comparison can only
+  agree with itself at birth. Its README says which of the two it is, and its replay asserts the
+  ratified numbers before it asserts byte-equality, so a regression fails against the requirement
+  rather than against a diff. The alternative is not a stronger corpus but no corpus: a shape
+  first frozen once real consumer streams exist could never have covered the change that made the
+  shape possible.
 
 ## Major non-goals
 

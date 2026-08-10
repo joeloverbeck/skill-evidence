@@ -12,9 +12,11 @@ independent runs went wrong in the same way, not because someone reread it and h
 
 ## The loop
 
-1. **Capture.** After a completed use — clean or not — one receipt is recorded: whether the use
+1. **Capture.** After a completed use — clean or not — a receipt is recorded: whether the use
    qualified, its outcome (`clean`, `friction`, `material_failure`, `severe_incident`), and for
-   anything non-clean the expected/observed/consequence facts plus a coarse symptom key.
+   anything non-clean the expected/observed/consequence facts plus a coarse symptom key. A run that
+   deviated in several ways records one receipt per deviation, so a review can name exactly the one
+   it could not test; they share a run group and count as the single use they came from.
 2. **Accumulate.** Receipts append to `reports/skill-evidence/<skill>/events.jsonl`. Nothing is
    ever rewritten, reordered, or removed.
 3. **Derive.** A gate projection is computed from the stream: how much qualifying use the skill's
@@ -42,7 +44,7 @@ has an engine and no driver.
 
 | Package | What it does |
 |---|---|
-| `skill-evidence-capture` | Records one receipt after a completed use of another skill, without diagnosing or changing it |
+| `skill-evidence-capture` | Records a receipt after a completed use of another skill — one more for each further way that run deviated — without diagnosing or changing it |
 | `skill-evolution` | Evidence-gated revision: hard-refuses unless the derived gate authorizes it, lands only a blind-validated candidate |
 | `skill-evolution-status` | Read-only readiness census across the repository's gated skills |
 | `method-gap-research-status` | Read-only census recommending one skill, or none, for method-gap research |

@@ -34,6 +34,7 @@ fn record_library_uses_explicit_clock_uuid_repository_and_session_inputs() {
             retrospective: false,
             evidence_refs: Vec::new(),
             same_run_group: Some("explicit-run-group".to_owned()),
+            further_incident: false,
         },
         &RecordInputs {
             event_id: "evt_explicit".to_owned(),
@@ -140,6 +141,7 @@ fn duplicate_explicit_event_id_refuses_without_mutating_the_store() {
         retrospective: false,
         evidence_refs: Vec::new(),
         same_run_group: Some(same_run_group.to_owned()),
+        further_incident: false,
     };
     let inputs = |recorded_at: &str| RecordInputs {
         event_id: "evt_duplicate".to_owned(),
@@ -213,6 +215,7 @@ fn record_library_enforces_self_receipt_policy_without_caller_configuration() {
             retrospective: false,
             evidence_refs: Vec::new(),
             same_run_group: Some("self-receipt".to_owned()),
+            further_incident: false,
         },
         &RecordInputs {
             event_id: "evt_self".to_owned(),

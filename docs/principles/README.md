@@ -111,6 +111,16 @@ not executables* in [`consumer-contract.md`](consumer-contract.md), against the 
 permanently bounds withdrawal to the retirement set, and preserves the breaking-change status of
 package retirement and rename.
 
+Amended 2026-08-10 by the repository owner, at the exact text and placement of the added paragraph
+in the frozen-fixture-corpora bullet of §*Roles of significant pre-existing artifacts* in
+[`mission-and-scope.md`](mission-and-scope.md), against the repository as of `9da3843`. No other
+clause changed; the no-editing rule and *evidence, not examples* are unmoved. The amendment admits
+a corpus frozen for a stream shape this repository has only just begun to write, before any
+consumer holds one, and binds such a corpus to disclose in its README that it guards forward
+rather than attesting to the change that introduced it. Its pressure was GitHub
+[#27](https://github.com/joeloverbeck/skill-evidence/issues/27), whose new recorded shape — two
+use records sharing one run group — no historical corpus could contain.
+
 Adoption of these documents does not by itself adopt any future schema version, installer redesign,
 distribution change, or resolution of an open issue. In particular it does not settle the open
 question in `joeloverbeck/skill-evidence#2`; it supplies the clause that question is decided

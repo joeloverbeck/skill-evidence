@@ -76,6 +76,7 @@ fn record_authorizing_incidents(
                 retrospective: false,
                 evidence_refs: vec!["logs/fixture.txt".to_owned()],
                 same_run_group: None,
+                further_incident: false,
             },
             &RecordInputs {
                 event_id: format!("evt_incident_{serial}"),

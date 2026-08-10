@@ -287,6 +287,8 @@ pub struct SkillEvidenceRecordArgs {
     #[arg(long)]
     same_run_group: Option<String>,
     #[arg(long)]
+    further_incident: bool,
+    #[arg(long)]
     root: Option<PathBuf>,
     #[arg(long)]
     human: bool,
@@ -595,6 +597,7 @@ fn run_skill_evidence(
                 evidence_ref,
                 session_id,
                 same_run_group,
+                further_incident,
                 root,
                 human,
             } = *args;
@@ -615,6 +618,7 @@ fn run_skill_evidence(
                 retrospective,
                 evidence_refs: evidence_ref,
                 same_run_group,
+                further_incident,
             };
             let session_id = resolve_session_id(session_id.as_deref())?;
             let inputs = crate::RecordInputs {

@@ -40,14 +40,40 @@ A use record whose outcome is not `clean`. Every incident carries a symptom key 
 expected/observed/consequence facts.
 _Avoid_: failure, defect, bug
 
+**Deviation**:
+One observable way a run departed from what the target said, and the unit a use record records.
+Two deviations in one run are distinct when their expected-and-observed facts are — a different
+instruction was not followed, or a different artifact broke a different contract — and the same
+deviation surfacing twice in one run is one deviation. Distinctness is read off what the session
+shows; it is never a claim that two deviations have different causes.
+_Avoid_: issue, problem, error, violation
+
+**Further incident**:
+A second or later incident recorded from one run, declared as such and sharing that run's run
+group and task fingerprint. Each is an ordinary use record with its own event id, so a review can
+name one without reaching the others, and between them they are one qualifying use. Independence
+is counted per candidate cluster, so siblings landing in the same cluster contribute one
+independent incident between them; siblings carrying different symptom keys land in different
+clusters and contribute one to each. Recording a run's deviations apart describes what the run
+did and claims nothing about their causes.
+
+Two such records are siblings *of each other*. That is a different relation from the one
+[`docs/adr/0002-blocked-no-valid-test-retires-its-evidence-from-the-gate.md`](docs/adr/0002-blocked-no-valid-test-retires-its-evidence-from-the-gate.md)
+calls a sibling — "a friction sibling cannot lower a `material_recurrence` bar" means a
+cluster-mate, which normally comes from a *different* run. Neither usage is wrong and the ADR
+is unaffected; say which relation is meant whenever both are in play.
+_Avoid_: sub-incident, related incident, duplicate receipt
+
 **Symptom key**:
 A coarse clustering aid attached to an incident — `execution`, `output`, `triggering`, and five
 others. It groups incidents; it does not name a cause and is never diagnostic.
 _Avoid_: category, cause, tag, error type
 
 **Run group**:
-The dedup unit for use records. A retry or continuation of the same failed task belongs to the
-same run group, so it produces one receipt, not several.
+The one run a use record belongs to, and the unit the use denominator counts. A retry or
+continuation of the same failed task belongs to the same run group and adds no further use. A run
+that deviated in several observable ways records one incident per deviation, so a run group can
+hold several records while remaining one use.
 _Avoid_: attempt, batch, session group
 
 **Evidence store**:

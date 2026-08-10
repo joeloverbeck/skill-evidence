@@ -44,76 +44,139 @@ fn clean_record(root: &Path, task_label: &str, session_id: &str) -> Command {
     command
 }
 
-/// The capture reply is the surface an operator sees on every single use, so it is
-/// where a half-told story does the most damage. Once a blocked close retires a
-/// cluster, the reply still counts those incidents as open while having no cluster
-/// left to name — it must say where they went rather than trail off into an empty
-/// symptom list.
-#[test]
-fn capture_reply_names_evidence_retired_by_a_blocked_close() {
-    let fixture = repository_with_demo_skill();
-    let hash = "8fd064beeb351b7698023277ac023aa2dfd2cca632a069018a6e1c739316e5bf";
-    let target = json!({
+fn incident_record(root: &Path, task_label: &str, session_id: &str, observed: &str) -> Command {
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evidence", "record", "--root"])
+        .arg(root)
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--outcome",
+            "material_failure",
+            "--task-label",
+            task_label,
+            "--session-id",
+            session_id,
+            "--symptom-key",
+            "output",
+            "--expected",
+            "expected",
+            "--observed",
+            observed,
+            "--consequence",
+            "consequence",
+            "--run-condition",
+            "condition",
+        ]);
+    command
+}
+
+fn recorded_events(root: &Path) -> Vec<Value> {
+    fs::read_to_string(root.join("reports/skill-evidence/demo-skill/events.jsonl"))
+        .expect("read event stream")
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("recorded event JSON"))
+        .collect()
+}
+
+/// The demo skill's content hash, which every seeded event must carry to sit on the current
+/// target hash rather than a superseded one.
+const DEMO_SKILL_HASH: &str = "8fd064beeb351b7698023277ac023aa2dfd2cca632a069018a6e1c739316e5bf";
+
+fn seeded_target() -> Value {
+    json!({
         "name": "demo-skill",
         "repo_relative_path": ".claude/skills/demo-skill",
-        "content_hash": hash,
+        "content_hash": DEMO_SKILL_HASH,
         "repo_head": "fixture-head"
-    });
-    let triggers = ["evt_1", "evt_2", "evt_3"];
-    let mut events = triggers
-        .iter()
-        .enumerate()
-        .map(|(index, event_id)| {
-            json!({
-                "schema_version": 1,
-                "event_id": event_id,
-                "event_type": "use_recorded",
-                "recorded_at": format!("2026-01-02T0{index}:00:00Z"),
-                "operator_workflow": "skill-evidence-capture",
-                "target": target,
-                "top_level_session_id": format!("session-{index}"),
-                "payload": {
-                    "qualifying_use": true,
-                    "retrospective": false,
-                    "task_label": event_id,
-                    "task_fingerprint": event_id,
-                    "outcome": "friction",
-                    "symptom_key": "execution",
-                    "expected": "expected",
-                    "observed": "observed",
-                    "consequence": "consequence",
-                    "workaround_taken": Value::Null,
-                    "evidence_refs": [],
-                    "same_run_group": event_id
-                }
-            })
-        })
-        .collect::<Vec<_>>();
-    events.push(json!({
+    })
+}
+
+/// One seeded `use_recorded` event.
+///
+/// The task label and fingerprint are the run group, so seeding two events under one group
+/// gives them the sibling shape a further-incident record writes.
+///
+/// `run_condition` is a parameter rather than a constant because `event.v1` leaves it
+/// optional: a stream omitting the key entirely is a shape this crate wrote before the key
+/// existed, and one caller below seeds exactly that on purpose. Collapsing it would delete
+/// that coverage silently.
+fn seeded_use_event(
+    event_id: &str,
+    hour: usize,
+    session_id: &str,
+    run_group: &str,
+    outcome: &str,
+    symptom_key: &str,
+    run_condition: Option<&str>,
+) -> Value {
+    let mut event = json!({
         "schema_version": 1,
-        "event_id": "evt_review_started",
-        "event_type": "review_started",
-        "recorded_at": "2026-01-02T10:00:00Z",
-        "operator_workflow": "skill-evolution",
-        "target": target,
-        "top_level_session_id": "review-session",
-        "payload": {"review_id": "rev_blocked"}
-    }));
-    events.push(json!({
-        "schema_version": 1,
-        "event_id": "evt_review_disposition",
-        "event_type": "review_disposition",
-        "recorded_at": "2026-01-02T11:00:00Z",
-        "operator_workflow": "skill-evolution",
-        "target": target,
-        "top_level_session_id": "review-session",
+        "event_id": event_id,
+        "event_type": "use_recorded",
+        "recorded_at": format!("2026-01-02T{hour:02}:00:00Z"),
+        "operator_workflow": "skill-evidence-capture",
+        "target": seeded_target(),
+        "top_level_session_id": session_id,
         "payload": {
-            "review_id": "rev_blocked",
-            "disposition": "blocked_no_valid_test",
-            "adjudicated_event_ids": triggers
+            "qualifying_use": true,
+            "retrospective": false,
+            "task_label": run_group,
+            "task_fingerprint": run_group,
+            "outcome": outcome,
+            "symptom_key": symptom_key,
+            "expected": "expected",
+            "observed": "observed",
+            "consequence": "consequence",
+            "workaround_taken": Value::Null,
+            "evidence_refs": [],
+            "same_run_group": run_group
         }
-    }));
-    let evidence_directory = fixture.path().join("reports/skill-evidence/demo-skill");
+    });
+    if let Some(run_condition) = run_condition {
+        event["payload"]["run_condition"] = json!(run_condition);
+    }
+    event
+}
+
+/// The claim and close a completed review leaves behind, an hour apart.
+fn seeded_review(
+    review_id: &str,
+    disposition: &str,
+    adjudicated: &[&str],
+    hour: usize,
+) -> [Value; 2] {
+    [
+        json!({
+            "schema_version": 1,
+            "event_id": format!("evt_review_started_{review_id}"),
+            "event_type": "review_started",
+            "recorded_at": format!("2026-01-02T{hour:02}:00:00Z"),
+            "operator_workflow": "skill-evolution",
+            "target": seeded_target(),
+            "top_level_session_id": "review-session",
+            "payload": {"review_id": review_id}
+        }),
+        json!({
+            "schema_version": 1,
+            "event_id": format!("evt_review_disposition_{review_id}"),
+            "event_type": "review_disposition",
+            "recorded_at": format!("2026-01-02T{:02}:00:00Z", hour + 1),
+            "operator_workflow": "skill-evolution",
+            "target": seeded_target(),
+            "top_level_session_id": "review-session",
+            "payload": {
+                "review_id": review_id,
+                "disposition": disposition,
+                "adjudicated_event_ids": adjudicated
+            }
+        }),
+    ]
+}
+
+fn seed_event_stream(root: &Path, events: &[Value]) {
+    let evidence_directory = root.join("reports/skill-evidence/demo-skill");
     fs::create_dir_all(&evidence_directory).expect("create evidence directory");
     fs::write(
         evidence_directory.join("events.jsonl"),
@@ -125,6 +188,477 @@ fn capture_reply_names_evidence_retired_by_a_blocked_close() {
             + "\n",
     )
     .expect("write seeded event stream");
+}
+
+/// One completed run can deviate in several distinct ways, and compressing them into a
+/// single record costs a later review the ability to name exactly the deviation its
+/// instrument could not test — the whole event retires instead, testable siblings
+/// included. A declared sibling is an ordinary record sharing the run's group, so the run
+/// still counts once while each deviation stays separately addressable.
+#[test]
+fn skill_evidence_further_incident_records_a_sibling_of_the_same_run() {
+    let fixture = repository_with_demo_skill();
+    let first = incident_record(
+        fixture.path(),
+        "One triage run",
+        "session-a",
+        "four briefs cited file paths",
+    )
+    .output()
+    .expect("record the run's first incident");
+    assert!(
+        first.status.success(),
+        "first incident failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&first.stdout),
+        String::from_utf8_lossy(&first.stderr)
+    );
+
+    let undeclared = incident_record(
+        fixture.path(),
+        "One triage run",
+        "session-a",
+        "the binding coupling was buried mid-comment",
+    )
+    .output()
+    .expect("record an undeclared second incident");
+    assert_eq!(undeclared.status.code(), Some(3));
+    let refusal = String::from_utf8_lossy(&undeclared.stderr);
+    assert!(refusal.contains("Duplicate receipt refused"), "{refusal}");
+    assert!(
+        refusal.contains("a genuinely distinct use needs a distinct --task-label"),
+        "an undeclared duplicate must still meet the unchanged refusal: {refusal}"
+    );
+
+    let sibling = incident_record(
+        fixture.path(),
+        "One triage run",
+        "session-a",
+        "the binding coupling was buried mid-comment",
+    )
+    .arg("--further-incident")
+    .output()
+    .expect("record the declared sibling");
+    assert!(
+        sibling.status.success(),
+        "declared sibling failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&sibling.stdout),
+        String::from_utf8_lossy(&sibling.stderr)
+    );
+
+    let events = recorded_events(fixture.path());
+    assert_eq!(events.len(), 2);
+    assert_ne!(events[0]["event_id"], events[1]["event_id"]);
+    assert_eq!(
+        events[0]["payload"]["same_run_group"], events[1]["payload"]["same_run_group"],
+        "siblings record one run, so they share its group"
+    );
+    assert_eq!(
+        events[0]["payload"]["task_fingerprint"],
+        events[1]["payload"]["task_fingerprint"]
+    );
+    assert_eq!(
+        events[1]["payload"]["observed"],
+        "the binding coupling was buried mid-comment"
+    );
+}
+
+/// The use denominator counts run groups, so the group is what a use is. A caller-supplied
+/// group is an assertion; the derived one is computed from target, task label, and
+/// top-level session. Letting the two flags combine would be the one path where an
+/// asserted string both bypasses the duplicate refusal and decides the denominator — a
+/// fixed group across a hash would hold it at one use forever. A further incident comes
+/// from the same session by construction, so the derived group is already the right one
+/// and no override is ever needed.
+#[test]
+fn skill_evidence_further_incident_refuses_a_caller_supplied_run_group() {
+    let fixture = repository_with_demo_skill();
+    let first = incident_record(
+        fixture.path(),
+        "One triage run",
+        "session-a",
+        "four briefs cited file paths",
+    )
+    .output()
+    .expect("record the run's first incident");
+    assert!(first.status.success());
+
+    let combined = incident_record(
+        fixture.path(),
+        "One triage run",
+        "session-a",
+        "the binding coupling was buried mid-comment",
+    )
+    .args(["--same-run-group", "asserted-group"])
+    .arg("--further-incident")
+    .output()
+    .expect("record with both flags");
+    assert_eq!(combined.status.code(), Some(3));
+    let refusal = String::from_utf8_lossy(&combined.stderr);
+    assert!(
+        refusal.contains("--further-incident") && refusal.contains("--same-run-group"),
+        "the refusal must name both flags: {refusal}"
+    );
+    assert!(
+        refusal.contains("Nothing recorded."),
+        "a refusal writes nothing and says so: {refusal}"
+    );
+    assert_eq!(recorded_events(fixture.path()).len(), 1);
+}
+
+/// The flag declares a run this store already recorded. With nothing recorded for that
+/// run it declares something untrue, and honouring it would turn a narrow opt-in into a
+/// standing way to record under a group nobody can see — the first record of a run is an
+/// ordinary use and must be recorded as one.
+#[test]
+fn skill_evidence_further_incident_refuses_a_run_with_no_recorded_sibling() {
+    let fixture = repository_with_demo_skill();
+    let orphan = incident_record(
+        fixture.path(),
+        "One triage run",
+        "session-a",
+        "the binding coupling was buried mid-comment",
+    )
+    .arg("--further-incident")
+    .output()
+    .expect("record a further incident of nothing");
+    assert_eq!(orphan.status.code(), Some(3));
+    let refusal = String::from_utf8_lossy(&orphan.stderr);
+    assert!(
+        refusal.contains("--further-incident") && refusal.contains("Nothing recorded."),
+        "the refusal must name the flag and say nothing was written: {refusal}"
+    );
+    // The match is on this session and this task's label against the current hash. Explaining
+    // it by run-group membership describes the resolution this command stopped using, and
+    // "on the unchanged target" asserts something false whenever the run this operator means
+    // was recorded before an edit.
+    assert!(
+        !refusal.contains("on the unchanged target"),
+        "a sibling may sit on a superseded hash, so the target is not asserted unchanged: {refusal}"
+    );
+    assert!(
+        refusal.contains("in this top-level session"),
+        "the refusal must explain itself by the rule the code applies: {refusal}"
+    );
+    assert!(
+        !fixture
+            .path()
+            .join("reports/skill-evidence/demo-skill/events.jsonl")
+            .exists(),
+        "a refusal writes no event stream at all"
+    );
+}
+
+/// A further incident shares its siblings' run group, and a run whose first record was
+/// written with `--same-run-group` carries a group no derivation reproduces. Deriving one
+/// anyway leaves that run unable to record a second deviation from the very session that
+/// recorded it, with no exit that does not mint a second group for one run.
+///
+/// The group is still never taken from the caller here: it is read off the record already in
+/// the store, which is what keeps the denominator on identity the store owns.
+#[test]
+fn skill_evidence_further_incident_joins_a_run_recorded_under_a_supplied_group() {
+    let fixture = repository_with_demo_skill();
+    let first = incident_record(
+        fixture.path(),
+        "One triage run",
+        "session-a",
+        "four briefs cited file paths",
+    )
+    .args(["--same-run-group", "carried-over-group"])
+    .output()
+    .expect("record the run under a supplied group");
+    assert!(
+        first.status.success(),
+        "first record failed: stderr={}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+
+    let sibling = incident_record(
+        fixture.path(),
+        "One triage run",
+        "session-a",
+        "the binding coupling was buried mid-comment",
+    )
+    .arg("--further-incident")
+    .output()
+    .expect("record a further incident of that run");
+    assert!(
+        sibling.status.success(),
+        "a run recorded under a supplied group must still take further incidents: stderr={}",
+        String::from_utf8_lossy(&sibling.stderr)
+    );
+
+    let events = recorded_events(fixture.path());
+    assert_eq!(events.len(), 2);
+    assert_eq!(
+        events[1]["payload"]["same_run_group"], "carried-over-group",
+        "the sibling joins the group its run already carries"
+    );
+    assert_eq!(
+        events[0]["payload"]["task_fingerprint"],
+        events[1]["payload"]["task_fingerprint"]
+    );
+}
+
+/// A run group is derived from the target, the task label and the top-level session, so a
+/// further incident cannot reach a run whose records were written in an earlier session. That
+/// limit is a consequence of keeping the denominator on computed identity, and it is
+/// tolerable — but the refusal must not answer it with the advice meant for a typo. Recording
+/// that deviation as a fresh use mints a second run group for one run and counts it twice,
+/// which is exactly the inflation the run-group denominator exists to prevent.
+#[test]
+fn skill_evidence_further_incident_refuses_a_run_recorded_in_another_session() {
+    let fixture = repository_with_demo_skill();
+    assert!(
+        incident_record(
+            fixture.path(),
+            "One triage run",
+            "session-a",
+            "four briefs cited file paths",
+        )
+        .output()
+        .expect("record the run's first incident")
+        .status
+        .success()
+    );
+
+    let later_session = incident_record(
+        fixture.path(),
+        "One triage run",
+        "session-b",
+        "a deviation of that run, noticed in a later session",
+    )
+    .arg("--further-incident")
+    .output()
+    .expect("record a further incident from another session");
+    assert_eq!(later_session.status.code(), Some(3));
+    let refusal = String::from_utf8_lossy(&later_session.stderr);
+    assert!(
+        refusal.contains("session-a"),
+        "the refusal must name the session that holds the run: {refusal}"
+    );
+    assert!(
+        refusal.contains("would count one run twice"),
+        "and must not advise recording it as a fresh use: {refusal}"
+    );
+    assert!(
+        !refusal.contains("record it without the flag"),
+        "that advice is for a run with no record at all, and here it inflates the denominator: {refusal}"
+    );
+    assert_eq!(recorded_events(fixture.path()).len(), 1);
+}
+
+/// A clean record asserts no skill-attributable friction was visible in that run. Recording
+/// one as a sibling of an incident would put both claims about a single run on disk, and the
+/// stream is append-only, so nothing could ever resolve them.
+///
+/// The asymmetry is deliberate and runs the other way: a run first recorded clean can still
+/// gain an incident, because noticing a deviation later is an honest addition rather than a
+/// contradiction.
+#[test]
+fn skill_evidence_further_incident_refuses_a_clean_outcome() {
+    let fixture = repository_with_demo_skill();
+    assert!(
+        incident_record(
+            fixture.path(),
+            "One triage run",
+            "session-a",
+            "four briefs cited file paths",
+        )
+        .output()
+        .expect("record the run's first incident")
+        .status
+        .success()
+    );
+
+    let clean_sibling = clean_record(fixture.path(), "One triage run", "session-a")
+        .arg("--further-incident")
+        .output()
+        .expect("record a clean sibling");
+    assert_eq!(clean_sibling.status.code(), Some(3));
+    let refusal = String::from_utf8_lossy(&clean_sibling.stderr);
+    assert!(
+        refusal.contains("--further-incident") && refusal.contains("Nothing recorded."),
+        "the refusal must name the flag and say nothing was written: {refusal}"
+    );
+    assert_eq!(recorded_events(fixture.path()).len(), 1);
+
+    let other = repository_with_demo_skill();
+    assert!(
+        clean_record(other.path(), "One triage run", "session-a")
+            .output()
+            .expect("record a run as clean")
+            .status
+            .success()
+    );
+    let later_incident = incident_record(
+        other.path(),
+        "One triage run",
+        "session-a",
+        "a deviation noticed after the clean receipt",
+    )
+    .arg("--further-incident")
+    .output()
+    .expect("record an incident of a run first recorded clean");
+    assert!(
+        later_incident.status.success(),
+        "a run recorded clean must still be able to gain an incident: stderr={}",
+        String::from_utf8_lossy(&later_incident.stderr)
+    );
+    assert_eq!(recorded_events(other.path()).len(), 2);
+}
+
+/// The clause exists to explain a divergence between the two counts the reply prints, so it
+/// must be keyed on what those counts actually read. Adjudicated siblings leave
+/// `open_incident_ids` and stop inflating the open count — the divergence is gone, and a
+/// reply still explaining it sends the operator looking for something that is no longer
+/// there. An untestable-coverage sibling stays open and keeps the clause honestly.
+#[test]
+fn capture_reply_drops_the_sibling_clause_once_a_close_adjudicated_them() {
+    let fixture = repository_with_demo_skill();
+    let incident = |event_id: &str, hour: usize, session: &str, group: &str| {
+        seeded_use_event(
+            event_id,
+            hour,
+            session,
+            group,
+            "material_failure",
+            "output",
+            Some("condition"),
+        )
+    };
+    let mut events = vec![
+        // One run that deviated twice, and a second run that deviated once.
+        incident("evt_sibling_one", 1, "session-a", "run-a"),
+        incident("evt_sibling_two", 2, "session-a", "run-a"),
+        incident("evt_other_run", 3, "session-b", "run-b"),
+    ];
+    events.extend(seeded_review(
+        "rev_adjudicating",
+        "closed_no_skill_defect",
+        &["evt_sibling_one", "evt_sibling_two"],
+        4,
+    ));
+    seed_event_stream(fixture.path(), &events);
+
+    let output = clean_record(fixture.path(), "A later clean use", "session-c")
+        .arg("--human")
+        .output()
+        .expect("record a use after the close");
+    assert!(output.status.success());
+    let reply = String::from_utf8(output.stdout).expect("human reply UTF-8");
+    assert!(
+        reply.contains("open incidents: 1"),
+        "only the unadjudicated run stays open: reply={reply}"
+    );
+    assert!(
+        reply.contains("qualifying uses on current target hash: 3"),
+        "reply={reply}"
+    );
+    assert!(
+        !reply.contains("counts once"),
+        "the counts no longer diverge, so there is nothing to reconcile: reply={reply}"
+    );
+}
+
+/// Every sibling is its own open incident, so the open-incident count now rises faster than
+/// the use count — and the collecting reply prints both, side by side, to an operator who
+/// has no other view of the store. Two incidents against one use reads as a miscount unless
+/// the reply says which of the two it is. The clause appears only where the divergence does;
+/// a store whose runs recorded one incident each reads exactly as it always has.
+#[test]
+fn capture_reply_reconciles_open_incidents_against_uses_when_a_run_recorded_several() {
+    let fixture = repository_with_demo_skill();
+    assert!(
+        incident_record(
+            fixture.path(),
+            "One triage run",
+            "session-a",
+            "four briefs cited file paths",
+        )
+        .arg("--human")
+        .output()
+        .expect("record the run's first incident")
+        .status
+        .success()
+    );
+
+    let sibling = incident_record(
+        fixture.path(),
+        "One triage run",
+        "session-a",
+        "the binding coupling was buried mid-comment",
+    )
+    .args(["--further-incident", "--human"])
+    .output()
+    .expect("record the declared sibling");
+    assert!(sibling.status.success());
+    let reply = String::from_utf8(sibling.stdout).expect("human reply UTF-8");
+    assert!(reply.contains("open incidents: 2"), "reply={reply}");
+    assert!(
+        reply.contains("qualifying uses on current target hash: 1"),
+        "reply={reply}"
+    );
+    assert!(
+        reply.contains("a run that recorded several incidents counts once"),
+        "the reply must reconcile the two counts it prints: reply={reply}"
+    );
+
+    let ordinary = repository_with_demo_skill();
+    let single = incident_record(
+        ordinary.path(),
+        "An ordinary run",
+        "session-a",
+        "one deviation",
+    )
+    .arg("--human")
+    .output()
+    .expect("record one ordinary incident");
+    assert!(single.status.success());
+    let ordinary_reply = String::from_utf8(single.stdout).expect("human reply UTF-8");
+    assert!(
+        ordinary_reply.contains("open incidents: 1"),
+        "reply={ordinary_reply}"
+    );
+    assert!(
+        !ordinary_reply.contains("counts once"),
+        "a store with no siblings must read exactly as it always has: reply={ordinary_reply}"
+    );
+}
+
+/// The capture reply is the surface an operator sees on every single use, so it is
+/// where a half-told story does the most damage. Once a blocked close retires a
+/// cluster, the reply still counts those incidents as open while having no cluster
+/// left to name — it must say where they went rather than trail off into an empty
+/// symptom list.
+#[test]
+fn capture_reply_names_evidence_retired_by_a_blocked_close() {
+    let fixture = repository_with_demo_skill();
+    let triggers = ["evt_1", "evt_2", "evt_3"];
+    // Seeded without a run condition: the key is optional in `event.v1` and these are the
+    // shape this crate wrote before it existed.
+    let mut events = triggers
+        .iter()
+        .enumerate()
+        .map(|(index, event_id)| {
+            seeded_use_event(
+                event_id,
+                index,
+                &format!("session-{index}"),
+                event_id,
+                "friction",
+                "execution",
+                None,
+            )
+        })
+        .collect::<Vec<_>>();
+    events.extend(seeded_review(
+        "rev_blocked",
+        "blocked_no_valid_test",
+        &triggers,
+        10,
+    ));
+    seed_event_stream(fixture.path(), &events);
 
     let output = clean_record(fixture.path(), "Task after blocked close", "later-session")
         .arg("--human")

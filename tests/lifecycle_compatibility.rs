@@ -120,6 +120,96 @@ fn rust_derives_the_exact_javascript_lifecycle_fixture_projection_without_rewrit
     );
 }
 
+/// The denominator rule, held against a real recorded stream.
+///
+/// `lifecycle-v1` above cannot hold this: its projection records zero qualifying uses, so
+/// replaying it compares `0` against `0`. And no corpus written before GitHub #27 can hold
+/// it either — two use records sharing one run group on one hash is precisely the shape the
+/// write path refused until a further incident could declare itself.
+///
+/// So the rule that one run is one use however many ways it deviated has, until this
+/// corpus, been pinned only by hand-built streams inside the derivation suite. Those move
+/// with the code. This one does not: it is bytes the compiled writer produced, and any
+/// future reader that counts records rather than run groups, or that lets siblings count as
+/// independent, changes these numbers and fails here.
+#[test]
+fn rust_replays_the_further_incident_corpus_without_recounting_its_runs() {
+    let source = repository_root().join("fixtures/skill-evidence/further-incidents-v1");
+    let temporary = tempfile::tempdir().expect("temporary fixture repository");
+    copy_directory(&source, temporary.path());
+    let store = temporary.path().join("reports/skill-evidence/demo-skill");
+    let events_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let original_events = fs::read(&events_path).expect("read frozen event stream");
+    let expected_projection = fs::read(&projection_path).expect("read frozen gate projection");
+
+    let use_records = String::from_utf8(original_events.clone())
+        .expect("frozen stream is UTF-8")
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .filter(|line| {
+            serde_json::from_str::<Value>(line).expect("frozen event JSON")["event_type"]
+                == "use_recorded"
+        })
+        .count();
+    assert_eq!(use_records, 5, "the corpus must hold the sibling shape");
+
+    let status = skill_evidence::derive_store(
+        temporary.path(),
+        Path::new(".claude/skills/demo-skill"),
+        &DerivationInputs {
+            generated_at: "2026-08-10T20:55:04.810067225Z".to_owned(),
+            now_epoch_milliseconds: 1_800_000_000_000,
+            session_id: "session-review".to_owned(),
+            lock_owner: "lock_further_incident_fixture_derivation".to_owned(),
+        },
+    )
+    .expect("derive the further-incident fixture");
+
+    assert_eq!(
+        status.qualifying_uses_on_current_hash, 3,
+        "five records, three runs — the run that deviated three ways is one use"
+    );
+    let [retired] = status.instrument_limited_incident_ids.as_slice() else {
+        panic!(
+            "the close named exactly one sibling: {:?}",
+            status.instrument_limited_incident_ids
+        );
+    };
+    assert!(
+        status.open_incident_ids.contains(retired),
+        "named coverage was never adjudicated, so it stays open in the ledger"
+    );
+    let cluster = status
+        .candidate_clusters
+        .iter()
+        .find(|cluster| cluster.symptom_key == "execution")
+        .expect("the surviving incident still clusters");
+    assert!(
+        !cluster.open_event_ids.contains(retired),
+        "a named sibling leaves the clusters"
+    );
+    assert_eq!(
+        cluster.open_event_ids.len(),
+        2,
+        "its run-mates, recorded after the trigger list froze, are still clustering — the rule \
+         whose loss motivated #27"
+    );
+    assert_eq!(
+        cluster.independent_incidents, 1,
+        "two open events from one run are one independent incident, so a run misbehaving \
+         repeatedly cannot reach a recurrence threshold on its own"
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read re-derived gate projection"),
+        expected_projection
+    );
+    assert_eq!(
+        fs::read(&events_path).expect("reread event stream"),
+        original_events
+    );
+}
+
 /// The forward-only rule, mechanically.
 ///
 /// `derive_store` above proves the frozen streams still *project*. It does not

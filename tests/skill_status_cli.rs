@@ -487,6 +487,108 @@ fn method_gap_research_status_separates_current_and_historical_evidence() {
     );
 }
 
+/// `qualifying_uses` is the same domain term the gate projection counts, and the glossary
+/// gives it one meaning: a run, not a record. A reporter still counting records publishes a
+/// different number than `gate-status.json` for the same stream under the same name, and a
+/// reader has no way to tell which of the two answers the question they asked.
+#[test]
+fn method_gap_research_status_counts_run_groups_rather_than_records() {
+    let root = tempfile::tempdir().expect("temporary repository");
+    let target = root.path().join(".claude/skills/game-evidence");
+    fs::create_dir_all(&target).expect("create fixture skill");
+    fs::write(
+        target.join("SKILL.md"),
+        "---\nname: game-evidence\n---\n# game-evidence\n",
+    )
+    .expect("write fixture skill");
+
+    let inventory = || {
+        let output = skill_evidence()
+            .args(["skills", "method-gap-research-status", "game-*", "--root"])
+            .arg(root.path())
+            .args(["--now-epoch-milliseconds", "1784980800000"])
+            .output()
+            .expect("run evidence inventory");
+        assert!(output.status.success());
+        serde_json::from_slice::<Value>(&output.stdout).expect("inventory JSON")
+    };
+    let current_hash = inventory()["targets"][0]["target_content_hash"]
+        .as_str()
+        .expect("current target hash")
+        .to_owned();
+
+    let sibling = |id: &str, hash: &str, run_group: &str| {
+        json!({
+            "schema_version": 1,
+            "event_id": id,
+            "event_type": "use_recorded",
+            "recorded_at": "2026-07-25T11:59:59.000Z",
+            "operator_workflow": "skill-evidence-capture",
+            "target": {
+                "name": "game-evidence",
+                "repo_relative_path": ".claude/skills/game-evidence",
+                "content_hash": hash,
+                "repo_head": "fixture-head"
+            },
+            "top_level_session_id": "fixture-session",
+            "payload": {
+                "qualifying_use": true,
+                "retrospective": false,
+                "task_label": run_group,
+                "task_fingerprint": run_group,
+                "outcome": "friction",
+                "symptom_key": "execution",
+                "expected": "expected",
+                "observed": "observed",
+                "consequence": "consequence",
+                "workaround_taken": Value::Null,
+                "run_condition": "condition",
+                "evidence_refs": [],
+                "same_run_group": run_group
+            }
+        })
+    };
+    // One run that deviated twice on the current hash, and one on a superseded hash.
+    let events = [
+        sibling("evt_old", "old-hash", "run-old"),
+        sibling("evt_one", &current_hash, "run-current"),
+        sibling("evt_two", &current_hash, "run-current"),
+    ];
+    let store = root.path().join("reports/skill-evidence/game-evidence");
+    fs::create_dir_all(&store).expect("create evidence store");
+    fs::write(
+        store.join("events.jsonl"),
+        events
+            .iter()
+            .map(Value::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n",
+    )
+    .expect("write evidence stream");
+
+    let report = inventory();
+    let evidence = &report["targets"][0]["current_evidence"];
+    assert_eq!(
+        evidence["qualifying_uses"], 1,
+        "two siblings record one run, so the current hash has seen one use"
+    );
+    assert_eq!(
+        evidence["outcome_counts"]["friction"], 2,
+        "outcome counts stay per record — they describe incidents, not exercise"
+    );
+    let current_row = evidence["observed_target_hashes"]
+        .as_array()
+        .expect("observed target hashes")
+        .iter()
+        .find(|row| row["content_hash"] == current_hash.as_str())
+        .expect("the current hash is observed");
+    assert_eq!(
+        current_row["qualifying_uses"], 1,
+        "the per-hash tally counts runs under the same name"
+    );
+}
+
 #[test]
 fn method_gap_research_status_discovers_only_target_identifying_lineage() {
     let root = tempfile::tempdir().expect("temporary repository");

@@ -162,6 +162,59 @@ impl Fixture {
             }
         })
     }
+
+    /// Another incident from the run `of_run` already recorded — what a
+    /// `--further-incident` record writes.
+    ///
+    /// Two such records are siblings *of each other*, in the sense CONTEXT.md's *Further
+    /// incident* entry defines. Every bare "sibling" in this file means that relation — a
+    /// run-mate — never the cluster-mate sense ADR 0002 uses when it says a friction sibling
+    /// cannot lower a `material_recurrence` bar.
+    ///
+    /// Siblings carry their own event identity and their own symptom, and share the run's
+    /// group, task label, and task fingerprint. The caller passes the run's session, since
+    /// one run is one session.
+    fn further_incident_event(
+        &self,
+        serial: usize,
+        of_run: usize,
+        outcome: &str,
+        symptom_key: Option<&str>,
+        session_id: &str,
+    ) -> Value {
+        let mut event = self.use_event(serial, outcome, symptom_key, session_id);
+        event["payload"]["task_label"] = json!(format!("task {of_run}"));
+        event["payload"]["task_fingerprint"] = json!(format!("fingerprint-{of_run}"));
+        event["payload"]["same_run_group"] = json!(format!("run-{of_run}"));
+        event
+    }
+}
+
+/// The denominator measures how much use this exact target version has seen, and one run
+/// is one use however many ways it deviated. Counting records instead would let an
+/// operator who recorded a run honestly advance it toward `ten_use_unresolved` faster than
+/// one who compressed the same run into a single receipt — recording would manufacture its
+/// own authorization.
+#[test]
+fn qualifying_uses_count_run_groups_rather_than_records() {
+    let fixture = Fixture::new();
+    fixture.write_events(&[
+        fixture.use_event(1, "friction", Some("execution"), "session-a"),
+        fixture.further_incident_event(2, 1, "friction", Some("output"), "session-a"),
+        fixture.further_incident_event(3, 1, "friction", Some("state"), "session-a"),
+        fixture.use_event(4, "clean", None, "session-b"),
+    ]);
+
+    let status = fixture.derive("session-c", 1_767_398_400_000);
+    assert_eq!(
+        status.qualifying_uses_on_current_hash, 2,
+        "three siblings record one run, so two runs are two uses"
+    );
+    assert_eq!(
+        status.open_incident_ids,
+        ["evt_1", "evt_2", "evt_3"],
+        "every sibling stays separately addressable in the ledger"
+    );
 }
 
 #[test]
@@ -190,6 +243,82 @@ fn friction_recurrence_requires_a_fresh_top_level_session() {
     assert_eq!(
         fresh_session.derivation_session_id.as_deref(),
         Some("session-d")
+    );
+}
+
+/// The whole point of recording a run's deviations separately is that a close can name
+/// exactly the one no trial could express. That is worth nothing if the name reaches the
+/// run: the sibling that a same-hash predecessor already confirmed as a real target defect
+/// would be gate-retired along with it, which is the cost `evt_41dfe1f4` actually paid.
+///
+/// Sharing a run group is a statement about how the evidence was recorded, never about what
+/// a review could decide. Retirement follows the names and nothing else.
+#[test]
+fn naming_one_sibling_untestable_leaves_its_siblings_clustering() {
+    let fixture = Fixture::new();
+    let mut events = vec![
+        fixture.use_event(1, "friction", Some("execution"), "session-a"),
+        fixture.further_incident_event(2, 1, "friction", Some("execution"), "session-a"),
+        fixture.use_event(3, "friction", Some("execution"), "session-b"),
+    ];
+    events.extend(fixture.review_naming_untestable_coverage(
+        "rev_1",
+        "closed_no_skill_defect",
+        &["evt_2"],
+        &["evt_2"],
+    ));
+    fixture.write_events(&events);
+
+    let status = fixture.derive("session-c", 1_767_398_400_000);
+    assert_eq!(
+        status.open_incident_ids,
+        ["evt_1", "evt_2", "evt_3"],
+        "a named event was never adjudicated, so it stays open in the ledger"
+    );
+    assert_eq!(
+        status.instrument_limited_incident_ids,
+        ["evt_2"],
+        "retirement reaches the name, not the run group it belongs to"
+    );
+    let cluster = status
+        .candidate_clusters
+        .iter()
+        .find(|cluster| cluster.symptom_key == "execution")
+        .expect("the unnamed incidents still cluster");
+    assert_eq!(cluster.open_event_ids, ["evt_1", "evt_3"]);
+    assert_eq!(cluster.independent_incidents, 2);
+    assert_eq!(status.qualifying_uses_on_current_hash, 2);
+}
+
+/// Independence is what makes a recurrence claim mean anything, and it is derived from the
+/// top-level session and the task fingerprint — both of which siblings share, because they
+/// record one run. Letting a run reach a threshold by deviating twice would say two
+/// independent incidents recurred when one run misbehaved once.
+///
+/// The contrast is
+/// `two_independent_material_failures_fire_the_material_recurrence_gate`: the same two
+/// records from distinct sessions do fire.
+#[test]
+fn siblings_of_one_run_cannot_reach_material_recurrence() {
+    let fixture = Fixture::new();
+    fixture.write_events(&[
+        fixture.use_event(1, "material_failure", Some("output"), "session-a"),
+        fixture.further_incident_event(2, 1, "material_failure", Some("output"), "session-a"),
+    ]);
+
+    let status = fixture.derive("session-b", 1_767_398_400_000);
+    assert_eq!(status.state, "collecting");
+    assert_eq!(status.authorization_reason, None);
+    assert_eq!(status.trigger_event_ids, [] as [String; 0]);
+    let cluster = status
+        .candidate_clusters
+        .iter()
+        .find(|cluster| cluster.symptom_key == "output")
+        .expect("the siblings cluster on their shared symptom");
+    assert_eq!(cluster.open_event_ids, ["evt_1", "evt_2"]);
+    assert_eq!(
+        cluster.independent_incidents, 1,
+        "one run contributes one independent incident however many ways it deviated"
     );
 }
 

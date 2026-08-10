@@ -111,6 +111,159 @@ fn snapshot_tree(root: &std::path::Path) -> BTreeMap<String, Vec<u8>> {
     snapshot
 }
 
+/// Capture is where a run's deviations become addressable evidence or stop being
+/// addressable at all. A recorder told to fix exactly one outcome and one symptom key, with
+/// nothing said about a run that deviated several ways, compresses them into one record and
+/// the reviewer inherits a trigger it can only retire whole.
+///
+/// The package has to say this without becoming a diagnoser. Recording deviations apart is
+/// a description of what the session shows — it asserts nothing about their causes in
+/// either direction, and the boundary that forbids claiming a shared cause has to forbid
+/// the converse just as plainly, or the guidance itself becomes the diagnosis.
+#[test]
+fn installed_capture_package_records_one_incident_per_deviation_without_diagnosing() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let package = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evidence-capture/SKILL.md"),
+    )
+    .expect("read installed capture package");
+
+    assert!(
+        package.contains("one record per deviation"),
+        "the package must say when a run yields more than one record"
+    );
+    assert!(
+        package.contains("--further-incident"),
+        "the package must name the flag that declares a sibling"
+    );
+    assert!(
+        package.contains("same `--task-label`"),
+        "a sibling shares its run's task label, which is what puts it in the run's group"
+    );
+    assert!(
+        package.contains(
+            "never asserts that two deviations share a cause, and never asserts that they do not"
+        ),
+        "recording deviations apart must stay description rather than causal judgment"
+    );
+    assert!(
+        package.contains("one qualifying use"),
+        "the package must say that siblings do not multiply the use they came from"
+    );
+    assert!(
+        package.contains("never combines with `--same-run-group`"),
+        "the two flags declare different things and the package must not blur them"
+    );
+    assert!(
+        !package.contains("Cost ceiling: one compiled command plus"),
+        "the cost ceiling must account for a run that records more than once"
+    );
+}
+
+/// Once a run can take several commands to record, a refusal on the third has no terminal
+/// state in a package whose states are "everything was appended" or "nothing was written".
+/// The operator following it reports that nothing was written over records already in an
+/// append-only stream — the one claim the substrate can never let a report make, because
+/// nothing will remove them and the next reader takes the stream as it stands.
+#[test]
+fn installed_capture_package_states_the_partial_append_terminal_state() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let package = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evidence-capture/SKILL.md"),
+    )
+    .expect("read installed capture package");
+
+    assert!(
+        package.contains("records already appended stand"),
+        "a later refusal must not be reported as though the earlier records were not written"
+    );
+    assert!(
+        package.contains("which deviations were recorded and which were not"),
+        "the report must let the operator tell the appended records from the missing ones"
+    );
+}
+
+/// The census publishes `qualifying_uses` and `outcome_counts` side by side in one object,
+/// and since #27 they count different things: runs and records. A run that deviated twice
+/// makes the outcome counts sum above the use count, which reads as a miscount to anyone who
+/// has not been told. The terminal reply took this same debt on and paid it; a report a
+/// commissioning decision rests on cannot carry it silently.
+#[test]
+fn installed_method_gap_package_separates_run_counts_from_record_counts() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let package = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/method-gap-research-status/SKILL.md"),
+    )
+    .expect("read installed method-gap package");
+
+    assert!(
+        package.contains("`qualifying_uses` counts runs"),
+        "the census must say which of the two numbers counts runs"
+    );
+    assert!(
+        package.contains("outcome counts"),
+        "and which counts records"
+    );
+    assert!(
+        package.contains("more outcomes than uses"),
+        "the reader must be told the sum can exceed the use count without either being wrong"
+    );
+}
+
+/// The command refuses a clean further incident and allows the reverse — a run first
+/// recorded clean can still gain an incident. That asymmetry is deliberate, because refusing
+/// it would leave a deviation noticed after the receipt with nowhere to go, but an operator
+/// who is never told the path exists will not use it, and the evidence is simply lost.
+#[test]
+fn installed_capture_package_states_a_clean_run_can_still_gain_an_incident() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let package = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evidence-capture/SKILL.md"),
+    )
+    .expect("read installed capture package");
+
+    assert!(
+        package.contains("a run already recorded clean can still gain an incident"),
+        "the operator must be told the deviation noticed after a clean receipt has a home"
+    );
+    assert!(
+        package.contains("never the other way round"),
+        "and that the reverse — a clean receipt for a run already recorded as deviating — is not available"
+    );
+}
+
+/// The package sends cross-session continuations to `--same-run-group`, which a further
+/// incident may not use. An operator reading only that would try the route, be refused, and
+/// have no instruction covering where they actually are — the state that ends with one run
+/// recorded as two uses.
+#[test]
+fn installed_capture_package_bounds_further_incidents_to_one_session() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let package = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evidence-capture/SKILL.md"),
+    )
+    .expect("read installed capture package");
+
+    assert!(
+        package.contains("only within the top-level session that recorded the run"),
+        "the package must state the limit before the operator meets it as a refusal"
+    );
+    assert!(
+        package.contains("would count that one run twice"),
+        "and must say why recording it as a fresh use is not the way out"
+    );
+}
+
 #[test]
 fn installed_skill_evolution_reference_writes_the_report_before_close_and_amends_it_after() {
     let root = tempfile::tempdir().expect("temporary repository root");

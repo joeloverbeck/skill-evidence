@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -1223,12 +1223,30 @@ fn summarize_current_evidence(
         })
         .collect();
 
+    // `qualifying_uses` is the gate projection's term and carries its meaning: a run, not a
+    // record. One run can record several incidents, so this tally deduplicates on the run
+    // group within a hash — the same rule `derive_gate` applies to the current hash, and a
+    // reporter counting records instead would publish a different number than
+    // `gate-status.json` under the same name. Outcome counts stay per record: they describe
+    // the incidents, not how much the target was exercised.
+    //
+    // Counted once, for every hash, and the current hash reads its answer off the same rows
+    // rather than recomputing it. Two tallies of one rule are two places for it to drift.
     let mut observed_target_hashes = Vec::<ObservedTargetHash>::new();
     let mut positions = HashMap::<String, usize>::new();
+    let mut counted_run_groups = HashSet::new();
     for event in events.iter().filter(|event| event.use_recorded().is_some()) {
+        let fresh_run = counted_run_groups.insert((
+            event.target_content_hash.as_str(),
+            event
+                .use_recorded()
+                .expect("filtered use record")
+                .same_run_group
+                .as_str(),
+        ));
         if let Some(index) = positions.get(&event.target_content_hash).copied() {
             let row = &mut observed_target_hashes[index];
-            row.qualifying_uses += 1;
+            row.qualifying_uses += usize::from(fresh_run);
             row.last_recorded_at.clone_from(&event.recorded_at);
         } else {
             positions.insert(
@@ -1237,15 +1255,19 @@ fn summarize_current_evidence(
             );
             observed_target_hashes.push(ObservedTargetHash {
                 content_hash: event.target_content_hash.clone(),
-                qualifying_uses: 1,
+                qualifying_uses: usize::from(fresh_run),
                 first_recorded_at: event.recorded_at.clone(),
                 last_recorded_at: event.recorded_at.clone(),
             });
         }
     }
+    let qualifying_uses = observed_target_hashes
+        .iter()
+        .find(|row| row.content_hash == current_hash)
+        .map_or(0, |row| row.qualifying_uses);
 
     CurrentEvidence {
-        qualifying_uses: current_uses.len(),
+        qualifying_uses,
         outcome_counts,
         open_incidents,
         observed_target_hashes,

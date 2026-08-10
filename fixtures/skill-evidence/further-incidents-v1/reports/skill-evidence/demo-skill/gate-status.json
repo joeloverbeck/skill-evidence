@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-10T20:55:04.810067225Z",
+  "target_content_hash": "8fd064beeb351b7698023277ac023aa2dfd2cca632a069018a6e1c739316e5bf",
+  "qualifying_uses_on_current_hash": 3,
+  "open_incident_ids": [
+    "evt_7884248d-2edb-4d00-860f-5f5e994603ff",
+    "evt_9c46207d-b892-4053-8566-465dddaf929e",
+    "evt_1b9d108a-ce34-44c6-9f13-d64ec7fd26ed"
+  ],
+  "candidate_clusters": [
+    {
+      "symptom_key": "execution",
+      "open_event_ids": [
+        "evt_9c46207d-b892-4053-8566-465dddaf929e",
+        "evt_1b9d108a-ce34-44c6-9f13-d64ec7fd26ed"
+      ],
+      "independent_incidents": 1,
+      "max_severity": "friction"
+    }
+  ],
+  "state": "collecting",
+  "authorized_workflow": null,
+  "authorization_reason": null,
+  "trigger_event_ids": [],
+  "threshold_session_id": null,
+  "not_before": null,
+  "active_review_id": null,
+  "last_completed_review_id": "rev_further_incidents",
+  "review_reentry_basis": null,
+  "target_name": "demo-skill",
+  "target_repo_relative_path": ".claude/skills/demo-skill",
+  "derivation_session_id": "session-review",
+  "instrument_limited_incident_ids": [
+    "evt_7884248d-2edb-4d00-860f-5f5e994603ff"
+  ]
+}

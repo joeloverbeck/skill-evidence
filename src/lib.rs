@@ -256,6 +256,14 @@ pub struct RecordUseRequest {
     pub retrospective: bool,
     pub evidence_refs: Vec<String>,
     pub same_run_group: Option<String>,
+    /// Declares that this record is another incident from a run this store has already
+    /// recorded, rather than a fresh use.
+    ///
+    /// One completed run can deviate in several distinct ways, and a review can only name
+    /// what has an identity — so each deviation is its own record, sharing the run group
+    /// and task fingerprint of its siblings. The duplicate refusal stays in force for
+    /// everything that does not declare itself this way.
+    pub further_incident: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1823,7 +1831,7 @@ pub fn record_use(
         format!("{}::{normalized_label}", target.target_name).as_bytes(),
         12,
     );
-    let same_run_group = request.same_run_group.clone().unwrap_or_else(|| {
+    let requested_run_group = request.same_run_group.clone().unwrap_or_else(|| {
         short_digest(
             format!(
                 "{}::{normalized_label}::{}",
@@ -1833,14 +1841,44 @@ pub fn record_use(
             12,
         )
     });
-    if let Some(duplicate) = events.iter().find(|event| {
-        event.target_content_hash == hash.content_hash
-            && event.use_recorded().is_some_and(|recorded| {
-                recorded.same_run_group == same_run_group
-                    || (recorded.same_run_group == legacy_run_group
-                        && event.top_level_session_id == inputs.session_id)
-            })
-    }) {
+    let recorded_uses_on_this_hash = || {
+        events
+            .iter()
+            .filter(|event| event.target_content_hash == hash.content_hash)
+            .filter_map(|event| event.use_recorded().map(|recorded| (event, recorded)))
+    };
+    // A further incident shares its siblings' run group, so it takes that group off the
+    // record already carrying it rather than deriving its own. A run whose first record was
+    // written with `--same-run-group` carries a group no derivation reproduces, and deriving
+    // one anyway would leave that run unable to record a second deviation from the very
+    // session that recorded it — with no exit that does not mint a second group for one run.
+    //
+    // The sibling is matched on the run's own session and task fingerprint, both computed.
+    // So the group still never comes from this caller: it is read out of the store, which is
+    // what keeps the denominator resting on identity the store owns. It also keeps the reach
+    // inside one session, since that is what the fingerprint alone would not bound.
+    let sibling_run_group = request
+        .further_incident
+        .then(|| {
+            recorded_uses_on_this_hash()
+                .find(|(event, recorded)| {
+                    event.top_level_session_id == inputs.session_id
+                        && recorded.task_fingerprint == task_fingerprint
+                })
+                .map(|(_, recorded)| recorded.same_run_group.clone())
+        })
+        .flatten();
+    let sibling_in_run_group = sibling_run_group.is_some();
+    let same_run_group = sibling_run_group.unwrap_or(requested_run_group);
+    let duplicate = recorded_uses_on_this_hash()
+        .find(|(event, recorded)| {
+            recorded.same_run_group == same_run_group
+                || (recorded.same_run_group == legacy_run_group
+                    && event.top_level_session_id == inputs.session_id)
+        })
+        .map(|(event, _)| event);
+    // `sibling_in_run_group` already implies the flag: nothing is adopted without it.
+    if let Some(duplicate) = duplicate.filter(|_| !sibling_in_run_group) {
         let message = if duplicate.top_level_session_id == inputs.session_id {
             format!(
                 "Duplicate receipt refused: run group {same_run_group} already recorded on the unchanged target ({}). A retry or continuation of the same task is the same qualifying use; a genuinely distinct use needs a distinct --task-label.",
@@ -1853,6 +1891,30 @@ pub fn record_use(
             )
         };
         return Err(refusal(message));
+    }
+    if request.further_incident && !sibling_in_run_group {
+        // A run group is derived from the target, the task label and this session, so a run
+        // recorded in an earlier session is out of reach. Answering that with the advice
+        // meant for a run with no record at all would have the operator mint a second group
+        // for one run — the denominator inflation counting run groups exists to prevent.
+        // Scoped to another session, because the same-session case can no longer reach here:
+        // a run recorded in this session is matched above whatever group it carries. Saying
+        // "written elsewhere" of the operator's own session would be false.
+        let elsewhere = recorded_uses_on_this_hash()
+            .find(|(event, recorded)| {
+                event.top_level_session_id != inputs.session_id
+                    && recorded.task_fingerprint == task_fingerprint
+            })
+            .map(|(event, _)| event);
+        return Err(refusal(match elsewhere {
+            Some(event) => format!(
+                "--further-incident reaches only a run recorded in this top-level session, and this task's records were written elsewhere (event {} in session {} at {}). A further incident is matched to its run by that run's own session and task label, so this deviation cannot join a run recorded in another one; recording it without the flag would count one run twice. Nothing recorded.",
+                event.event_id, event.top_level_session_id, event.recorded_at
+            ),
+            None =>
+                "--further-incident declares another incident from a run this store has not recorded: no use record in this top-level session carries this task's label against the target as it stands. A run's first incident is an ordinary use — record it without the flag. Nothing recorded."
+                    .to_owned(),
+        }));
     }
 
     let clean = Outcome::parse(&request.outcome) == Some(Outcome::Clean);
@@ -1927,7 +1989,11 @@ pub fn record_use(
             Recovery::RederiveGate,
         )
     })?;
-    let terminal_reply = build_reply(&inputs.event_id, &status);
+    let terminal_reply = build_reply(
+        &inputs.event_id,
+        &status,
+        some_run_holds_several_open_incidents(&events, &status.open_incident_ids),
+    );
     Ok(RecordReceipt {
         schema: host.record_schema(),
         event_id: inputs.event_id.clone(),
@@ -1990,6 +2056,18 @@ fn validate_record_request(request: &RecordUseRequest) -> Result<(), Error> {
             ));
         }
     }
+    if request.further_incident && request.outcome == "clean" {
+        return Err(refusal(
+            "--further-incident records another incident from a run, and a clean outcome is not one: a run this store already recorded as deviating cannot also be recorded as clean, because nothing withdraws the record that says otherwise. The reverse is allowed and is why the flag is asymmetric — a run first recorded clean may still gain an incident, since noticing a deviation later adds what the earlier receipt could not see rather than contradicting it. Nothing recorded."
+                .to_owned(),
+        ));
+    }
+    if request.further_incident && request.same_run_group.is_some() {
+        return Err(refusal(
+            "--further-incident cannot be combined with --same-run-group: a further incident comes from the same run, whose group is already derived from the target, the task label, and this top-level session. The two flags declare different things, and the use denominator counts run groups, so it stays on computed identity rather than an asserted one. Nothing recorded."
+                .to_owned(),
+        ));
+    }
     if request.retrospective && request.evidence_refs.is_empty() {
         return Err(refusal(
             "Retrospective evidence requires a concrete recoverable reference (artifact, diff, log, transcript); memory alone is inadmissible. Nothing recorded."
@@ -2006,6 +2084,40 @@ fn validate_record_request(request: &RecordUseRequest) -> Result<(), Error> {
         ));
     }
     Ok(())
+}
+
+/// Whether the open incidents include more than one from a single run.
+///
+/// This is exactly the condition under which the two counts the collecting reply prints can
+/// diverge, so it is derived from the projection's own open list rather than from the raw
+/// stream. Adjudicated incidents have already left that list and stop inflating the open
+/// count, while an incident retired as untestable stays open and keeps inflating it — both
+/// of which the reply must follow rather than approximate.
+fn some_run_holds_several_open_incidents(
+    events: &[EvidenceEvent],
+    open_incident_ids: &[String],
+) -> bool {
+    let open = open_incident_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
+    let mut open_incidents_per_run_group = HashMap::new();
+    for event in events {
+        if !open.contains(event.event_id.as_str()) {
+            continue;
+        }
+        let Some(recorded) = event.use_recorded() else {
+            continue;
+        };
+        let seen = open_incidents_per_run_group
+            .entry(recorded.same_run_group.as_str())
+            .or_insert(0_usize);
+        *seen += 1;
+        if *seen > 1 {
+            return true;
+        }
+    }
+    false
 }
 
 fn short_digest(bytes: &[u8], length: usize) -> String {
@@ -2260,7 +2372,15 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
     .into_bytes())
 }
 
-fn build_reply(event_id: &str, status: &GateStatus) -> String {
+/// `multi_incident_run` says whether the open incidents include more than one from a single
+/// run.
+///
+/// It is not on [`GateStatus`], which is both a published projection and a public struct.
+/// Serialized, it would need `gate-status.v1` to admit a property this change is not
+/// allowed to add; unserialized, it would be a public field existing only to phrase one
+/// terminal reply. Either way it is a detail of what the reply says, not a fact the gate
+/// turns on.
+fn build_reply(event_id: &str, status: &GateStatus, multi_incident_run: bool) -> String {
     let head = format!("Evidence recorded: {event_id}.");
     match status.state.as_str() {
         "closed" => format!("{head}\nGate: closed.\nNo action authorized."),
@@ -2285,8 +2405,16 @@ fn build_reply(event_id: &str, status: &GateStatus) -> String {
                 0 => String::new(),
                 count => format!(" retired as untestable: {count};"),
             };
+            // One run can record several incidents, so the open-incident count rises
+            // faster than the use count. Printing both without saying which of the two
+            // this is leaves the operator to reconcile a store they cannot see.
+            let siblings = if multi_incident_run {
+                " (a run that recorded several incidents counts once)"
+            } else {
+                ""
+            };
             format!(
-                "{head}\nGate: collecting — open incidents: {} (independent by symptom: {clusters});{retired} qualifying uses on current target hash: {}.\nNo action authorized.",
+                "{head}\nGate: collecting — open incidents: {} (independent by symptom: {clusters});{retired} qualifying uses on current target hash: {}{siblings}.\nNo action authorized.",
                 status.open_incident_ids.len(),
                 status.qualifying_uses_on_current_hash
             )
@@ -2924,6 +3052,26 @@ fn derive_gate(
     let mut cluster_events = Vec::<(String, Vec<&EvidenceEvent>)>::new();
     let mut fired = None;
     let mut queued_pre_close_evidence = false;
+    // The denominator counts runs, not records. One run can record several incidents —
+    // distinct deviations, each with its own identity so a close can name exactly the one
+    // its instrument could not test — and they share the run group that says they are one
+    // use. Counting records instead would let an honestly recorded run advance
+    // `ten_use_unresolved` faster than a compressed one, which is recording manufacturing
+    // its own authorization.
+    //
+    // Counted as the loop walks, so the running total the threshold below reads is the
+    // number of runs seen so far. Where a hash carries one record per run group this counts
+    // exactly what counting records counted, at every point in the walk and not only at the
+    // end — so no such stream re-derives to a different denominator than it already reports.
+    //
+    // Two separate grounds say existing streams are that shape, and only the first is
+    // structural. Every record written before this change met a write path that refused any
+    // repeat of a derived run group — the declared further incident that may now repeat one
+    // did not exist to be written. That argument does not reach a legacy group, whose check
+    // is scoped to one session, so a pre-session-scoped stream was never excluded by
+    // construction. Measured instead — 1251 use records across the three consumer
+    // repositories and this one, every `(hash, run group)` pair distinct.
+    let mut counted_run_groups = HashSet::new();
     for (event_index, event) in events.iter().enumerate() {
         let Some(recorded) = event.use_recorded() else {
             continue;
@@ -2931,7 +3079,9 @@ fn derive_gate(
         if event.target_content_hash != current_hash {
             continue;
         }
-        status.qualifying_uses_on_current_hash += 1;
+        if counted_run_groups.insert(recorded.same_run_group.as_str()) {
+            status.qualifying_uses_on_current_hash += 1;
+        }
         let open_incident =
             recorded.outcome != Outcome::Clean && !adjudicated.contains(event.event_id.as_str());
         // A contemporaneous severe incident authorizes on its own below, from
