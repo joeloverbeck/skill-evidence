@@ -490,6 +490,117 @@ fn installed_skill_evolution_reference_reports_the_close_retirement_reach() {
 }
 
 #[test]
+fn installed_skill_evolution_reference_records_the_unexpressible_mechanism_dead_end() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains(
+            "When any mechanism was marked **unable to be expressed**, record a dead-end note for each one"
+        ),
+        "the terminal reporting step must make the dead-end record conditional on the review reaching that reading"
+    );
+    assert!(
+        reference.contains(
+            "the mechanism, its binding constraint, and that this workflow has no further instrument for it"
+        ),
+        "the next reader needs the mechanism, the constraint that defeated the instrument, and the workflow limit"
+    );
+    assert!(
+        reference
+            .contains("The decision to pursue it belongs to the maintainer, not a later review"),
+        "the note must report the dead end without scheduling another workflow"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_carries_forward_a_repeated_untestable_mechanism() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains(
+            "Use the same-target `prior_reviews` reports read before step 4 to check whether an earlier review ruled a mechanism of the same shape unable to be expressed on these target bytes"
+        ),
+        "the evidence packet and prior report must supply the repeated same-bytes ruling"
+    );
+    assert!(
+        reference.contains("reaching this exit twice on one target is the signal the note carries"),
+        "the report must make the repeated dead end legible to the maintainer and next reviewer"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_provides_a_fixed_report_home_for_dead_ends() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    for required in [
+        "## Unable to be expressed",
+        "- Mechanism:",
+        "- Binding constraint:",
+        "- Earlier same-shape ruling on these target bytes:",
+        "- Further instrument in this workflow: none",
+    ] {
+        assert!(
+            reference.contains(required),
+            "the installed report template must give `{required}` a fixed home: reference={reference}"
+        );
+    }
+}
+
+#[test]
+fn installed_skill_evolution_reference_completes_with_the_unexpressible_mechanism_clause() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains(
+            "When any mechanism was marked unable to be expressed, add one clause stating that fact alongside the retirement reach"
+        ),
+        "the user-facing completion must disclose the dead end beside the reach it already reports"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_leaves_reviews_without_unexpressible_mechanisms_unchanged() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains(
+            "When no mechanism has that reading, omit the `## Unable to be expressed` section and add no completion clause; the report and completion otherwise stay unchanged"
+        ),
+        "a review that can express every mechanism must retain its existing report and completion"
+    );
+}
+
+#[test]
 fn installed_skill_evolution_reference_routes_untestable_coverage_out_of_adjudication() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");

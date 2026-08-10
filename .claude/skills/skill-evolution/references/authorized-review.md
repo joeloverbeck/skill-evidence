@@ -163,6 +163,12 @@ Gate retirement — what `retired_from_gate_event_ids` reports, never the adjudi
 
 Before a `blocked_no_valid_test` close, read the authorization reason and coverage list from the claim receipt. Re-evaluate that authorization reason against the live candidate clusters in the gate projection, using the roster above to identify the widest reason-specific reach bound. Vouch that the binding constraint you named plausibly covers every incident in that bound, not every same-symptom sibling. Vouch only for incidents inside that reason-specific reach bound; same-symptom incidents outside it do not affect this close. The projection is current as of the last recorded incident, so no extra derive run is required. This reason-specific reach bound can name incidents the close will not retire: a contemporaneous severe incident is never retired because it authorizes on its own. If you cannot vouch for an incident in that reason-specific reach bound, record the mismatch in the review report and user-facing completion.
 
+When any mechanism was marked **unable to be expressed**, record a dead-end note for each one in the review report: the mechanism, its binding constraint, and that this workflow has no further instrument for it. The decision to pursue it belongs to the maintainer, not a later review. This records the limit and schedules nothing.
+
+Use the same-target `prior_reviews` reports read before step 4 to check whether an earlier review ruled a mechanism of the same shape unable to be expressed on these target bytes. When it did, say so in that mechanism's dead-end note; reaching this exit twice on one target is the signal the note carries.
+
+The dead-end section in the template below is conditional. When no mechanism has that reading, omit the `## Unable to be expressed` section and add no completion clause; the report and completion otherwise stay unchanged.
+
 Before any close, write the review report at `reviews/<review-id>.md`, with unreached sections marked `not reached — <disposition>`. Fill every section the review has reached and put `pending close receipt` only where the receipt supplies the final value. The compiled close command verifies that this report file exists before it appends anything; it does not judge the report's prose.
 
 ```markdown
@@ -201,6 +207,12 @@ Before any close, write the review report at `reviews/<review-id>.md`, with unre
 - Regressions:
 - Decision:
 
+## Unable to be expressed
+- Mechanism:
+- Binding constraint:
+- Earlier same-shape ruling on these target bytes:
+- Further instrument in this workflow: none
+
 ## Landing
 - Landed: yes/no
 - Target after hash or unchanged hash:
@@ -224,7 +236,7 @@ When validation ran without building a candidate or recording `validation_comple
 
 After the close succeeds, amend the review report with the final disposition and every close-receipt value that was pending. Read `retired_from_gate_event_ids` from the close receipt whenever it is present: it names what this close moved out of the gate, including an empty reach, and never the adjudication retirement that `adjudicated_event_ids` carries. The projection's `instrument_limited_incident_ids` is instead the standing per-hash set and can include retirements from earlier reviews. Copy the receipt's list into the report and state that retirement reach in the user-facing completion. A close that neither carried an instrument-limited disposition nor named untestable coverage omits the key and has no retirement reach to report.
 
-The user-facing completion is concise, links the report, states whether the live skill changed, and, when the close receipt carries `retired_from_gate_event_ids`, states that retirement reach exactly, including an empty list.
+The user-facing completion is concise, links the report, states whether the live skill changed, and, when the close receipt carries `retired_from_gate_event_ids`, states that retirement reach exactly, including an empty list. When any mechanism was marked unable to be expressed, add one clause stating that fact alongside the retirement reach.
 
 *Done when the report existed before close, the disposition event exists, the report carries the close receipt's final values, and the completion was delivered.*
 
