@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-10T18:52:32.162693872Z",
+  "generated_at": "2026-08-10T19:23:02.34197638Z",
   "target_content_hash": "b4aaa5ea17450343dfa971ab4f08a9a4427c36b1f956579c96f270e90e3af9dd",
-  "qualifying_uses_on_current_hash": 9,
+  "qualifying_uses_on_current_hash": 10,
   "open_incident_ids": [
     "evt_8f260430-9680-478a-b30e-7203cc416179",
     "evt_2553baa7-5531-4a32-8b16-936c2a8f4cf0"
@@ -18,16 +18,19 @@
       "max_severity": "friction"
     }
   ],
-  "state": "collecting",
-  "authorized_workflow": null,
-  "authorization_reason": null,
-  "trigger_event_ids": [],
-  "threshold_session_id": null,
+  "state": "eligible_pending_cooldown",
+  "authorized_workflow": "skill-evolution",
+  "authorization_reason": "ten_use_unresolved",
+  "trigger_event_ids": [
+    "evt_8f260430-9680-478a-b30e-7203cc416179",
+    "evt_2553baa7-5531-4a32-8b16-936c2a8f4cf0"
+  ],
+  "threshold_session_id": "019fed06-fc1c-75d3-ad10-fe27267f1d9e",
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": "rev_5045213f-d3a2-47f9-8b08-e0634c6103b0",
-  "review_reentry_basis": null,
+  "review_reentry_basis": "first_eligibility",
   "target_name": "implement",
   "target_repo_relative_path": ".claude/skills/implement",
-  "derivation_session_id": "019fece8-a0ca-76a0-9d52-93a8adbaa9c2"
+  "derivation_session_id": "019fed06-fc1c-75d3-ad10-fe27267f1d9e"
 }
