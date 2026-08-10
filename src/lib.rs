@@ -201,10 +201,10 @@ pub struct EvolutionCloseRequest {
     pub adjudicate: Vec<String>,
     /// Coverage this review could not decide: either no trial could express the
     /// mechanism they record, or the acceptance gate grades outcome while their evidence
-    /// bears no outcome claim. A strict subset of the coverage list — naming an event here
-    /// does not remove it from what the close accounted for, it records that the accounting
-    /// was *undecided* rather than *concluded* — and it asserts nothing about whether the
-    /// mechanism reproduced.
+    /// bears no outcome claim. A subset of the coverage list, and possibly all of it —
+    /// naming an event here does not remove it from what the close accounted for, it records
+    /// that the accounting was *undecided* rather than *concluded* — and it asserts nothing
+    /// about whether the mechanism reproduced.
     pub instrument_limited: Vec<String>,
     pub trials: Option<String>,
     pub artifacts: Option<String>,

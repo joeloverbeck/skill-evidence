@@ -151,7 +151,7 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
   pre-registered as unreachable, which is the mislabel this decision exists to prevent, reached from
   the other direction.
   **The reach argument above re-runs and lands unchanged, because reach does not move.** The named
-  events are a strict subset of a coverage list this close already accounted for, so nothing outside
+  events all sit inside a coverage list this close already accounted for, so nothing outside
   that list changes character and no reason-scoped widening applies to them: a close that examined its
   coverage mechanism by mechanism has already said which mechanisms it could not decide, and inferring
   more would retire evidence the review never examined — what #16 narrowed away from. Nor is this the
