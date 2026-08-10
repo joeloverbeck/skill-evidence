@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-10T05:25:38.371926524Z",
+  "generated_at": "2026-08-10T06:44:10.703092105Z",
   "target_content_hash": "fa4587c9947cd3836cebbf6ebda49196f0b9fb0cef1b7b7ff5d03fc01f20d31f",
-  "qualifying_uses_on_current_hash": 11,
+  "qualifying_uses_on_current_hash": 12,
   "open_incident_ids": [
     "evt_5930fbff-7cbc-4cdd-a64e-0f312b2488eb",
     "evt_ff458eea-8b9a-44f3-bc37-c3b0c9c035ab",
@@ -47,5 +47,5 @@
   "review_reentry_basis": "first_eligibility",
   "target_name": "tdd",
   "target_repo_relative_path": ".claude/skills/tdd",
-  "derivation_session_id": "019fea08-773b-7062-831b-d7672ef49eba"
+  "derivation_session_id": "019fea25-08a9-76f2-9f40-004edb6b3d85"
 }
