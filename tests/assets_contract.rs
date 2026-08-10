@@ -185,6 +185,94 @@ fn installed_skill_evolution_reference_weighs_trigger_workarounds_before_freezin
 }
 
 #[test]
+fn installed_skill_evolution_reference_requires_per_mechanism_trials() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let ownership = reference
+        .find("### 3. Determine target ownership and causal mechanism")
+        .expect("the ownership step remains explicit");
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let validation = reference
+        .find("### 6. Run blind comparative validation")
+        .expect("the candidate-arm step remains explicit");
+    let report = reference
+        .find("# Skill Evolution Review: <skill-name>")
+        .expect("the review report template remains explicit");
+
+    for (required, section) in [
+        (
+            "Name one candidate mechanism for each trigger event, or explicitly group several trigger events under one shared mechanism and state why they share it.",
+            &reference[ownership..freeze],
+        ),
+        (
+            "Freeze one reproduction trial per distinct mechanism, each with its own trigger event IDs, witness, unexpressed reading, and incidence-sized run count.",
+            &reference[freeze..current_arm],
+        ),
+        (
+            "The current arm is the union of the reproduction trials; if their results disagree, proceed only on each mechanism that reproduced and report every mechanism as reproduced, not reproduced with witnesses expressed, or unable to be expressed.",
+            &reference[current_arm..validation],
+        ),
+        (
+            "Before any candidate output exists, freeze whether a candidate-arm run whose witness reads unexpressed is discounted from the comparison or replaced.",
+            &reference[freeze..current_arm],
+        ),
+    ] {
+        assert!(
+            section.contains(required),
+            "installed reference must preserve `{required}` in its governing step: reference={reference}"
+        );
+    }
+
+    assert_eq!(
+        reference[report..]
+            .matches("- Trigger event → reproduction trial → witness reading:")
+            .count(),
+        2,
+        "both evidence adjudication and results must carry the per-mechanism mapping: reference={reference}"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_reserves_blocked_for_the_whole_review() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    for required in [
+        "When only some mechanisms are untestable, mark each as unable to be expressed in the plan and proceed with the runnable reproduction trials.",
+        "`blocked_no_valid_test` remains a whole-review disposition; do not assign it to an individual mechanism.",
+    ] {
+        assert!(
+            plan.contains(required),
+            "installed reference must preserve `{required}` in the frozen-plan contract: reference={reference}"
+        );
+    }
+}
+
+#[test]
 fn installed_event_schema_declares_close_validation_effort_as_optional() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");

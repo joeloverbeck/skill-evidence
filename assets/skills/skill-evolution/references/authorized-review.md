@@ -48,19 +48,19 @@ Now — and only now — read the target skill, plus the minimum external contra
 
 For a non-proceeding class, carry the mapped disposition and a factual note to step 9. Route outside-target evidence to its owner factually without proposing an unsanctioned repair, and never edit another owner from this review.
 
-The mechanism stays a *candidate* here. Only step 5's current arm can confirm it, so do not treat an unconfirmed mechanism as absent and do not close `not_reproducible` merely because no trial has run yet.
+Each mechanism stays a *candidate* here. Only step 5's current arm can confirm it, so do not treat an unconfirmed mechanism as absent and do not close `not_reproducible` merely because no trial has run yet. Name one candidate mechanism for each trigger event, or explicitly group several trigger events under one shared mechanism and state why they share it.
 
 Before freezing the plan, read `workaround_taken` only from the raw trigger events in the evidence packet. State what those recorded workarounds establish about the candidate mechanism and target ownership, or state that none was recorded on a trigger event. Repeated suppression of the mechanism is evidence for target ownership because the mechanism responds to instruction the target could carry; a workaround that was taken without suppressing the mechanism is evidence against target ownership. Record the direction as evidence, never as a verdict.
 
 Using the packet's candidate cluster for this authorization, count the open incident IDs outside the trigger set and state that count, including zero. This count discloses how many incident payloads the bounded workaround read could not reach. Do not characterize, estimate, or reason about those incidents; do not read the historical ledger or seek their payloads.
 
-*Done when the candidate mechanism and ownership class are written down, and a non-proceeding class has its terminal disposition and note ready for step 9.*
+*Done when each trigger is mapped to a candidate mechanism and ownership class, and a non-proceeding class has its terminal disposition and note ready for step 9.*
 
 ### 4. Freeze the validation plan before any candidate exists
 
-Name the incident's binding constraint first — the condition without which the failure does not occur, such as load, volume, instruction recency or context distance, caller-owned input size, or elapsed run length — then decide whether the trial instrument can vary it. A trial executor starts fresh and short-context with the contract in hand, so a constraint that exists only deep inside a long run is outside what any trial set can express. When the instrument cannot vary the constraint, or no meaningful fresh validation can be constructed at all, carry `blocked_no_valid_test` and a note naming the constraint to step 9; freeze no plan, build no candidate, and run no trial.
+For each distinct mechanism, name its binding constraint — the condition without which its failure does not occur, such as load, context distance, input size, or elapsed run length — and decide whether the trial instrument can vary it. A trial executor starts fresh and short-context, so a constraint that exists only deep inside a long run is inexpressible. Mark that mechanism as unable to be expressed in the frozen plan; freeze no run or candidate for it. When only some mechanisms are untestable, mark each as unable to be expressed in the plan and proceed with the runnable reproduction trials. If none is testable, carry `blocked_no_valid_test` and a note naming the constraints to step 9 without freezing a plan or building a candidate. `blocked_no_valid_test` remains a whole-review disposition; do not assign it to an individual mechanism.
 
-For each constraint the instrument can vary, name its **witness**: the observable in a finished run's own output or artifacts that shows whether that run expressed the constraint. The frozen plan must also name the observation that would make the witness read unexpressed. An observable that no finished run could make read unexpressed does not show *whether*, and is not a witness; the constraint it was meant to read takes the `blocked_no_valid_test` exit above before a candidate exists. Anything a reader can check in what the run already produces qualifies — no new instrument is required — and a constraint nothing a finished run yields could show is one this instrument cannot vary, so it takes the same exit. Fix the reading now, before any outcome exists: a witness reading unexpressed takes `blocked_no_valid_test`, naming that constraint, to step 9. Chosen after a result is in hand, that reading is not evidence.
+For each testable constraint, name its **witness**: the observable in a finished run's output or artifacts that shows whether the run expressed the constraint, plus the observation that reads unexpressed. An observable that cannot read unexpressed is not a witness; mark its mechanism unable to be expressed. Anything already produced by the run can qualify; require no new instrument. Fix every reading before outcomes exist, because one chosen after a result is not evidence.
 
 A same-hash predecessor that already ran trials constrains this judgment: if it reports the current arm passing on a mechanism shape these incidents repeat, that is evidence the wording is followed when freshly read, and the constraint is the run condition rather than the text. Do not re-derive it by rerunning equivalent trials.
 
@@ -68,32 +68,29 @@ The incidents' recorded run conditions are the evidence for this judgment, not a
 
 Reconcile the frozen plan with step 3's workaround finding. Keep the plan consistent with that directional evidence without letting it replace a trial or skip or shrink the frozen trial set; blind comparative validation remains the gate.
 
-Every reproduction trial runs at least 3 times when its first-run witness reads expressed. Where the recorded `run_condition` and `workaround_taken` fields support an estimate of the per-launch incidence, freeze that estimate in the plan, choose a reproduction run count above the floor against it, and state how that estimate supports the chosen run count. Where the record does not support an estimate, say so explicitly and use the floor. The floor forbids a single-run reproduction; incidence-based sizing carries the statistical weight. Step 5's first-run rule remains an early stop: an unexpressed reading closes the arm at that one run instead of spending its planned remainder.
+Freeze one reproduction trial per distinct mechanism, each with its own trigger event IDs, witness, unexpressed reading, and incidence-sized run count. For an untestable mechanism, record its constraint and unable-to-be-expressed reading in that trial slot instead of inventing a run. Each runnable reproduction gets at least 3 runs when its first witness reads expressed. If recorded `run_condition` and `workaround_taken` support a per-launch incidence estimate, freeze it, choose a count above the floor, and explain the sizing; otherwise state that and use the floor. An unexpressed first reading stops that trial before its remaining runs. Before any candidate output exists, freeze whether a candidate-arm run whose witness reads unexpressed is discounted from the comparison or replaced.
 
 Only then define the trials, so the change cannot pick only tests it already knows how to pass. Ordinary, narrow change — at least three paired trials:
 
-1. a fresh reproduction of the implicated mechanism;
+1. the fresh reproduction trial for each distinct mechanism;
 2. an adjacent case exercising the same capability differently;
 3. an unrelated core regression case.
 
 Escalate to at least five paired trials (add another core-regression case and a fragile, edge, or safety-relevant case) when the change affects destructive or external actions, state integrity or confidentiality, shared conventions or multiple skills, triggering or scope boundaries, a broad workflow section, more than one major behavior, or substantial deletion or reorganization.
 
-Freeze per trial: the raw prompt/task, raw input artifacts, an observable pass/fail or comparison rubric, its witness, any deterministic checks, which behavior it protects, and evaluator-independence requirements. Save the frozen plan under `reviews/<review-id>/`.
+Freeze per trial: the raw prompt/task, raw input artifacts, pass/fail or comparison rubric, witness, deterministic checks, protected behavior, and evaluator-independence requirements. Save the plan under `reviews/<review-id>/`.
 
-*Done when the binding constraint is named and variable by the trials, its witness and unexpressed reading are fixed, and the full trial set is frozen on disk, or `blocked_no_valid_test` and its note are ready for step 9.*
+*Done when every mechanism has a binding constraint and trial slot, every runnable trial has its readings fixed, and the full set is frozen, or all mechanisms are blocked and ready for step 9.*
 
 ### 5. Construct an isolated candidate
 
-Run the frozen reproduction trial(s) on the unchanged current skill before building anything, under step 6's rules; they are its current arm, not extra runs, and their outcome never reopens the frozen trial set.
+The current arm is the union of the reproduction trials; if their results disagree, proceed only on each mechanism that reproduced and report every mechanism as reproduced, not reproduced with witnesses expressed, or unable to be expressed.
 
-Read the witness on the **first** of those runs before spending another. Unexpressed → carry `blocked_no_valid_test` and a note naming the constraint the run did not express to step 9 at that one run: no candidate, no further trials, and no re-cut prompt or fixture. Expressed → the arm continues under the frozen plan.
+Run each runnable reproduction on the unchanged current skill before building anything, under step 6's rules. Read its **first** witness before spending another. Unexpressed → mark that mechanism unable to be expressed and stop only its trial, with no re-cut prompt or fixture. Expressed → finish its planned current-arm runs.
 
-If the mechanism does not recur across the arm, no candidate can be materially better — but a passing arm carries two readings, and the close must say which one it rests on. The arm's witnesses decide, run 1's included:
+Classify each mechanism separately, including run 1: failure recurred → reproduced; witnesses expressed on every run without failure → not reproduced with witnesses expressed; any unexpressed witness → unable to be expressed. Build the candidate only for reproduced mechanisms and carry all three mappings into the report. This per-mechanism routing does not create per-trigger dispositions; the review still closes once.
 
-- expressed on every run, and the failure still did not appear — the target handles it: carry `monitor_for_recurrence` and a note naming the condition the arm reproduced and what it did to step 9;
-- unexpressed on any run — that run did not hold the condition, so the pass is uninformative about the incidents: carry `blocked_no_valid_test` and a note naming the condition the arm could not express to step 9.
-
-Never record both readings, and never let a pass default to `monitor_for_recurrence` when the condition went unexpressed — that retires the trigger events on a conclusion the trials did not reach. Then go to step 9.
+If none reproduced, build no candidate: when every mechanism was not reproduced with witnesses expressed, carry `monitor_for_recurrence`; when any was unable to be expressed, carry `blocked_no_valid_test`. Name every mechanism's reading in the note, then go to step 9.
 
 Copy the live target to `reviews/<review-id>/candidate/` (outside skill discovery) and modify only that copy; the live target stays untouched until every trial passes. Design rules:
 
@@ -104,11 +101,11 @@ Copy the live target to `reviews/<review-id>/candidate/` (outside skill discover
 - growth only for a proven missing capability that cannot be expressed by replacing existing text;
 - tool- or repository-specific details go in conditional references, not universal runtime rules; shared guidance keeps one canonical home.
 
-*Done when the first run's witness read expressed, the mechanism recurred on the current arm, and the candidate differs from the live target only where the mechanism demands it, or the arm-supported disposition and note are ready for step 9.*
+*Done when every mechanism is classified and at least one reproduced mechanism has a narrowly scoped candidate, or the arm-supported disposition and per-mechanism note are ready for step 9.*
 
 ### 6. Run blind comparative validation
 
-Run every frozen trial against both the unchanged current skill and the candidate, using fresh sessions or independent agents with minimal task-local context. Give executors the raw task and artifacts — never the diagnosis, intended repair, expected answer, or which version they hold; randomize or conceal version labels for evaluators. The evidence store holds all of it — incident bodies, this review's diagnosis, and the candidate bytes — so every executor prompt must bar reading it. Run applicable deterministic checks on both versions where comparison matters, and on the candidate before landing. Retain raw outputs and evaluator decisions under `reviews/<review-id>/`.
+Run every frozen trial against both the unchanged current skill and the candidate, using fresh sessions or independent agents with minimal task-local context. Give executors the raw task and artifacts — never the diagnosis, repair, expected answer, or version label; conceal or randomize labels for evaluators. Bar every executor from the evidence store, which holds the incident bodies, diagnosis, and candidate bytes. For a candidate-arm witness that reads unexpressed, apply the plan's frozen discount-or-replace choice before comparison; never improvise from the visible split. Run applicable deterministic checks on both versions where comparison matters, and on the candidate before landing. Retain raw outputs and evaluator decisions under `reviews/<review-id>/`.
 
 *Done when every frozen trial ran on both versions and the raw outputs are on disk.*
 
@@ -167,6 +164,7 @@ Before any close, write the review report at `reviews/<review-id>.md`, with unre
 ## Evidence adjudication
 - Independence result:
 - Confirmed mechanism:
+- Trigger event → reproduction trial → witness reading:
 - Target ownership:
 - Recorded-workaround finding:
 - Non-trigger open incident count:
@@ -184,6 +182,7 @@ Before any close, write the review report at `reviews/<review-id>.md`, with unre
 ## Results
 - Current version:
 - Binding condition reproduced by the current arm: yes/no/not reached
+- Trigger event → reproduction trial → witness reading:
 - Candidate version:
 - Regressions:
 - Decision:
