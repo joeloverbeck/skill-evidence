@@ -2,7 +2,7 @@
 
 You are here only because the preflight printed `authorized: true`. Work from its bounded evidence packet — the trigger events, use counts on the current hash, related prior dispositions, and the concrete artifacts they cite. Do not ingest the full historical ledger; the gate projection exists to keep old incident lore from dominating current judgment. The threshold authorized a diagnosis, not a presumption that the skill is defective or a guarantee of an edit.
 
-`prior_reviews` indexes every review already completed on this target, whatever cluster it adjudicated, because what a predecessor ruled about the instrument or the mechanism is symptom-independent. Read the report of each one whose `same_target_hash` is true before step 4: those judged these exact bytes and govern how far this review can get. Also read any older entry whose note bears on this cluster — it landed a change, but a standing instruction, such as one against repeating a behavioral reproduction, survives the landing. Rediscovering a predecessor's ruling by running trials is waste; contradicting it silently is worse. `related_prior_dispositions` remains the narrower symptom-linked view for duplicate-mechanism judgment.
+`prior_reviews` indexes every review already completed on this target, whatever cluster it adjudicated, because what a predecessor ruled about the instrument or the mechanism is symptom-independent. Read the report of each one whose `same_target_hash` is true before step 4: those judged these exact target bytes. After step 1, compare each entry's `operating_skill_hash`, when present, with the current `review_started` event's `operating_skill_hash`. A matching identity means the predecessor used these review rules and its rulings govern how far this review can get. A differing identity means the predecessor used different review rules: its report is evidence to weigh rather than a ruling that governs. An entry with no recorded identity is unknown rather than equal; read exactly as it is read today, with its same-target rulings governing, because absence cannot retroactively establish that its rules differed. Also read any older entry whose note bears on this cluster — it landed a change, but a standing instruction, such as one against repeating a behavioral reproduction, survives the landing. Rediscovering a predecessor's ruling by running trials is waste; contradicting it silently is worse. `related_prior_dispositions` remains the narrower symptom-linked view for duplicate-mechanism judgment.
 
 Compiled command family (all event writes, from the repository root): `cargo run --locked -p {{cargo_package}} -- skills evolution <command> --target <skill-path> …`. Every command takes explicit `--recorded-at`, `--now-epoch-milliseconds`, `--session-id`, and `--lock-owner` inputs. Mutating commands also take caller-owned `--event-id` and `--repository-head` inputs; `claim` takes a caller-owned `--review-id`. The command never reads the ambient clock or generates an identity. Review artifacts live under `reports/skill-evidence/<skill-key>/reviews/`.
 
@@ -11,12 +11,13 @@ Compiled command family (all event writes, from the repository root): `cargo run
 ```bash
 cargo run --locked -p {{cargo_package}} -- skills evolution claim \
   --target <skill-path> --review-id <review-id> --risk-tier provisional \
+  --record-operating-skill-hash \
   --event-id <event-id> --recorded-at <RFC3339-clock> \
   --now-epoch-milliseconds <clock-ms> --repository-head <repository-head> \
   --session-id <top-level-session-id> --lock-owner <caller-owned-lock-id>
 ```
 
-The compiled command re-evaluates every authorization term under the store lock, appends `review_started` (trigger IDs, authorizing rule, baseline target hash, provisional risk tier, fresh-session or cooldown proof), and re-derives the gate to `review_in_progress`. If it refuses — another review owns the target, or the gate moved — relay the refusal and stop without semantic analysis.
+The compiled command re-evaluates every authorization term under the store lock, appends `review_started` (trigger IDs, authorizing rule, baseline target hash, computed operating Skill Evolution package hash, provisional risk tier, fresh-session or cooldown proof), and re-derives the gate to `review_in_progress`. Read the current `operating_skill_hash` from that appended event only for the `prior_reviews` comparison above; do not ingest the historical ledger. If it refuses — another review owns the target, or the gate moved — relay the refusal and stop without semantic analysis.
 
 *Done when the compiled command printed a `review_id` and the review owns the target.*
 

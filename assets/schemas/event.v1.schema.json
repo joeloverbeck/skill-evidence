@@ -228,6 +228,28 @@
     },
     {
       "if": {
+        "properties": { "event_type": { "const": "review_started" } },
+        "required": ["event_type"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": ["review_id"],
+            "properties": {
+              "review_id": { "type": "string", "minLength": 1 },
+              "operating_skill_hash": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Content hash computed from the operating Skill Evolution package when the claim opted to record it. Omitted when that operating-package identity was not recorded; absence never means it matched the package running now."
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
         "properties": {
           "event_type": {
             "enum": [

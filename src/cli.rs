@@ -203,6 +203,9 @@ pub struct EvolutionClaimArgs {
     review_id: Option<String>,
     #[arg(long, default_value = "provisional")]
     risk_tier: String,
+    /// Record the computed content hash of the operating Skill Evolution package.
+    #[arg(long)]
+    record_operating_skill_hash: bool,
 }
 
 #[derive(Debug, Args)]
@@ -393,11 +396,13 @@ fn run_skill_evolution(
                 event,
                 review_id,
                 risk_tier,
+                record_operating_skill_hash,
             } = args;
             let (root, target, inputs) = lifecycle_event_inputs(event, "skill-evolution", host)?;
             let request = crate::EvolutionClaimRequest {
                 review_id: review_id.unwrap_or_default(),
                 risk_tier,
+                record_operating_skill_hash,
             };
             let receipt = crate::evolution_claim(&root, &target, &request, &inputs)?;
             Ok(print_successful_report(&receipt, out))

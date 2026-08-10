@@ -174,6 +174,12 @@ pub struct LifecycleEventInputs {
 pub struct EvolutionClaimRequest {
     pub review_id: String,
     pub risk_tier: String,
+    /// Record the content hash of the host's operating Skill Evolution package.
+    ///
+    /// The caller chooses whether the receipt carries the identity but never supplies the
+    /// identity itself. The crate hashes `LifecycleEventInputs::operator_skill` when this is
+    /// true; false preserves the historical `review_started` payload byte-for-byte.
+    pub record_operating_skill_hash: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -853,19 +859,24 @@ pub fn evolution_claim(
             })
         },
     );
+    let mut payload = serde_json::json!({
+        "review_id": request.review_id,
+        "target_hash": hash.content_hash,
+        "trigger_event_ids": status.trigger_event_ids,
+        "authorizing_rule": status.authorization_reason,
+        "risk_tier": request.risk_tier,
+        "session_or_cooldown_proof": proof
+    });
+    if request.record_operating_skill_hash {
+        payload["operating_skill_hash"] =
+            serde_json::json!(hash_target_directory(&inputs.operator_skill)?.content_hash);
+    }
     let event = lifecycle_event(
         &target,
         &hash.content_hash,
         "skill-evolution",
         "review_started",
-        serde_json::json!({
-            "review_id": request.review_id,
-            "target_hash": hash.content_hash,
-            "trigger_event_ids": status.trigger_event_ids,
-            "authorizing_rule": status.authorization_reason,
-            "risk_tier": request.risk_tier,
-            "session_or_cooldown_proof": proof
-        }),
+        payload,
         inputs,
     );
     let after = append_lifecycle_event(
@@ -1498,16 +1509,22 @@ fn evolution_evidence_packet(
         })
         .map(|event| event.raw.clone())
         .collect::<Vec<_>>();
-    let review_hashes = events
+    let review_starts = events
         .iter()
         .filter_map(|event| match &event.kind {
             EventKind::ReviewStarted { review_id } => Some((
                 review_id.as_str(),
-                event
-                    .raw
-                    .pointer("/payload/target_hash")
-                    .and_then(Value::as_str)
-                    .unwrap_or(event.target_content_hash.as_str()),
+                (
+                    event
+                        .raw
+                        .pointer("/payload/target_hash")
+                        .and_then(Value::as_str)
+                        .unwrap_or(event.target_content_hash.as_str()),
+                    event
+                        .raw
+                        .pointer("/payload/operating_skill_hash")
+                        .and_then(Value::as_str),
+                ),
             )),
             _ => None,
         })
@@ -1523,11 +1540,19 @@ fn evolution_evidence_packet(
                 let mut prior = serde_json::json!({
                     "review_id": review_id,
                     "disposition": event.raw.pointer("/payload/disposition").and_then(Value::as_str),
-                    "same_target_hash": review_hashes.get(review_id.as_str()).copied()
+                    "same_target_hash": review_starts.get(review_id.as_str())
+                        .map(|(target_hash, _)| *target_hash)
                         == Some(status.target_content_hash.as_str()),
                     "note": event.raw.pointer("/payload/note").and_then(Value::as_str),
                     "adjudicated_event_ids": adjudicated_event_ids
                 });
+                if let Some(operating_skill_hash) = review_starts
+                    .get(review_id.as_str())
+                    .and_then(|(_, operating_skill_hash)| *operating_skill_hash)
+                {
+                    prior["operating_skill_hash"] =
+                        Value::String(operating_skill_hash.to_owned());
+                }
                 let report = format!("reviews/{review_id}.md");
                 if target.evidence_directory.join(&report).is_file() {
                     prior["report"] = serde_json::json!(report);
@@ -2125,7 +2150,7 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
                     ("claimed_at", encoded_json(&proof["claimed_at"])),
                 ])
             };
-            ordered_json_object(&[
+            let mut parts = vec![
                 ("review_id", encoded_json(&payload["review_id"])),
                 ("target_hash", encoded_json(&payload["target_hash"])),
                 (
@@ -2138,7 +2163,11 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
                 ),
                 ("risk_tier", encoded_json(&payload["risk_tier"])),
                 ("session_or_cooldown_proof", proof),
-            ])
+            ];
+            if let Some(operating_skill_hash) = payload.get("operating_skill_hash") {
+                parts.push(("operating_skill_hash", encoded_json(operating_skill_hash)));
+            }
+            ordered_json_object(&parts)
         }
         Some("validation_completed") => ordered_json_object(&[
             ("review_id", encoded_json(&payload["review_id"])),
@@ -2585,6 +2614,16 @@ fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
                     errors.push(format!("{key} must be null or a non-empty string"));
                 }
             }
+        }
+    } else if event_type == Some(EventType::ReviewStarted) {
+        if non_empty_string(payload.get("review_id")).is_none() {
+            errors.push("review_id missing".to_owned());
+        }
+        if payload
+            .get("operating_skill_hash")
+            .is_some_and(|value| non_empty_string(Some(value)).is_none())
+        {
+            errors.push("operating_skill_hash must be a non-empty string when present".to_owned());
         }
     } else if event_type == Some(EventType::ReviewDisposition) {
         if non_empty_string(payload.get("review_id")).is_none() {

@@ -140,6 +140,35 @@ fn installed_skill_evolution_reference_writes_the_report_before_close_and_amends
 }
 
 #[test]
+fn installed_skill_evolution_reference_uses_operating_identity_for_precedent() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains("--record-operating-skill-hash"),
+        "every real Skill Evolution claim must opt into the compiled identity receipt"
+    );
+    assert!(
+        reference.contains("evidence to weigh rather than a ruling that governs"),
+        "a predecessor decided under different operating-package bytes is not current precedent"
+    );
+    assert!(
+        reference.contains("unknown rather than equal")
+            && reference.contains("read exactly as it is read today"),
+        "an absent historical identity must remain unknown without rewriting prior semantics"
+    );
+    assert!(
+        reference.contains("operating_skill_hash"),
+        "the rule must name the compiled receipt key it consumes"
+    );
+}
+
+#[test]
 fn installed_skill_evolution_reference_weighs_trigger_workarounds_before_freezing_the_plan() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
@@ -351,6 +380,79 @@ fn installed_event_schema_keeps_untestable_coverage_optional_and_open() {
     assert!(
         payload.get("additionalProperties").is_none(),
         "a consumer still on a stale installed schema must keep validating streams that carry this key"
+    );
+}
+
+#[test]
+fn installed_event_schema_declares_operating_skill_hash_as_optional_and_open() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let schema: serde_json::Value = serde_json::from_slice(
+        &fs::read(
+            root.path()
+                .join("schemas/skill-evidence/event.v1.schema.json"),
+        )
+        .expect("read installed event schema"),
+    )
+    .expect("installed event schema JSON");
+    let review_started = schema["allOf"]
+        .as_array()
+        .expect("event conditionals")
+        .iter()
+        .find(|branch| {
+            branch.pointer("/if/properties/event_type/const")
+                == Some(&serde_json::json!("review_started"))
+        })
+        .expect("review_started payload schema");
+    let payload = review_started
+        .pointer("/then/properties/payload")
+        .expect("review_started payload");
+
+    assert_eq!(
+        payload["properties"]["operating_skill_hash"]["type"],
+        "string"
+    );
+    assert_eq!(
+        payload["properties"]["operating_skill_hash"]["minLength"],
+        1
+    );
+    assert!(
+        !payload["required"]
+            .as_array()
+            .expect("required review_started properties")
+            .iter()
+            .any(|field| field == "operating_skill_hash"),
+        "absent means the operating package identity was not recorded"
+    );
+    assert!(
+        payload.get("additionalProperties").is_none(),
+        "a consumer with the previous installed schema must keep validating the additive key"
+    );
+
+    let validator = jsonschema::validator_for(&schema).expect("compile installed event schema");
+    let mut event = serde_json::json!({
+        "schema_version": 1,
+        "event_id": "evt_review_started",
+        "event_type": "review_started",
+        "recorded_at": "2026-01-02T03:04:05Z",
+        "operator_workflow": "skill-evolution",
+        "target": {
+            "name": "demo-skill",
+            "repo_relative_path": ".claude/skills/demo-skill",
+            "content_hash": "target-hash",
+            "repo_head": "fixture-head"
+        },
+        "top_level_session_id": "review-session",
+        "payload": { "review_id": "review-fixture" }
+    });
+    assert!(
+        validator.is_valid(&event),
+        "the historical absent shape stays valid"
+    );
+    event["payload"]["operating_skill_hash"] = serde_json::json!("operating-hash");
+    assert!(
+        validator.is_valid(&event),
+        "the additive recorded shape is valid"
     );
 }
 
