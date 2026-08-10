@@ -50,6 +50,10 @@ For a non-proceeding class, carry the mapped disposition and a factual note to s
 
 The mechanism stays a *candidate* here. Only step 5's current arm can confirm it, so do not treat an unconfirmed mechanism as absent and do not close `not_reproducible` merely because no trial has run yet.
 
+Before freezing the plan, read `workaround_taken` only from the raw trigger events in the evidence packet. State what those recorded workarounds establish about the candidate mechanism and target ownership, or state that none was recorded on a trigger event. Repeated suppression of the mechanism is evidence for target ownership because the mechanism responds to instruction the target could carry; a workaround that was taken without suppressing the mechanism is evidence against target ownership. Record the direction as evidence, never as a verdict.
+
+Using the packet's candidate cluster for this authorization, count the open incident IDs outside the trigger set and state that count, including zero. This count discloses how many incident payloads the bounded workaround read could not reach. Do not characterize, estimate, or reason about those incidents; do not read the historical ledger or seek their payloads.
+
 *Done when the candidate mechanism and ownership class are written down, and a non-proceeding class has its terminal disposition and note ready for step 9.*
 
 ### 4. Freeze the validation plan before any candidate exists
@@ -61,6 +65,8 @@ For each constraint the instrument can vary, name its **witness**: the observabl
 A same-hash predecessor that already ran trials constrains this judgment: if it reports the current arm passing on a mechanism shape these incidents repeat, that is evidence the wording is followed when freshly read, and the constraint is the run condition rather than the text. Do not re-derive it by rerunning equivalent trials.
 
 The incidents' recorded run conditions are the evidence for this judgment, not a guess about them. When they agree that the failures arrived at volume, late in a long run, or only intermittently, say so here and treat a fresh short-context single-run trial as unable to express that.
+
+Reconcile the frozen plan with step 3's workaround finding. Keep the plan consistent with that directional evidence without letting it replace a trial or skip or shrink the frozen trial set; blind comparative validation remains the gate.
 
 Every reproduction trial runs at least 3 times when its first-run witness reads expressed. Where the recorded `run_condition` and `workaround_taken` fields support an estimate of the per-launch incidence, freeze that estimate in the plan, choose a reproduction run count above the floor against it, and state how that estimate supports the chosen run count. Where the record does not support an estimate, say so explicitly and use the floor. The floor forbids a single-run reproduction; incidence-based sizing carries the statistical weight. Step 5's first-run rule remains an early stop: an unexpressed reading closes the arm at that one run instead of spending its planned remainder.
 
@@ -162,6 +168,8 @@ Before any close, write the review report at `reviews/<review-id>.md`, with unre
 - Independence result:
 - Confirmed mechanism:
 - Target ownership:
+- Recorded-workaround finding:
+- Non-trigger open incident count:
 
 ## Candidate
 - Change hypothesis:

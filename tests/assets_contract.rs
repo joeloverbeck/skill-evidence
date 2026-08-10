@@ -140,6 +140,51 @@ fn installed_skill_evolution_reference_writes_the_report_before_close_and_amends
 }
 
 #[test]
+fn installed_skill_evolution_reference_weighs_trigger_workarounds_before_freezing_the_plan() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let ownership = reference
+        .find("### 3. Determine target ownership and causal mechanism")
+        .expect("the ownership step remains explicit");
+    let workaround = reference
+        .find("read `workaround_taken` only from the raw trigger events in the evidence packet")
+        .expect("the ownership step reads only the workaround evidence the packet carries");
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    assert!(
+        ownership < workaround && workaround < freeze,
+        "the workaround finding belongs to ownership determination before plan freezing: reference={reference}"
+    );
+
+    for required in [
+        "state that none was recorded on a trigger event",
+        "Repeated suppression of the mechanism is evidence for target ownership",
+        "a workaround that was taken without suppressing the mechanism is evidence against target ownership",
+        "Record the direction as evidence, never as a verdict",
+        "count the open incident IDs outside the trigger set and state that count, including zero",
+        "Do not characterize, estimate, or reason about those incidents",
+        "do not read the historical ledger or seek their payloads",
+        "Reconcile the frozen plan with step 3's workaround finding",
+        "without letting it replace a trial or skip or shrink the frozen trial set",
+        "- Recorded-workaround finding:",
+        "- Non-trigger open incident count:",
+        "acceptance decision is made from the trial results alone",
+    ] {
+        assert!(
+            reference.contains(required),
+            "installed reference must preserve `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
 fn installed_event_schema_declares_close_validation_effort_as_optional() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
