@@ -155,6 +155,12 @@ fn claim_evolution(root: &Path) -> Value {
     claim_existing_evolution(root)
 }
 
+fn write_review_report(root: &Path, review_id: &str, contents: &str) {
+    let reviews = root.join("reports/skill-evidence/demo-skill/reviews");
+    fs::create_dir_all(&reviews).expect("create review report directory");
+    fs::write(reviews.join(format!("{review_id}.md")), contents).expect("write review report");
+}
+
 fn claim_existing_evolution(root: &Path) -> Value {
     claim_existing_evolution_as(
         root,
@@ -191,6 +197,7 @@ fn claim_existing_evolution_as(
         "claim failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+    write_review_report(root, review_id, "");
     serde_json::from_slice(&output.stdout).expect("claim receipt JSON")
 }
 
@@ -856,6 +863,109 @@ fn skill_evolution_preflight_packet_names_evidence_retired_by_a_blocked_close() 
             "retired evidence must not cluster: packet={packet}"
         );
     }
+}
+
+#[test]
+fn skill_evolution_preflight_omits_an_unverified_historical_report_path() {
+    let fixture = repository_with_demo_skill();
+    claim_evolution(fixture.path());
+    let close = run_evolution_close(
+        fixture.path(),
+        "evt_historical_close",
+        "monitor_for_recurrence",
+        Some("historical close without structured effort"),
+    );
+    assert!(
+        close.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&close.stderr)
+    );
+    fs::remove_file(
+        fixture
+            .path()
+            .join("reports/skill-evidence/demo-skill/reviews/rev_fixture.md"),
+    )
+    .expect("remove historical report after close");
+    record_outcome(fixture.path(), "task d", "session-d", "output", "friction");
+    record_outcome(fixture.path(), "task e", "session-e", "output", "friction");
+    record_outcome(fixture.path(), "task f", "session-f", "output", "friction");
+
+    let output = run_evolution_preflight(
+        fixture.path(),
+        "lock_preflight_without_historical_report",
+        "fixture-session",
+    );
+
+    assert!(
+        output.status.success(),
+        "historical stream must remain readable: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let receipt: Value = serde_json::from_slice(&output.stdout).expect("preflight receipt JSON");
+    let prior = receipt["evidence_packet"]["prior_reviews"][0]
+        .as_object()
+        .expect("prior review entry");
+    assert!(!prior.contains_key("report"));
+    assert!(!prior.contains_key("trial_count"));
+    assert!(!prior.contains_key("artifacts_path"));
+}
+
+#[test]
+fn skill_evolution_preflight_carries_prior_close_validation_effort() {
+    let fixture = repository_with_demo_skill();
+    claim_evolution(fixture.path());
+    let mut close = skill_evidence();
+    close
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_prior_close_with_effort",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "monitor_for_recurrence",
+            "--note",
+            "two-run arm reproduced the condition without the failure",
+            "--trials",
+            "2",
+            "--artifacts",
+            "reports/skill-evidence/demo-skill/reviews/rev_fixture/trials",
+        ]);
+    lifecycle_clock(&mut close, "lock_prior_close_with_effort");
+    let close = close.output().expect("close review with asserted effort");
+    assert!(
+        close.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&close.stderr)
+    );
+    record_outcome(fixture.path(), "task d", "session-d", "output", "friction");
+    record_outcome(fixture.path(), "task e", "session-e", "output", "friction");
+    record_outcome(fixture.path(), "task f", "session-f", "output", "friction");
+
+    let output = run_evolution_preflight(
+        fixture.path(),
+        "lock_preflight_with_prior_effort",
+        "fixture-session",
+    );
+
+    assert!(
+        output.status.success(),
+        "preflight failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let receipt: Value = serde_json::from_slice(&output.stdout).expect("preflight receipt JSON");
+    let prior = &receipt["evidence_packet"]["prior_reviews"][0];
+    assert_eq!(prior["trial_count"], 2);
+    assert_eq!(
+        prior["artifacts_path"],
+        "reports/skill-evidence/demo-skill/reviews/rev_fixture/trials"
+    );
+    assert_eq!(prior["report"], "reviews/rev_fixture.md");
 }
 
 #[test]
@@ -1654,6 +1764,117 @@ fn skill_evolution_instrument_limited_close_reports_only_its_own_retirement_reac
 }
 
 #[test]
+fn skill_evolution_close_records_optional_validation_effort_as_asserted() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_close_with_effort",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "monitor_for_recurrence",
+            "--note",
+            "two-run arm reproduced the condition without the failure",
+            "--trials",
+            "2",
+            "--artifacts",
+            "reports/skill-evidence/demo-skill/reviews/rev_fixture/trials",
+        ]);
+    lifecycle_clock(&mut command, "lock_close_with_effort");
+
+    let output = command.output().expect("close review with asserted effort");
+
+    assert!(
+        output.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stream = fs::read_to_string(
+        fixture
+            .path()
+            .join("reports/skill-evidence/demo-skill/events.jsonl"),
+    )
+    .expect("read event stream");
+    let disposition: Value = stream
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("event JSON"))
+        .find(|event| event["event_id"] == "evt_close_with_effort")
+        .expect("review_disposition event");
+    assert_eq!(
+        disposition["payload"],
+        serde_json::json!({
+            "review_id": "rev_fixture",
+            "disposition": "monitor_for_recurrence",
+            "adjudicated_event_ids": claim["trigger_event_ids"],
+            "note": "two-run arm reproduced the condition without the failure",
+            "trial_count": 2,
+            "artifacts_path": "reports/skill-evidence/demo-skill/reviews/rev_fixture/trials"
+        })
+    );
+    let projection = fs::read_to_string(
+        fixture
+            .path()
+            .join("reports/skill-evidence/demo-skill/gate-status.json"),
+    )
+    .expect("read gate projection");
+    assert!(!projection.contains("trial_count"));
+    assert!(!projection.contains("artifacts_path"));
+    assert_event_stream_matches_the_published_schema(fixture.path());
+}
+
+#[test]
+fn skill_evolution_close_refuses_when_the_review_report_is_absent_without_writing() {
+    let fixture = repository_with_demo_skill();
+    claim_evolution(fixture.path());
+    let store = fixture.path().join("reports/skill-evidence/demo-skill");
+    fs::remove_file(store.join("reviews/rev_fixture.md"))
+        .expect("remove review report for refusal case");
+    let stream_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("read gate projection before refusal");
+
+    let output = run_evolution_close(
+        fixture.path(),
+        "evt_close_without_report",
+        "monitor_for_recurrence",
+        Some("current arm reproduced the condition"),
+    );
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        error.contains("reports/skill-evidence/demo-skill/reviews/rev_fixture.md"),
+        "refusal must name the expected report path: {error}"
+    );
+    assert_eq!(
+        fs::read(&stream_path).expect("read event stream after refusal"),
+        stream_before,
+        "a missing report must append no event"
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before,
+        "a missing report must not rewrite the projection"
+    );
+    assert!(
+        !store.join(".lock").exists(),
+        "the refusal must release the evidence-store lock"
+    );
+}
+
+#[test]
 fn skill_evolution_close_records_the_disposition_and_retires_the_trigger_events() {
     let fixture = repository_with_demo_skill();
     land_evolution_candidate(fixture.path());
@@ -2114,6 +2335,12 @@ fn rust_appended_lifecycle_events_keep_the_javascript_byte_order() {
         "lock_golden_evolution_land",
     );
     run(evolution_land, "evolution land");
+
+    write_review_report(
+        fixture.path(),
+        "rev_e32e7983-e876-4cf3-8537-019d2e37ce84",
+        "",
+    );
 
     let mut evolution_close = skill_evidence();
     evolution_close

@@ -247,6 +247,10 @@ pub struct EvolutionCloseArgs {
     note: Option<String>,
     #[arg(long)]
     adjudicate: Vec<String>,
+    #[arg(long)]
+    trials: Option<String>,
+    #[arg(long)]
+    artifacts: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -443,6 +447,8 @@ fn run_skill_evolution(
                 disposition,
                 note,
                 adjudicate,
+                trials,
+                artifacts,
             } = args;
             let (root, target, inputs) = lifecycle_event_inputs(event, "skill-evolution", host)?;
             let request = crate::EvolutionCloseRequest {
@@ -450,6 +456,8 @@ fn run_skill_evolution(
                 disposition: disposition.unwrap_or_default(),
                 note: note.unwrap_or_default(),
                 adjudicate,
+                trials,
+                artifacts,
             };
             let receipt = crate::evolution_close(&root, &target, &request, &inputs)?;
             Ok(print_successful_report(&receipt, out))

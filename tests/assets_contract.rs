@@ -112,6 +112,58 @@ fn snapshot_tree(root: &std::path::Path) -> BTreeMap<String, Vec<u8>> {
 }
 
 #[test]
+fn installed_skill_evolution_reference_writes_the_report_before_close_and_amends_it_after() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let write = reference
+        .find("Before any close, write the review report")
+        .expect("the report is written before close");
+    let close = reference
+        .find("skills evolution close")
+        .expect("the compiled close command remains explicit");
+    let amend = reference
+        .find("After the close succeeds, amend the review report")
+        .expect("the report is amended from the close receipt");
+    assert!(write < close && close < amend, "reference={reference}");
+    assert!(
+        reference.contains(
+            "--trials <count> --artifacts reports/skill-evidence/<skill-key>/reviews/<review-id>"
+        ),
+        "a no-candidate validation arm must carry its asserted effort into close"
+    );
+}
+
+#[test]
+fn installed_event_schema_declares_close_validation_effort_as_optional() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let schema: serde_json::Value = serde_json::from_slice(
+        &fs::read(
+            root.path()
+                .join("schemas/skill-evidence/event.v1.schema.json"),
+        )
+        .expect("read installed event schema"),
+    )
+    .expect("installed event schema JSON");
+    let payload = schema
+        .pointer("/allOf/1/then/properties/payload")
+        .expect("review_disposition payload schema");
+    assert_eq!(payload["properties"]["trial_count"]["type"], "integer");
+    assert_eq!(payload["properties"]["artifacts_path"]["type"], "string");
+    let required = payload["required"]
+        .as_array()
+        .expect("required review_disposition properties");
+    assert!(!required.iter().any(|field| field == "trial_count"));
+    assert!(!required.iter().any(|field| field == "artifacts_path"));
+}
+
+#[test]
 fn installed_skill_evolution_reference_reports_the_close_retirement_reach() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");

@@ -199,6 +199,8 @@ pub struct EvolutionCloseRequest {
     pub disposition: String,
     pub note: String,
     pub adjudicate: Vec<String>,
+    pub trials: Option<String>,
+    pub artifacts: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -774,7 +776,7 @@ pub fn evolution_preflight(
             "trigger_event_ids": status.trigger_event_ids,
             "threshold_session_id": status.threshold_session_id
         },
-        "evidence_packet": evolution_evidence_packet(&events, &status)
+        "evidence_packet": evolution_evidence_packet(&target, &events, &status)
     }))
 }
 
@@ -1067,6 +1069,22 @@ pub fn evolution_close(
                 .to_owned(),
         ));
     }
+    let trial_count = request
+        .trials
+        .as_ref()
+        .map(|trials| {
+            trials
+                .parse::<usize>()
+                .ok()
+                .filter(|count| *count >= 1)
+                .ok_or_else(|| refusal("--trials must be a positive integer.".to_owned()))
+        })
+        .transpose()?;
+    if request.artifacts.as_ref().is_some_and(String::is_empty) {
+        return Err(refusal(
+            "--artifacts must name the retained validation outputs when supplied.".to_owned(),
+        ));
+    }
     if !EVOLUTION_ADJUDICATING_DISPOSITIONS.contains(&request.disposition.as_str())
         && !request.adjudicate.is_empty()
     {
@@ -1100,6 +1118,20 @@ pub fn evolution_close(
         return Err(refusal(format!(
             "Review {} already has a review_disposition. Nothing done.",
             request.review_id
+        )));
+    }
+    let report = target
+        .evidence_directory
+        .join("reviews")
+        .join(format!("{}.md", request.review_id));
+    if !report.is_file() {
+        let expected = report
+            .strip_prefix(&target.repository_root)
+            .unwrap_or(&report)
+            .to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/");
+        return Err(refusal(format!(
+            "Review report must exist before close: {expected}. Nothing done."
         )));
     }
     let hash = hash_target_directory(&target.target_real)?.content_hash;
@@ -1167,17 +1199,24 @@ pub fn evolution_close(
             adjudicated.push(identity.clone());
         }
     }
+    let mut payload = serde_json::json!({
+        "review_id": request.review_id,
+        "disposition": request.disposition,
+        "adjudicated_event_ids": adjudicated,
+        "note": request.note
+    });
+    if let Some(trial_count) = trial_count {
+        payload["trial_count"] = serde_json::json!(trial_count);
+    }
+    if let Some(artifacts) = &request.artifacts {
+        payload["artifacts_path"] = serde_json::json!(artifacts);
+    }
     let event = lifecycle_event(
         &target,
         &hash,
         "skill-evolution",
         "review_disposition",
-        serde_json::json!({
-            "review_id": request.review_id,
-            "disposition": request.disposition,
-            "adjudicated_event_ids": adjudicated,
-            "note": request.note
-        }),
+        payload,
         inputs,
     );
     let after = append_lifecycle_event(&target, &hash, &mut events, event, &derivation_inputs)?;
@@ -1322,7 +1361,11 @@ fn require_active_ownership(
     Ok(status)
 }
 
-fn evolution_evidence_packet(events: &[EvidenceEvent], status: &GateStatus) -> Value {
+fn evolution_evidence_packet(
+    target: &TargetContext,
+    events: &[EvidenceEvent],
+    status: &GateStatus,
+) -> Value {
     let by_id = events
         .iter()
         .map(|event| (event.event_id.as_str(), event))
@@ -1387,15 +1430,26 @@ fn evolution_evidence_packet(events: &[EvidenceEvent], status: &GateStatus) -> V
                 review_id,
                 adjudicated_event_ids,
                 ..
-            } => Some(serde_json::json!({
-                "review_id": review_id,
-                "disposition": event.raw.pointer("/payload/disposition").and_then(Value::as_str),
-                "same_target_hash": review_hashes.get(review_id.as_str()).copied()
-                    == Some(status.target_content_hash.as_str()),
-                "note": event.raw.pointer("/payload/note").and_then(Value::as_str),
-                "adjudicated_event_ids": adjudicated_event_ids,
-                "report": format!("reviews/{review_id}.md")
-            })),
+            } => {
+                let mut prior = serde_json::json!({
+                    "review_id": review_id,
+                    "disposition": event.raw.pointer("/payload/disposition").and_then(Value::as_str),
+                    "same_target_hash": review_hashes.get(review_id.as_str()).copied()
+                        == Some(status.target_content_hash.as_str()),
+                    "note": event.raw.pointer("/payload/note").and_then(Value::as_str),
+                    "adjudicated_event_ids": adjudicated_event_ids
+                });
+                let report = format!("reviews/{review_id}.md");
+                if target.evidence_directory.join(&report).is_file() {
+                    prior["report"] = serde_json::json!(report);
+                }
+                for field in ["trial_count", "artifacts_path"] {
+                    if let Some(value) = event.raw.pointer(&format!("/payload/{field}")) {
+                        prior[field] = value.clone();
+                    }
+                }
+                Some(prior)
+            }
             _ => None,
         })
         .collect::<Vec<_>>();
@@ -2022,15 +2076,24 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
                 ("mirror_status", encoded_json(&payload["mirror_status"])),
             ])
         }
-        Some("review_disposition") => ordered_json_object(&[
-            ("review_id", encoded_json(&payload["review_id"])),
-            ("disposition", encoded_json(&payload["disposition"])),
-            (
-                "adjudicated_event_ids",
-                encoded_json(&payload["adjudicated_event_ids"]),
-            ),
-            ("note", encoded_json(&payload["note"])),
-        ]),
+        Some("review_disposition") => {
+            let mut parts = vec![
+                ("review_id", encoded_json(&payload["review_id"])),
+                ("disposition", encoded_json(&payload["disposition"])),
+                (
+                    "adjudicated_event_ids",
+                    encoded_json(&payload["adjudicated_event_ids"]),
+                ),
+                ("note", encoded_json(&payload["note"])),
+            ];
+            if let Some(trial_count) = payload.get("trial_count") {
+                parts.push(("trial_count", encoded_json(trial_count)));
+            }
+            if let Some(artifacts_path) = payload.get("artifacts_path") {
+                parts.push(("artifacts_path", encoded_json(artifacts_path)));
+            }
+            ordered_json_object(&parts)
+        }
         Some(event_type) => {
             return Err(unsafe_failure(format!(
                 "Cannot serialize unsupported lifecycle event type {event_type}."
@@ -2449,6 +2512,18 @@ fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
             })
         {
             errors.push("adjudicated_event_ids must be a non-empty array of event ids".to_owned());
+        }
+        if payload
+            .get("trial_count")
+            .is_some_and(|value| value.as_u64().is_none_or(|count| count == 0))
+        {
+            errors.push("trial_count must be a positive integer when present".to_owned());
+        }
+        if payload
+            .get("artifacts_path")
+            .is_some_and(|value| non_empty_string(Some(value)).is_none())
+        {
+            errors.push("artifacts_path must be a non-empty string when present".to_owned());
         }
     } else if non_empty_string(payload.get("review_id")).is_none() {
         errors.push(format!(

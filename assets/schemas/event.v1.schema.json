@@ -204,6 +204,16 @@
                 "type": "array",
                 "minItems": 1,
                 "items": { "type": "string", "minLength": 1 }
+              },
+              "trial_count": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Caller-asserted validation trial count. Omitted when no count was recorded for this close."
+              },
+              "artifacts_path": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Caller-asserted path to retained validation artifacts. Omitted when no path was recorded for this close."
               }
             }
           }
