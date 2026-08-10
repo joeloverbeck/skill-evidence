@@ -8,6 +8,8 @@ Amended: 2026-08-09, GitHub [#14](https://github.com/joeloverbeck/skill-evidence
 
 Amended: 2026-08-09, GitHub [#16](https://github.com/joeloverbeck/skill-evidence/issues/16) — retirement now reaches only what the close's own authorization reason could name; the friction-sibling justification below was measured wrong for `material_recurrence` and is corrected. A correction path for an erroneous vouch is recorded as declined rather than left open.
 
+Amended: 2026-08-10, GitHub [#23](https://github.com/joeloverbeck/skill-evidence/issues/23) — an adjudicating close can now name part of its coverage list as untestable and retire it on this decision's warrant without adjudicating it. Reach is unmoved and the treadmill reasoning below re-runs unchanged; see the consequence on untestable coverage.
+
 A Skill Evolution review that closes `blocked_no_valid_test` reached no conclusion, so it adjudicates
 nothing and its trigger evidence stays open. That close still laid a watermark, and the watermark
 deferred the very evidence that opened the gate — labelled `queued_pre_close_evidence`, as though a
@@ -120,7 +122,8 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
   contract decision and is not taken here.
 - **The close receipt and the projection name retirement at their distinct scopes.** A
   `blocked_no_valid_test` receipt carries `retired_from_gate_event_ids`, the retirement reach of that
-  close, even when the list is empty; every non-instrument-limited close omits the key. The projection
+  close, even when the list is empty; so does an adjudicating close that named untestable coverage,
+  reporting the names the derivation actually retired. Every other close omits the key. The projection
   keeps `instrument_limited_incident_ids` as the standing per-hash retired set, which can include
   earlier closes and can shrink after later adjudication. `skills evolution-status` reports targets
   carrying that standing set under **Retired as untestable** rather than folding them into the omitted
@@ -128,6 +131,44 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
   would trade one dishonest projection for another.
 - Evidence a blocked close did not cover, still deferred behind its watermark, now reports
   `queued_behind_instrument_limited_review` instead of `queued_pre_close_evidence`.
+- **Untestable coverage carries this warrant into an adjudicating close, one event at a time.**
+  A whole-review disposition cannot hold a review whose mechanisms reached different readings, and a
+  multi-incident authorization routinely produces one: `friction_recurrence` needs three independent
+  incidents, which routinely means three distinct mechanisms, and the trial set now runs one
+  reproduction per mechanism. An adjudicating close therefore names the coverage this instrument
+  could not decide — no trial could express the mechanism, or the acceptance gate grades outcome and
+  the evidence bears no outcome claim ([ADR 0003](0003-no-new-instrument-for-conformance-only-evidence.md)) —
+  and those retire as instrument-limited rather than adjudicated — open in the ledger, out of the
+  clusters. Naming an event asserts only that this review could not decide it; it never asserts that
+  the mechanism failed to reproduce, and the per-mechanism readings stay in the review report.
+  **The severe carve-out below reaches this channel too, and costs more here.** A named
+  contemporaneous severe incident stops being adjudicated and is still not retired, so it keeps
+  authorizing every session — where before this change an adjudicating close would have retired it
+  and ended the loop. That is the bargain the carve-out already struck for a blocked close, struck
+  again for the same reason: a projection claiming a severe incident stopped driving the gate while it
+  demonstrably still does is the worse failure. The reference states the cost at the point of choice.
+  Without the channel the projection asserts a conclusion the frozen plan had already
+  pre-registered as unreachable, which is the mislabel this decision exists to prevent, reached from
+  the other direction.
+  **The reach argument above re-runs and lands unchanged, because reach does not move.** The named
+  events are a strict subset of a coverage list this close already accounted for, so nothing outside
+  that list changes character and no reason-scoped widening applies to them: a close that examined its
+  coverage mechanism by mechanism has already said which mechanisms it could not decide, and inferring
+  more would retire evidence the review never examined — what #16 narrowed away from. Nor is this the
+  treadmill: an untestable trigger left merely *uncovered* would stay open **and** clustering, meeting
+  the same instrument wall on the next review, which is the shape the considered options above reject.
+  Retiring it is the same honest exit, at trigger granularity.
+  **Naming the whole coverage list is allowed.** Reading a close that named everything as a review
+  that concluded nothing would be wrong: a review can decide none of what it covered while having
+  concluded a great deal, because the acceptance gate grades outcome and cannot decide a covered
+  trigger whose evidence bears no outcome claim, however thoroughly the trials tested its mechanism
+  ([ADR 0003](0003-no-new-instrument-for-conformance-only-evidence.md)). Refusing it would push
+  exactly that review onto `blocked_no_valid_test`, whose reach is the authorization reason's whole
+  cluster — strictly wider than the close covered, retiring evidence the review never examined, while
+  asserting an untestability its own trials disprove. Which limit a review met is semantic and the
+  command cannot see it, so the reference decides it at step 9 and the command polices only what it
+  can check: coverage the close does not hold. The close receipt reports the named retirement in
+  `retired_from_gate_event_ids`, so this channel is no quieter than the disposition-level one.
 - **A contemporaneous severe incident is never retired this way.** It authorizes from
   `open_incident` alone, ahead of any watermark, so it was never trapped; listing one as
   instrument-limited would have the projection claim it stopped driving the gate while it demonstrably
@@ -145,6 +186,12 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
   every fixture under `fixtures/skill-evidence/` is byte-identical to before this change — event
   streams, expected projection, and the status-reporter goldens alike. The census summary omits its
   `retired as untestable` count when zero specifically so that stays true.
+  **The #23 amendment does move it**, adding optional `instrument_limited_event_ids` to
+  `review_disposition`. Absent means what every close already asserted — everything covered was
+  concluded — so no history is reinterpreted, the canonical writer omits the key entirely when unused,
+  and the frozen corpora stay byte-identical. That payload sets no `additionalProperties: false`, and
+  the reader checks only the keys it knows, so a consumer still on a stale installed `event.v1` keeps
+  validating streams that carry it. `releasing.md` §2 governs it regardless.
 - **The installed-asset surface moves too, and a partial upgrade is the hazard.**
   `consumer-contract.md` names three surfaces and warns that conflating them is the mistake it
   exists to prevent, so this one gets its own bullet. `gate-status.v1.schema.json` gains
@@ -162,6 +209,12 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
   downstream struct-literal construction. Per [`../releasing.md`](../releasing.md) §1 that is a minor
   bump while `0.x`: **the release carrying this must be `0.2.0`**, not a patch. The version is not
   moved here, because this repository cuts releases as their own commits.
+  The #23 amendment breaks it again the same way: `EvolutionCloseRequest` gains `instrument_limited`
+  and carries no `#[non_exhaustive]` either, and `skills evolution close` gains `--instrument-limited`,
+  which is the mounted command surface `consumer-contract.md` names as contract however little
+  `cargo build` notices. **The release carrying that amendment is a minor bump from whatever precedes
+  it**, and must require `skills evidence install --force`, because the installed review text and the
+  installed `event.v1` both move with it. The version is again not moved here.
 - The cost, accepted: a conformance problem this instrument cannot test goes quiet after one review
   instead of reappearing. It is visible in the projection and in the census, but nothing will prompt
   again. GitHub [#2](https://github.com/joeloverbeck/skill-evidence/issues/2) is where the question of

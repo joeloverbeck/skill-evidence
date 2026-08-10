@@ -50,11 +50,13 @@ For a non-proceeding class, carry the mapped disposition and a factual note to s
 
 Each mechanism stays a *candidate* here. Only step 5's current arm can confirm it, so do not treat an unconfirmed mechanism as absent and do not close `not_reproducible` merely because no trial has run yet. Name one candidate mechanism for each trigger event, or explicitly group several trigger events under one shared mechanism and state why they share it.
 
+Classify what claim each trigger's evidence bears, not only its mechanism. Read `consequence` from each raw trigger event: one recording that no defect reached the delivered work, or recording the effect as undetermined, bears a **conformance-only** claim — the run did not do what the skill said, and nothing about the work it delivered. One asserting the delivered work was worse is **outcome-graded**. Step 7 grades outcome, so a conformance-only trigger has opened a gate its own evidence cannot satisfy. Record each trigger's class. A cluster holding both classes is ordinary, because a symptom key groups incidents without naming a cause; route it per trigger at step 9 rather than picking one class for the review.
+
 Before freezing the plan, read `workaround_taken` only from the raw trigger events in the evidence packet. State what those recorded workarounds establish about the candidate mechanism and target ownership, or state that none was recorded on a trigger event. Repeated suppression of the mechanism is evidence for target ownership because the mechanism responds to instruction the target could carry; a workaround that was taken without suppressing the mechanism is evidence against target ownership. Record the direction as evidence, never as a verdict.
 
 Using the packet's candidate cluster for this authorization, count the open incident IDs outside the trigger set and state that count, including zero. This count discloses how many incident payloads the bounded workaround read could not reach. Do not characterize, estimate, or reason about those incidents; do not read the historical ledger or seek their payloads.
 
-*Done when each trigger is mapped to a candidate mechanism and ownership class, and a non-proceeding class has its terminal disposition and note ready for step 9.*
+*Done when each trigger is mapped to a candidate mechanism, an ownership class, and an evidence class, and a non-proceeding class has its terminal disposition and note ready for step 9.*
 
 ### 4. Freeze the validation plan before any candidate exists
 
@@ -88,9 +90,9 @@ The current arm is the union of the reproduction trials; if their results disagr
 
 Run each runnable reproduction on the unchanged current skill before building anything, under step 6's rules. Read its **first** witness before spending another. Unexpressed → mark that mechanism unable to be expressed and stop only its trial, with no re-cut prompt or fixture. Expressed → finish its planned current-arm runs.
 
-Classify each mechanism separately, including run 1: failure recurred → reproduced; witnesses expressed on every run without failure → not reproduced with witnesses expressed; any unexpressed witness → unable to be expressed. Build the candidate only for reproduced mechanisms and carry all three mappings into the report. This per-mechanism routing does not create per-trigger dispositions; the review still closes once.
+Classify each mechanism separately, including run 1: failure recurred → reproduced; witnesses expressed on every run without failure → not reproduced with witnesses expressed; any unexpressed witness → unable to be expressed. Build the candidate only for reproduced mechanisms and carry all three mappings into the report. This per-mechanism routing does not create per-trigger dispositions; the review still closes once, and step 9 carries each mechanism's reading into that one close.
 
-If none reproduced, build no candidate: when every mechanism was not reproduced with witnesses expressed, carry `monitor_for_recurrence`; when any was unable to be expressed, carry `blocked_no_valid_test`. Name every mechanism's reading in the note, then go to step 9.
+If none reproduced, build no candidate. When no trial could express any mechanism, carry `blocked_no_valid_test`. Otherwise carry `monitor_for_recurrence` and name every unexpressible mechanism's triggers at step 9 — a disposition whose reach is the authorization reason's whole cluster must not stand in for a review that did express something. Name every mechanism's reading in the note, then go to step 9.
 
 Copy the live target to `reviews/<review-id>/candidate/` (outside skill discovery) and modify only that copy; the live target stays untouched until every trial passes. Design rules:
 
@@ -111,7 +113,7 @@ Run every frozen trial against both the unchanged current skill and the candidat
 
 ### 7. Apply the acceptance gate
 
-The candidate passes only when it resolves the implicated mechanism on the reproduction case(s); is noninferior on every protected core behavior; introduces no material or severe regression; passes all affected deterministic checks; preserves safety, scope, and ownership invariants; any growth is necessary, minimal, and supported by better outcomes; and it is materially better on the target mechanism rather than merely worded differently. Behaviorally tied: prefer the candidate only when it is meaningfully smaller or clearer; otherwise the current skill stays.
+The candidate passes only when it resolves the implicated mechanism on the reproduction case(s); is noninferior on every protected core behavior; introduces no material or severe regression; passes all affected deterministic checks; preserves safety, scope, and ownership invariants; any growth is necessary, minimal, and supported by better outcomes; and it is materially better on the target mechanism rather than merely worded differently. Behaviorally tied: prefer the candidate only when it is meaningfully smaller or clearer; otherwise the current skill stays. This gate grades outcome, so it decides nothing about a conformance-only trigger whose mechanism it graded without demonstrating an outcome deficit; that trigger routes to step 9 rather than sharing whatever verdict the gate reaches. A trigger this gate never graded is untouched by that bar — step 9 says where each one lands.
 
 On failure, leave the target untouched: `record-validation --decision rejected …`, then carry `candidate_rejected_validation` to step 9. A rejected candidate is not a license to improvise another in the same review — new evidence must reopen eligibility. Sole exception: a mechanical candidate defect discovered before any behavioral trial may be corrected once, then the complete frozen suite reruns.
 
@@ -140,9 +142,19 @@ cargo run --locked -p skill-evidence -- skills evolution land --target <skill-pa
 
 ### 9. Report, close, amend, complete
 
-Every close records the trigger events the review covered in `adjudicated_event_ids`; for an adjudicating disposition, add `--adjudicate <event-id>` only for additional events the review genuinely covered. The adjudicating dispositions are `resolved_by_change`, `closed_no_skill_defect`, `outside_target`, `insufficient_independence`, `monitor_for_recurrence`, and `candidate_rejected_validation`. Their covered event IDs retire from the active set.
+Every close records the trigger events the review covered in `adjudicated_event_ids`; for an adjudicating disposition, add `--adjudicate <event-id>` only for additional events the review genuinely covered. The adjudicating dispositions are `resolved_by_change`, `closed_no_skill_defect`, `outside_target`, `insufficient_independence`, `monitor_for_recurrence`, and `candidate_rejected_validation`. Their covered event IDs retire from the active set, except any the close names as untestable below.
 
-`blocked_no_valid_test` and `superseded_by_target_version` are non-adjudicating dispositions: their payload still records the trigger coverage, but those IDs do not retire from the active set because the review reached no conclusion. Do not pass `--adjudicate` with either disposition; the compiled command refuses that combination. Trigger events stay in `events.jsonl` forever, and the gate projection combines the disposition with the coverage list to decide retirement.
+One disposition covers the whole list, and step 5 routinely reads different results for different mechanisms in it. Naming has two grounds, and they are different limits.
+
+**No trial could express the mechanism.** For every covered trigger whose mechanism read **unable to be expressed**, add `--instrument-limited <event-id>`. Here the limit is the reproduction trial, and naming records that.
+
+**The acceptance gate cannot decide it.** A trigger step 3 classified conformance-only, whose mechanism step 7 graded, is adjudicated only when those trials demonstrated an outcome deficit for it; absent that demonstration, name it here as well. Here the limit is the acceptance gate rather than the reproduction trial: step 7 grades outcome, so it cannot decide a trigger whose evidence bears no outcome claim, however cleanly the mechanism reproduced, and naming records nothing about whether it reproduced — the per-mechanism readings stay in the report, where the trials put them.
+
+This ground is per trigger, not per review, and the distinction is the whole point: a sibling reaching the acceptance gate says nothing about a trigger the gate never graded. A trigger whose own mechanism read **not reproduced with witnesses expressed** was decided by its reproduction trial, never by the outcome gate, so it adjudicates normally — and so does every trigger of a non-proceeding class from step 3, because an ownership, independence, novelty, or not-reproducible finding is not an outcome verdict. A non-proceeding class from step 3 never reaches that gate, so this ground does not touch it.
+
+A named event keeps its place in the coverage list, stays open in the ledger and stops clustering — the claim `blocked_no_valid_test` makes for a whole review, made one trigger at a time, so an event this review could not decide can never again reach a threshold. One carve-out survives from that whole-review claim. Naming a contemporaneous severe incident stops it being adjudicated without retiring it, because it authorizes on its own and still drives the gate. Expect it to re-authorize every session until a later review adjudicates it; naming one is a decision to keep it open, never a way to quiet it. Everything left in the list retires as adjudicated, which is what the disposition asserts about it. Both grounds must already be on record before the close — the frozen plan's unable-to-be-expressed reading, or step 3's evidence class; a reading invented at close is neither a trial result nor a classification. The flag narrows what the close concluded and never widens what it covered, so an event outside the coverage list is refused. Naming the entire list is not refused: a review can decide none of what it covered while having concluded a great deal, which is exactly what a wholly conformance-only cluster produces once a candidate has been built and graded. Close on the disposition that review actually reached and name every covered trigger. Choose `blocked_no_valid_test` only when no trial could express any mechanism — it reaches its authorization reason's whole cluster rather than the coverage list, so reaching for it here would retire evidence this review never covered while asserting an untestability its own trials disprove.
+
+`blocked_no_valid_test` and `superseded_by_target_version` are non-adjudicating dispositions: their payload still records the trigger coverage, but those IDs do not retire from the active set because the review reached no conclusion. Do not pass `--adjudicate` or `--instrument-limited` with either disposition; the compiled command refuses both combinations, and neither disposition concluded about anything it covered for the second to narrow. Trigger events stay in `events.jsonl` forever, and the gate projection combines the disposition with the coverage list to decide retirement.
 
 `blocked_no_valid_test` is further **instrument-limited**: closing it asserts that this instrument cannot test the evidence it covered, so the projection retires that evidence from the *evolution gate* while leaving it open and unadjudicated in the ledger. Those incidents stop clustering and can no longer reach a threshold, and the projection names them in `instrument_limited_incident_ids` — which the preflight evidence packet carries too, so the packet's open-incident count and its clusters still reconcile.
 
@@ -164,6 +176,7 @@ Before any close, write the review report at `reviews/<review-id>.md`, with unre
 ## Evidence adjudication
 - Independence result:
 - Confirmed mechanism:
+- Trigger event → evidence class:
 - Trigger event → reproduction trial → witness reading:
 - Target ownership:
 - Recorded-workaround finding:
@@ -191,6 +204,7 @@ Before any close, write the review report at `reviews/<review-id>.md`, with unre
 - Landed: yes/no
 - Target after hash or unchanged hash:
 - Final disposition:
+- Coverage named untestable:
 - Retirement reach event IDs:
 ```
 
@@ -207,7 +221,7 @@ cargo run --locked -p skill-evidence -- skills evolution close \
 
 When validation ran without building a candidate or recording `validation_completed`, add `--trials <count> --artifacts reports/skill-evidence/<skill-key>/reviews/<review-id>`. These are attributed assertions: the close records them for later reviewers and never uses them for eligibility, retirement, reach, or any other authorization. Omit them when no validation ran; absent means not recorded, never zero. A close after `record-validation` need not repeat the effort already carried by `validation_completed`.
 
-After the close succeeds, amend the review report with the final disposition and every close-receipt value that was pending. Read `retired_from_gate_event_ids` from the close receipt whenever it is present: it names this close's retirement reach, including an empty reach. The projection's `instrument_limited_incident_ids` is instead the standing per-hash set and can include retirements from earlier reviews. Copy the receipt's list into the report and state that retirement reach in the user-facing completion. A non-instrument-limited close omits the key and has no retirement reach to report.
+After the close succeeds, amend the review report with the final disposition and every close-receipt value that was pending. Read `retired_from_gate_event_ids` from the close receipt whenever it is present: it names this close's retirement reach, including an empty reach. The projection's `instrument_limited_incident_ids` is instead the standing per-hash set and can include retirements from earlier reviews. Copy the receipt's list into the report and state that retirement reach in the user-facing completion. A close that neither carried an instrument-limited disposition nor named untestable coverage omits the key and has no retirement reach to report.
 
 The user-facing completion is concise, links the report, states whether the live skill changed, and, when the close receipt carries `retired_from_gate_event_ids`, states that retirement reach exactly, including an empty list.
 

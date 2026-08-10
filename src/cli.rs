@@ -248,6 +248,8 @@ pub struct EvolutionCloseArgs {
     #[arg(long)]
     adjudicate: Vec<String>,
     #[arg(long)]
+    instrument_limited: Vec<String>,
+    #[arg(long)]
     trials: Option<String>,
     #[arg(long)]
     artifacts: Option<String>,
@@ -447,6 +449,7 @@ fn run_skill_evolution(
                 disposition,
                 note,
                 adjudicate,
+                instrument_limited,
                 trials,
                 artifacts,
             } = args;
@@ -456,6 +459,7 @@ fn run_skill_evolution(
                 disposition: disposition.unwrap_or_default(),
                 note: note.unwrap_or_default(),
                 adjudicate,
+                instrument_limited,
                 trials,
                 artifacts,
             };

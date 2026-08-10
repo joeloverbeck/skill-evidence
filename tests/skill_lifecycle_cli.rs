@@ -790,7 +790,8 @@ fn skill_evolution_preflight_refusal_names_evidence_retired_by_a_blocked_close()
     let message = String::from_utf8_lossy(&refusal.stderr);
     assert!(message.contains("Gate: collecting"), "message={message}");
     assert!(
-        message.contains("Retired as untestable: 3 (an earlier blocked_no_valid_test close"),
+        message
+            .contains("Retired as untestable: 3 (an earlier close could not decide that evidence"),
         "the refusal must say why this evidence will never open the gate: message={message}"
     );
 }
@@ -1685,6 +1686,75 @@ fn skill_evolution_non_instrument_limited_close_omits_retirement_reach_after_a_b
     );
 }
 
+/// A close reports the incidents *it* moved out of the gate. Naming coverage an earlier
+/// close already retired moves nothing, so it must not appear in this close's reach.
+#[test]
+fn naming_already_retired_coverage_adds_nothing_to_this_closes_reach() {
+    let fixture = repository_with_demo_skill();
+    let first_claim = claim_evolution(fixture.path());
+    let already_retired = first_claim["trigger_event_ids"][0]
+        .as_str()
+        .expect("trigger event id")
+        .to_owned();
+    let blocked = run_evolution_close(
+        fixture.path(),
+        "evt_earlier_blocked_close",
+        "blocked_no_valid_test",
+        Some("the execution cluster cannot be tested by this instrument"),
+    );
+    assert!(
+        blocked.status.success(),
+        "first close failed: {}",
+        String::from_utf8_lossy(&blocked.stderr)
+    );
+    for session in ["session-e", "session-f", "session-g"] {
+        record_outcome(fixture.path(), "output task", session, "output", "friction");
+    }
+    claim_existing_evolution_as(
+        fixture.path(),
+        "evt_second_claim",
+        "rev_second",
+        "lock_second_claim",
+    );
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_second_close",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_second",
+            "--disposition",
+            "monitor_for_recurrence",
+            "--note",
+            "the output cluster did not reproduce",
+            "--adjudicate",
+            &already_retired,
+            "--instrument-limited",
+            &already_retired,
+        ]);
+    lifecycle_clock(&mut command, "lock_second_close");
+
+    let output = command.output().expect("close second review");
+
+    assert!(
+        output.status.success(),
+        "second close failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let receipt: Value = serde_json::from_slice(&output.stdout).expect("second close receipt JSON");
+    assert_eq!(
+        receipt["retired_from_gate_event_ids"],
+        serde_json::json!([]),
+        "an earlier close already moved that incident out of the gate, so this one moved nothing"
+    );
+}
+
 #[test]
 fn skill_evolution_instrument_limited_close_reports_only_its_own_retirement_reach() {
     let fixture = repository_with_demo_skill();
@@ -1940,6 +2010,347 @@ fn skill_evolution_close_records_the_disposition_and_retires_the_trigger_events(
 }
 
 #[test]
+fn skill_evolution_close_records_coverage_its_instrument_could_not_test() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let untestable = claim["trigger_event_ids"][0]
+        .as_str()
+        .expect("trigger event id")
+        .to_owned();
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_evolution_close",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "monitor_for_recurrence",
+            "--note",
+            "two mechanisms did not reproduce; the third could not be expressed",
+            "--instrument-limited",
+            &untestable,
+        ]);
+    lifecycle_clock(&mut command, "lock_evolution_close");
+
+    let output = command.output().expect("close Skill Evolution review");
+
+    assert!(
+        output.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stream = fs::read_to_string(
+        fixture
+            .path()
+            .join("reports/skill-evidence/demo-skill/events.jsonl"),
+    )
+    .expect("read event stream");
+    let disposition: Value = stream
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("event JSON"))
+        .find(|event| event["event_id"] == "evt_evolution_close")
+        .expect("review_disposition event");
+    assert_eq!(
+        disposition["payload"]["instrument_limited_event_ids"],
+        serde_json::json!([untestable]),
+        "the close records which of its coverage it reached no conclusion about"
+    );
+    assert_eq!(
+        disposition["payload"]["adjudicated_event_ids"]
+            .as_array()
+            .expect("coverage list")
+            .len(),
+        3,
+        "the coverage list still names every trigger the claim carried"
+    );
+    let projection = gate(fixture.path());
+    assert_eq!(
+        projection["open_incident_ids"],
+        serde_json::json!([untestable]),
+        "an untestable trigger stays open, because the review concluded nothing about it"
+    );
+    assert_eq!(
+        projection["instrument_limited_incident_ids"],
+        serde_json::json!([untestable]),
+        "and it retires from the gate as untestable rather than as adjudicated"
+    );
+    assert_eq!(projection["candidate_clusters"], serde_json::json!([]));
+    assert_event_stream_matches_the_published_schema(fixture.path());
+}
+
+fn close_naming_untestable_coverage(
+    root: &Path,
+    event_id: &str,
+    disposition: &str,
+    named: &[&str],
+) -> std::process::Output {
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(root)
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            event_id,
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            disposition,
+            "--note",
+            "note",
+        ]);
+    for identity in named {
+        command.args(["--instrument-limited", identity]);
+    }
+    lifecycle_clock(&mut command, "lock_untestable_close");
+    command.output().expect("close Skill Evolution review")
+}
+
+#[test]
+fn close_refuses_naming_untestable_coverage_for_a_non_adjudicating_disposition() {
+    for disposition in ["blocked_no_valid_test", "superseded_by_target_version"] {
+        let fixture = repository_with_demo_skill();
+        let claim = claim_evolution(fixture.path());
+        let trigger = claim["trigger_event_ids"][0]
+            .as_str()
+            .expect("trigger event id")
+            .to_owned();
+        let stream_path = fixture
+            .path()
+            .join("reports/skill-evidence/demo-skill/events.jsonl");
+        let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+
+        let output = close_naming_untestable_coverage(
+            fixture.path(),
+            "evt_untestable_non_adjudicating",
+            disposition,
+            &[&trigger],
+        );
+
+        assert_eq!(output.status.code(), Some(3), "disposition {disposition}");
+        let error = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            error.contains("--instrument-limited"),
+            "{disposition}: {error}"
+        );
+        assert!(error.contains(disposition), "{disposition}: {error}");
+        assert_eq!(
+            fs::read(&stream_path).expect("read event stream after refusal"),
+            stream_before,
+            "disposition {disposition}"
+        );
+    }
+}
+
+#[test]
+fn close_refuses_naming_untestable_coverage_it_does_not_cover() {
+    for (case, outside) in [
+        ("an incident that arrived after the threshold froze", None),
+        ("an event id no stream holds", Some("evt_absent")),
+    ] {
+        let fixture = repository_with_demo_skill();
+        claim_evolution(fixture.path());
+        let outside = outside.map_or_else(
+            || {
+                record_outcome(
+                    fixture.path(),
+                    "task d",
+                    "session-d",
+                    "execution",
+                    "friction",
+                )
+            },
+            str::to_owned,
+        );
+        let stream_path = fixture
+            .path()
+            .join("reports/skill-evidence/demo-skill/events.jsonl");
+        let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+
+        let output = close_naming_untestable_coverage(
+            fixture.path(),
+            "evt_untestable_outside_coverage",
+            "monitor_for_recurrence",
+            &[&outside],
+        );
+
+        assert_eq!(output.status.code(), Some(3), "{case}");
+        let error = String::from_utf8_lossy(&output.stderr);
+        assert!(error.contains(&outside), "{case}: {error}");
+        assert_eq!(
+            fs::read(&stream_path).expect("read event stream after refusal"),
+            stream_before,
+            "{case}"
+        );
+    }
+}
+
+/// The review both issues were filed about: every covered trigger is conformance-only, so
+/// none may reach the outcome-graded verdict, while the candidate was genuinely built and
+/// rejected. Naming the whole coverage list must be allowed. Routing such a review to
+/// `blocked_no_valid_test` instead would retire its whole symptom cluster — wider than
+/// this close ever covered — and declare untestable a mechanism its trials tested.
+#[test]
+fn an_adjudicating_close_may_name_its_whole_coverage_list_without_widening() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let triggers = claim["trigger_event_ids"]
+        .as_array()
+        .expect("trigger event ids")
+        .iter()
+        .map(|identity| identity.as_str().expect("trigger event id").to_owned())
+        .collect::<Vec<_>>();
+    let named = triggers.iter().map(String::as_str).collect::<Vec<_>>();
+    let sibling = record_outcome(
+        fixture.path(),
+        "task d",
+        "session-d",
+        "execution",
+        "friction",
+    );
+
+    let output = close_naming_untestable_coverage(
+        fixture.path(),
+        "evt_untestable_whole_coverage",
+        "monitor_for_recurrence",
+        &named,
+    );
+
+    assert!(
+        output.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let projection = gate(fixture.path());
+    let mut retired = projection["instrument_limited_incident_ids"]
+        .as_array()
+        .expect("instrument limited incident ids")
+        .iter()
+        .map(|identity| identity.as_str().expect("event id").to_owned())
+        .collect::<Vec<_>>();
+    retired.sort();
+    let mut expected = triggers.clone();
+    expected.sort();
+    assert_eq!(
+        retired, expected,
+        "reach is the names and nothing else, so an uncovered sibling is untouched"
+    );
+    assert!(
+        projection["open_incident_ids"]
+            .as_array()
+            .expect("open incident ids")
+            .iter()
+            .any(|identity| identity == &serde_json::json!(sibling)),
+        "the sibling this close never covered stays open"
+    );
+    assert_eq!(
+        projection["candidate_clusters"]
+            .as_array()
+            .expect("candidate clusters")
+            .len(),
+        1,
+        "and stays in its cluster, where only genuinely new evidence can reach a threshold"
+    );
+}
+
+/// `--adjudicate` dedups before it writes. This list lands in the same append-only
+/// event and can never be corrected, so it must too — `["X","X"]` is a shape
+/// `adjudicated_event_ids` can never take.
+#[test]
+fn close_records_repeated_untestable_names_once() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let untestable = claim["trigger_event_ids"][0]
+        .as_str()
+        .expect("trigger event id")
+        .to_owned();
+
+    let output = close_naming_untestable_coverage(
+        fixture.path(),
+        "evt_repeated_names_close",
+        "monitor_for_recurrence",
+        &[&untestable, &untestable],
+    );
+
+    assert!(
+        output.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stream = fs::read_to_string(
+        fixture
+            .path()
+            .join("reports/skill-evidence/demo-skill/events.jsonl"),
+    )
+    .expect("read event stream");
+    let disposition: Value = stream
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("event JSON"))
+        .find(|event| event["event_id"] == "evt_repeated_names_close")
+        .expect("review_disposition event");
+    assert_eq!(
+        disposition["payload"]["instrument_limited_event_ids"],
+        serde_json::json!([untestable])
+    );
+    assert_event_stream_matches_the_published_schema(fixture.path());
+}
+
+#[test]
+fn an_adjudicating_close_reports_the_coverage_it_retired_as_untestable() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let untestable = claim["trigger_event_ids"][0]
+        .as_str()
+        .expect("trigger event id")
+        .to_owned();
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_evolution_close",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "monitor_for_recurrence",
+            "--note",
+            "one mechanism's binding constraint was inexpressible in a fresh session",
+            "--instrument-limited",
+            &untestable,
+        ]);
+    lifecycle_clock(&mut command, "lock_evolution_close");
+
+    let output = command.output().expect("close Skill Evolution review");
+
+    assert!(
+        output.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let receipt: Value = serde_json::from_slice(&output.stdout).expect("close receipt JSON");
+    assert_eq!(
+        receipt["retired_from_gate_event_ids"],
+        serde_json::json!([untestable]),
+        "retiring evidence silently would trade one dishonest surface for another"
+    );
+}
+
+#[test]
 fn skill_evolution_close_refuses_adjudicate_for_non_adjudicating_dispositions() {
     for disposition in ["blocked_no_valid_test", "superseded_by_target_version"] {
         let fixture = repository_with_demo_skill();
@@ -2052,6 +2463,83 @@ fn skill_evolution_close_refuses_a_second_disposition() {
     );
     assert_eq!(repeated.status.code(), Some(3));
     assert!(String::from_utf8_lossy(&repeated.stderr).contains("already has a review_disposition"));
+}
+
+/// A wholly conformance-only cluster reaches step 7, is graded on outcome it never
+/// claimed, and must still land somewhere. The installed reference sends it to
+/// `blocked_no_valid_test` when no trial could express any mechanism, and says a rejected
+/// candidate does not bar that disposition, so the compiled command has to agree.
+#[test]
+fn a_rejected_candidate_does_not_bar_the_blocked_disposition() {
+    let fixture = repository_with_demo_skill();
+    claim_evolution(fixture.path());
+    let candidate = make_candidate(
+        fixture.path(),
+        "candidate graded on outcome it never claimed",
+    );
+    let mut reject_validation = skill_evidence();
+    reject_validation
+        .args(["skills", "evolution", "record-validation", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_conformance_rejected_validation",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--decision",
+            "rejected",
+            "--risk-tier",
+            "ordinary",
+        ])
+        .arg("--candidate")
+        .arg(&candidate)
+        .args([
+            "--trials",
+            "3",
+            "--artifacts",
+            "reports/skill-evidence/demo-skill/reviews/trials",
+            "--summary",
+            "no outcome deficit demonstrated for any covered trigger",
+        ]);
+    lifecycle_clock(
+        &mut reject_validation,
+        "lock_conformance_rejected_validation",
+    );
+    let rejection = reject_validation
+        .output()
+        .expect("record rejected validation");
+    assert!(
+        rejection.status.success(),
+        "record-validation failed: {}",
+        String::from_utf8_lossy(&rejection.stderr)
+    );
+
+    let close = run_evolution_close(
+        fixture.path(),
+        "evt_conformance_blocked_close",
+        "blocked_no_valid_test",
+        Some("every trigger is conformance-only and the acceptance gate grades outcome"),
+    );
+
+    assert!(
+        close.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&close.stderr)
+    );
+    let receipt: Value = serde_json::from_slice(&close.stdout).expect("close receipt JSON");
+    assert_eq!(receipt["disposition"], "blocked_no_valid_test");
+    assert_eq!(
+        gate(fixture.path())["open_incident_ids"]
+            .as_array()
+            .expect("open incident ids")
+            .len(),
+        3,
+        "a non-adjudicating close concludes about nothing, so every trigger stays open"
+    );
 }
 
 #[test]

@@ -113,6 +113,18 @@ impl Fixture {
         review
     }
 
+    fn review_naming_untestable_coverage(
+        &self,
+        review_id: &str,
+        disposition: &str,
+        covered: &[&str],
+        untestable: &[&str],
+    ) -> [Value; 2] {
+        let mut review = self.review(review_id, disposition, covered);
+        review[1]["payload"]["instrument_limited_event_ids"] = json!(untestable);
+        review
+    }
+
     fn use_event(
         &self,
         serial: usize,
@@ -976,6 +988,39 @@ fn every_adjudicating_evolution_disposition_retires_covered_incidents() {
 }
 
 #[test]
+fn an_adjudicating_close_leaves_coverage_it_named_untestable_open_and_unclustered() {
+    let fixture = Fixture::new();
+    let mut events = vec![
+        fixture.use_event(1, "friction", Some("execution"), "session-1"),
+        fixture.use_event(2, "friction", Some("execution"), "session-2"),
+    ];
+    events.extend(fixture.review_naming_untestable_coverage(
+        "review-mixed",
+        "candidate_rejected_validation",
+        &["evt_1", "evt_2"],
+        &["evt_1"],
+    ));
+    fixture.write_events(&events);
+
+    let status = fixture.derive("fresh-session", 1_767_398_400_000);
+
+    assert_eq!(
+        status.open_incident_ids,
+        vec!["evt_1".to_owned()],
+        "the review reached no conclusion about evt_1, so it stays open"
+    );
+    assert_eq!(
+        status.instrument_limited_incident_ids,
+        vec!["evt_1".to_owned()],
+        "evt_1 retires from the gate as untestable rather than as adjudicated"
+    );
+    assert!(
+        status.candidate_clusters.is_empty(),
+        "an incident retired as untestable can never reach a threshold again"
+    );
+}
+
+#[test]
 fn post_review_incident_reopens_ten_use_gate_with_its_bounded_cluster() {
     let fixture = Fixture::new();
     let mut events = vec![
@@ -1230,6 +1275,104 @@ fn unadjudicated_severe_incident_remains_quarantined_across_later_disposition() 
         Some("unadjudicated_severe")
     );
     assert_eq!(status.trigger_event_ids, ["evt_3"]);
+}
+
+/// ADR 0002's carve-out reaches the naming channel too: a contemporaneous severe incident
+/// authorizes on its own, so listing it as retired would have the projection claim it
+/// stopped driving the gate while it demonstrably still does. Naming it therefore stops it
+/// being adjudicated and nothing more — and the gate keeps re-authorizing, which is the
+/// safety claim rather than a defect.
+#[test]
+fn naming_a_contemporaneous_severe_incident_stops_adjudication_without_retiring_it() {
+    let fixture = Fixture::new();
+    let mut events = vec![fixture.use_event(1, "severe_incident", Some("execution"), "session-1")];
+    events.extend(fixture.review_naming_untestable_coverage(
+        "review-severe",
+        "monitor_for_recurrence",
+        &["evt_1"],
+        &["evt_1"],
+    ));
+    fixture.write_events(&events);
+
+    let status = fixture.derive("fresh-session", 1_767_398_400_000);
+
+    assert_eq!(status.open_incident_ids, vec!["evt_1".to_owned()]);
+    assert_eq!(
+        status.instrument_limited_incident_ids,
+        Vec::<String>::new(),
+        "it never left the gate, so the projection must not say it did"
+    );
+    assert_eq!(
+        status.authorized_workflow.as_deref(),
+        Some("skill-evolution"),
+        "and it still authorizes on its own"
+    );
+}
+
+/// The close refuses to name coverage it does not hold. Derivation must not honour it
+/// either, or a hand-edited stream retires an incident the review never accounted for —
+/// the widening the command exists to prevent.
+#[test]
+fn untestable_coverage_outside_the_coverage_list_retires_nothing() {
+    let fixture = Fixture::new();
+    let mut events = vec![
+        fixture.use_event(1, "friction", Some("execution"), "session-1"),
+        fixture.use_event(2, "friction", Some("execution"), "session-2"),
+    ];
+    events.extend(fixture.review_naming_untestable_coverage(
+        "review-overreaching",
+        "monitor_for_recurrence",
+        &["evt_1"],
+        &["evt_2"],
+    ));
+    fixture.write_events(&events);
+
+    let status = fixture.derive("fresh-session", 1_767_398_400_000);
+
+    assert_eq!(
+        status.instrument_limited_incident_ids,
+        Vec::<String>::new(),
+        "evt_2 is outside the coverage list, so this close established nothing about it"
+    );
+    assert_eq!(
+        status.open_incident_ids,
+        vec!["evt_2".to_owned()],
+        "and it stays open, driving the gate as before"
+    );
+    assert_eq!(
+        status.candidate_clusters.len(),
+        1,
+        "and stays in its cluster"
+    );
+}
+
+#[test]
+fn untestable_coverage_refuses_a_malformed_shape_on_read() {
+    for (case, invalid) in [
+        ("not an array", json!("evt_1")),
+        ("non-string member", json!([42])),
+        ("empty array", json!([])),
+        ("empty member", json!([""])),
+    ] {
+        let fixture = Fixture::new();
+        let mut events = vec![fixture.use_event(1, "friction", Some("execution"), "session-1")];
+        let mut review = fixture.review("review-malformed", "monitor_for_recurrence", &["evt_1"]);
+        review[1]["payload"]["instrument_limited_event_ids"] = invalid;
+        events.extend(review);
+        fixture.write_events(&events);
+
+        let status = fixture.derive("fresh-session", 1_767_398_400_000);
+
+        assert_eq!(status.state, "blocked", "case {case}");
+        assert!(
+            status
+                .integrity_errors
+                .iter()
+                .any(|error| error.contains("instrument_limited_event_ids")),
+            "case {case}: a shape the reader cannot trust must not be silently read as an empty narrowing: {:?}",
+            status.integrity_errors
+        );
+    }
 }
 
 #[test]

@@ -199,6 +199,13 @@ pub struct EvolutionCloseRequest {
     pub disposition: String,
     pub note: String,
     pub adjudicate: Vec<String>,
+    /// Coverage this review could not decide: either no trial could express the
+    /// mechanism they record, or the acceptance gate grades outcome while their evidence
+    /// bears no outcome claim. A strict subset of the coverage list — naming an event here
+    /// does not remove it from what the close accounted for, it records that the accounting
+    /// was *undecided* rather than *concluded* — and it asserts nothing about whether the
+    /// mechanism reproduced.
+    pub instrument_limited: Vec<String>,
     pub trials: Option<String>,
     pub artifacts: Option<String>,
 }
@@ -291,8 +298,10 @@ pub struct GateStatus {
     pub target_name: String,
     pub target_repo_relative_path: String,
     pub derivation_session_id: Option<String>,
-    /// Open incidents a review covered under an instrument-limited disposition, so
-    /// they no longer cluster and can no longer reach a threshold.
+    /// Open incidents a review could not decide, so they no longer cluster and can no
+    /// longer reach a threshold. Contributed by an instrument-limited disposition, which
+    /// reaches its authorization reason, and by untestable coverage an adjudicating close
+    /// named, which reaches only those names.
     ///
     /// Omitted when empty, like `integrity_errors`: the overwhelming majority of
     /// projections have none, and every projection ever written before this field
@@ -388,6 +397,12 @@ enum EventKind {
         review_id: String,
         disposition: String,
         adjudicated_event_ids: Vec<String>,
+        /// The subset of the coverage list this close could not decide — no trial could
+        /// express the mechanism, or the acceptance gate grades outcome while the evidence
+        /// bears no outcome claim. Empty for every close written before the key existed,
+        /// which is the same claim those closes were already making: everything covered
+        /// was decided.
+        instrument_limited_event_ids: Vec<String>,
     },
     ValidationCompleted {
         review_id: String,
@@ -479,6 +494,21 @@ impl EvidenceEvent {
                             .to_owned()
                     })
                     .collect(),
+                instrument_limited_event_ids: payload
+                    .get("instrument_limited_event_ids")
+                    .and_then(Value::as_array)
+                    .map(|identities| {
+                        identities
+                            .iter()
+                            .map(|identity| {
+                                identity
+                                    .as_str()
+                                    .expect("validated instrument-limited event identity")
+                                    .to_owned()
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
             },
             EventType::ValidationCompleted => EventKind::ValidationCompleted {
                 review_id: review_id(),
@@ -1048,6 +1078,18 @@ pub fn evolution_land(
     }))
 }
 
+/// Appends the identities not already present, preserving caller order.
+///
+/// Both event-id lists a close writes go through this: they land in an append-only event
+/// that can never be corrected, so a repeated flag must not record a duplicate.
+fn extend_without_duplicates(destination: &mut Vec<String>, additions: &[String]) {
+    for identity in additions {
+        if !destination.contains(identity) {
+            destination.push(identity.clone());
+        }
+    }
+}
+
 pub fn evolution_close(
     root: &Path,
     target: &Path,
@@ -1090,6 +1132,17 @@ pub fn evolution_close(
     {
         return Err(refusal(format!(
             "--adjudicate is not allowed with non-adjudicating disposition {}. Nothing done.",
+            request.disposition
+        )));
+    }
+    // A non-adjudicating close already concluded nothing about anything it covered, so
+    // singling out part of that coverage claims a distinction the disposition does not
+    // carry. `blocked_no_valid_test` retires its whole reason-scoped reach either way.
+    if !EVOLUTION_ADJUDICATING_DISPOSITIONS.contains(&request.disposition.as_str())
+        && !request.instrument_limited.is_empty()
+    {
+        return Err(refusal(format!(
+            "--instrument-limited is not allowed with non-adjudicating disposition {}, which already reaches no conclusion about anything it covers. Nothing done.",
             request.disposition
         )));
     }
@@ -1194,17 +1247,40 @@ pub fn evolution_close(
         }
     }
     let mut adjudicated = trigger_event_ids;
-    for identity in &request.adjudicate {
+    extend_without_duplicates(&mut adjudicated, &request.adjudicate);
+    // Naming untestable coverage narrows what the close concluded; it never widens what
+    // the close accounted for. An event outside the coverage list is one this review has
+    // no standing to report anything about, testable or not — so refuse rather than
+    // silently widen the reach past what the threshold froze.
+    for identity in &request.instrument_limited {
         if !adjudicated.contains(identity) {
-            adjudicated.push(identity.clone());
+            return Err(refusal(format!(
+                "--instrument-limited {identity} is not in this review's coverage list; it can only narrow what the close concluded, never widen what it covered. Nothing done."
+            )));
         }
     }
+    // Naming the whole coverage list is allowed, and deliberately so. A review can decide
+    // none of what it covered while having concluded a great deal: the acceptance gate
+    // grades outcome, so it cannot decide a covered trigger whose evidence bears no outcome
+    // claim, however thoroughly the trials tested its mechanism. Refusing here would push
+    // that review onto `blocked_no_valid_test`, whose reach is the authorization reason's
+    // whole cluster — wider than this close ever covered — while asserting an untestability
+    // its own trials disprove. Which limit a review met is semantic, and the command cannot
+    // see it; the reference decides it at step 9.
     let mut payload = serde_json::json!({
         "review_id": request.review_id,
         "disposition": request.disposition,
         "adjudicated_event_ids": adjudicated,
         "note": request.note
     });
+    if !request.instrument_limited.is_empty() {
+        // Deduplicated like the coverage list beside it. The event is append-only and this
+        // list can never be corrected, so a repeated flag must not record a shape
+        // `adjudicated_event_ids` could never take.
+        let mut named = Vec::new();
+        extend_without_duplicates(&mut named, &request.instrument_limited);
+        payload["instrument_limited_event_ids"] = serde_json::json!(named);
+    }
     if let Some(trial_count) = trial_count {
         payload["trial_count"] = serde_json::json!(trial_count);
     }
@@ -1226,7 +1302,17 @@ pub fn evolution_close(
         "adjudicated_event_ids": adjudicated,
         "state": after.state
     });
-    if EVOLUTION_INSTRUMENT_LIMITED_DISPOSITIONS.contains(&request.disposition.as_str()) {
+    // One channel reported at two scopes. A close reports what *it* moved out of the gate,
+    // so both scopes read the standing set after the close, drop whatever was already
+    // retired before it, and keep only what this close can claim: every new member for a
+    // disposition-level close, and just the named ones for an event-level naming. Reading
+    // the standing set rather than the request is what keeps a contemporaneous severe
+    // incident out of the reach — it is named but never retired, because it still drives
+    // the gate on its own.
+    let names_untestable_coverage = !request.instrument_limited.is_empty();
+    if EVOLUTION_INSTRUMENT_LIMITED_DISPOSITIONS.contains(&request.disposition.as_str())
+        || names_untestable_coverage
+    {
         let previously_retired = before
             .as_ref()
             .map(|status| {
@@ -1241,6 +1327,9 @@ pub fn evolution_close(
             .instrument_limited_incident_ids
             .iter()
             .filter(|identity| !previously_retired.contains(identity.as_str()))
+            .filter(|identity| {
+                !names_untestable_coverage || request.instrument_limited.contains(identity)
+            })
             .cloned()
             .collect::<Vec<_>>();
         receipt["retired_from_gate_event_ids"] = serde_json::json!(retirement_reach);
@@ -1617,7 +1706,7 @@ fn evolution_refusal(
     let retired = match instrument_limited_incidents {
         0 => String::new(),
         count => format!(
-            "\nRetired as untestable: {count} (an earlier blocked_no_valid_test close removed that evidence from this gate)."
+            "\nRetired as untestable: {count} (an earlier close could not decide that evidence and removed it from this gate)."
         ),
     };
     refusal(format!(
@@ -2084,8 +2173,16 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
                     "adjudicated_event_ids",
                     encoded_json(&payload["adjudicated_event_ids"]),
                 ),
-                ("note", encoded_json(&payload["note"])),
             ];
+            // Adjacent to the list it narrows, and omitted entirely when absent, so every
+            // close written before this key existed stays byte-identical.
+            if let Some(instrument_limited) = payload.get("instrument_limited_event_ids") {
+                parts.push((
+                    "instrument_limited_event_ids",
+                    encoded_json(instrument_limited),
+                ));
+            }
+            parts.push(("note", encoded_json(&payload["note"])));
             if let Some(trial_count) = payload.get("trial_count") {
                 parts.push(("trial_count", encoded_json(trial_count)));
             }
@@ -2145,7 +2242,7 @@ fn build_reply(event_id: &str, status: &GateStatus) -> String {
                 .map(|cluster| format!("{}={}", cluster.symptom_key, cluster.independent_incidents))
                 .collect::<Vec<_>>()
                 .join(", ");
-            // Open incidents retired by an instrument-limited close are still counted as
+            // Open incidents a close retired as untestable are still counted as
             // open — nothing was adjudicated — but they cluster no longer, so the symptom
             // list can now be empty while the count is not. Reporting the count without
             // saying where those incidents went reads as a gate quietly failing to
@@ -2513,6 +2610,25 @@ fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
         {
             errors.push("adjudicated_event_ids must be a non-empty array of event ids".to_owned());
         }
+        // Absent means the close concluded about everything it covered. A shape the reader
+        // cannot trust must not collapse into that claim, so it is an integrity error
+        // rather than a narrowing silently read as empty.
+        if payload
+            .get("instrument_limited_event_ids")
+            .is_some_and(|value| {
+                value.as_array().is_none_or(|identities| {
+                    identities.is_empty()
+                        || identities
+                            .iter()
+                            .any(|identity| non_empty_string(Some(identity)).is_none())
+                })
+            })
+        {
+            errors.push(
+                "instrument_limited_event_ids must be a non-empty array of event ids when present"
+                    .to_owned(),
+            );
+        }
         if payload
             .get("trial_count")
             .is_some_and(|value| value.as_u64().is_none_or(|count| count == 0))
@@ -2574,19 +2690,32 @@ fn derive_gate(
         status.state = "blocked".to_owned();
         return status;
     }
-    let adjudicated = events
-        .iter()
-        .flat_map(|event| match &event.kind {
-            EventKind::ReviewDisposition {
-                disposition,
-                adjudicated_event_ids,
-                ..
-            } if EVOLUTION_ADJUDICATING_DISPOSITIONS.contains(&disposition.as_str()) => {
-                adjudicated_event_ids.iter().map(String::as_str)
+    // The coverage list records what a close accounted for; the conclusion set is that
+    // list minus the events the close named as untestable. A close that recorded reaching
+    // no conclusion about an event never adjudicated it, whatever the target hash has done
+    // since, so this subtraction is unconditional exactly like the union it narrows.
+    // Whether such an event also leaves the gate is a separate question, answered below
+    // under ADR 0002's same-hash rule.
+    let mut adjudicated = HashSet::new();
+    for event in events {
+        let EventKind::ReviewDisposition {
+            disposition,
+            adjudicated_event_ids,
+            instrument_limited_event_ids,
+            ..
+        } = &event.kind
+        else {
+            continue;
+        };
+        if !EVOLUTION_ADJUDICATING_DISPOSITIONS.contains(&disposition.as_str()) {
+            continue;
+        }
+        for identity in adjudicated_event_ids {
+            if !instrument_limited_event_ids.contains(identity) {
+                adjudicated.insert(identity.as_str());
             }
-            _ => [].iter().map(String::as_str),
-        })
-        .collect::<HashSet<_>>();
+        }
+    }
     let recorded_symptoms = events
         .iter()
         .filter_map(|event| {
@@ -2670,6 +2799,49 @@ fn derive_gate(
             Some((index, covered, symptoms, authorizing_reason))
         })
         .collect::<Vec<_>>();
+    // Coverage an adjudicating close named as untestable leaves the gate on the same
+    // warrant ADR 0002 gives an instrument-limited close: the review established that it could
+    // not decide them, so they stop clustering while staying open in the ledger.
+    //
+    // This reach never widens past the names. A close that examined its coverage list
+    // mechanism by mechanism said exactly which mechanisms it could not decide, so there is
+    // nothing left for a symptom-wide or reason-scoped rule to infer — and inferring one
+    // would retire evidence the review did not examine, which is what #16 narrowed away
+    // from. The names may rest on either limit: no trial could express the mechanism, or
+    // the acceptance gate grades outcome while the evidence bears no outcome claim.
+    //
+    // Same-hash only, for ADR 0002's reason: what this review could not decide about these
+    // bytes says nothing about a target that has since changed.
+    let named_untestable_coverage = events
+        .iter()
+        .filter_map(|event| {
+            let EventKind::ReviewDisposition {
+                disposition,
+                adjudicated_event_ids,
+                instrument_limited_event_ids,
+                ..
+            } = &event.kind
+            else {
+                return None;
+            };
+            if !EVOLUTION_ADJUDICATING_DISPOSITIONS.contains(&disposition.as_str()) {
+                return None;
+            }
+            if !ran_on_current_hash(event.review_id().expect("review disposition identity")) {
+                return None;
+            }
+            // Naming is a narrowing of the coverage list, so a name outside that list
+            // establishes nothing. The close refuses to write one; honouring it on read
+            // would let a hand-edited stream retire an incident no review accounted for.
+            Some(
+                instrument_limited_event_ids
+                    .iter()
+                    .filter(|identity| adjudicated_event_ids.contains(identity))
+                    .map(String::as_str),
+            )
+        })
+        .flatten()
+        .collect::<HashSet<_>>();
     let started = events
         .iter()
         .filter(|event| event.starts_ownership())
@@ -2737,34 +2909,35 @@ fn derive_gate(
             recorded.outcome == Outcome::SevereIncident && !recorded.retrospective;
         let instrument_limited_incident = open_incident
             && !authorizes_on_its_own
-            && instrument_limited_closes.iter().any(
-                |(close, covered, symptoms, authorizing_reason)| {
-                    covered.contains(event.event_id.as_str())
-                        || (event_index < *close
-                            && match authorizing_reason {
-                                Some(ThresholdReason::Severe) => false,
-                                Some(ThresholdReason::TenUseUnresolved) => {
-                                    !recorded.retrospective
-                                        && recorded
-                                            .symptom_key
-                                            .as_deref()
-                                            .is_some_and(|symptom| symptoms.contains(symptom))
-                                }
-                                Some(ThresholdReason::MaterialRecurrence(symptom)) => {
-                                    recorded.symptom_key.as_deref() == Some(symptom.as_str())
-                                        && recorded.outcome.severity()
-                                            >= Outcome::MaterialFailure.severity()
-                                }
-                                Some(ThresholdReason::FrictionRecurrence(symptom)) => {
-                                    recorded.symptom_key.as_deref() == Some(symptom.as_str())
-                                }
-                                None => recorded
-                                    .symptom_key
-                                    .as_deref()
-                                    .is_some_and(|symptom| symptoms.contains(symptom)),
-                            })
-                },
-            );
+            && (named_untestable_coverage.contains(event.event_id.as_str())
+                || instrument_limited_closes.iter().any(
+                    |(close, covered, symptoms, authorizing_reason)| {
+                        covered.contains(event.event_id.as_str())
+                            || (event_index < *close
+                                && match authorizing_reason {
+                                    Some(ThresholdReason::Severe) => false,
+                                    Some(ThresholdReason::TenUseUnresolved) => {
+                                        !recorded.retrospective
+                                            && recorded
+                                                .symptom_key
+                                                .as_deref()
+                                                .is_some_and(|symptom| symptoms.contains(symptom))
+                                    }
+                                    Some(ThresholdReason::MaterialRecurrence(symptom)) => {
+                                        recorded.symptom_key.as_deref() == Some(symptom.as_str())
+                                            && recorded.outcome.severity()
+                                                >= Outcome::MaterialFailure.severity()
+                                    }
+                                    Some(ThresholdReason::FrictionRecurrence(symptom)) => {
+                                        recorded.symptom_key.as_deref() == Some(symptom.as_str())
+                                    }
+                                    None => recorded
+                                        .symptom_key
+                                        .as_deref()
+                                        .is_some_and(|symptom| symptoms.contains(symptom)),
+                                })
+                    },
+                ));
         if open_incident {
             status.open_incident_ids.push(event.event_id.clone());
         }

@@ -4,6 +4,8 @@ Status: accepted (2026-08-08, GitHub [#2](https://github.com/joeloverbeck/skill-
 
 Amended: 2026-08-09, GitHub [#16](https://github.com/joeloverbeck/skill-evidence/issues/16) — retirement consequences now defer to ADR 0002's reason-scoped reach rather than describing every instrument-limited close as whole-cluster retirement. No instrument decision changed.
 
+Amended: 2026-08-10, GitHub [#24](https://github.com/joeloverbeck/skill-evidence/issues/24) — this decision's routing now has a home in the text that executes it: the installed review reads each trigger's evidence class and bars the verdict per trigger rather than relying on the whole cluster being untestable. No instrument decision changed, and no classifier was built.
+
 Skill Evidence Capture's ladder is disjunctive. Two of the four things that reach `material_failure`
 are outcome claims — *"material rework required"*, *"wrong work caught before consequential
 reliance"* — and two can be satisfied by **conformance** alone: *"an expected output contract
@@ -172,6 +174,46 @@ The ground is simply that the owner declined it, with the parking already fixed.
   and closes `blocked_no_valid_test`.** That review costs a session and produces a report and a
   disposition, not a repair. The cost is accepted here for the second time, with the census's
   measurement of how often it falls due: about one review in ten.
+  **That routing was left implicit and does not survive a mixed cluster**, which is what #24 recorded:
+  a symptom key groups incidents without naming a cause, so one cluster holds conformance-only and
+  outcome-graded triggers at once. Step 4's exit keys on whether the instrument can vary a binding
+  constraint, not on evidence class, so a single expressible mechanism carries the review past it and
+  the adjudicating close that follows reaches the barred verdict over every trigger — including those
+  whose `consequence` bears no outcome claim at all. The routing is therefore stated per trigger and
+  enforced where the verdict is actually reached: a conformance-only trigger is adjudicated only when
+  those trials demonstrated an outcome deficit for it, which is precisely the condition the pairing
+  clause attaches to the prohibition. **The ground is per trigger, and it reaches only triggers step 7
+  actually graded.** A trigger whose own mechanism read *not reproduced with witnesses expressed* was
+  decided by its reproduction trial and never by the acceptance gate, and every trigger of a
+  non-proceeding step 3 class — ownership, independence, novelty, not-reproducible — reaches its
+  verdict without that gate at all. Those adjudicate normally. Gating on the *review* rather than the
+  trigger would let a sibling that reached the gate decide a trigger the gate never saw, which is the
+  claim-scoped reasoning this whole change exists to remove. Absent that, the close names it as
+  untestable coverage and it retires at ADR 0002's exit — the exit this decision already directed it
+  to, now reachable without the whole cluster having to be untestable.
+  **The limit that naming records is the acceptance gate, not the reproduction trial**, and the two
+  must not be confused. The mismatch this decision opens with is that step 7 grades outcome while the
+  evidence bears only conformance, so the instrument cannot decide such a trigger however cleanly its
+  mechanism reproduced — which is the sense in which the opening paragraph says *"this evidence
+  retires there."* Naming therefore asserts nothing about reproducibility, and the per-mechanism
+  readings stay in the review report where the trials put them. Reading it the other way would have
+  the projection claim a mechanism was untestable that the trials demonstrably tested, which is the
+  mislabel #16 was filed for, arriving from the opposite direction.
+  When every covered trigger is conformance-only with no demonstrated deficit, the close names them
+  all and still carries the disposition the review actually reached. That is not the case the first
+  consequence above describes: a cluster *this instrument cannot test* closes `blocked_no_valid_test`,
+  whereas a review that built a candidate and graded it has concluded a great deal and merely cannot
+  decide what it covered. Sending the second to the first's disposition would retire the authorization
+  reason's whole cluster — wider than the close covered — while asserting an untestability the trials
+  disprove, so the two are kept apart. Which of the two a review met is semantic, and the compiled
+  command cannot see it.
+  **This builds no classifier and no instrument.** The compiled command cannot read an evidence class
+  and is not asked to: judging what claim a `consequence` bears is semantic, and a command that
+  guessed it would be the caller-asserted truth `evidence-substrate-integrity.md` forbids. The class
+  is read by the reviewer from the recorded field, exactly as the census read it, and the command
+  refuses only what it can see: coverage a close does not hold, and the non-adjudicating dispositions,
+  which conclude nothing about anything and so have nothing for a naming to narrow. Naming the whole
+  coverage list of an adjudicating close is not among them, for the reason two paragraphs above.
 - **ADR 0002 owns the retirement cost of that close.** Retirement reaches what the close's own
   authorization reason names at close, subject to ADR 0002's current bounds; this ADR neither
   widens nor narrows that reach. Nothing added here brings retired evidence back, and no route back
@@ -180,6 +222,11 @@ The ground is simply that the owner declined it, with the parking already fixed.
   schema, no installed package, and no Rust API. This decision is documentation only, needs no
   release, and needs nothing of any consumer. `consumer-contract.md`'s three surfaces are untouched
   on purpose: the decision was that the mismatch does not warrant reaching them.
+  **The #24 amendment reaches the installed-package surface and only that one.** Giving the routing a
+  home means writing it into `skill-evolution/references/authorized-review.md`, so consumers need
+  `skills evidence install --force` to receive it — which the release carrying ADR 0002's #23
+  amendment already requires. What was declined here remains declined: no instrument, no acceptance
+  test for conformance, and no grading change.
 - **The capture ladder keeps grading a skipped core behavior `material_failure`.** That grade
   records the deviation's kind, which is what a ladder is for. Reading it as harm is what
   `inherited-prohibitions.md` forbids — *no severity ladder presented as proof of harm* — and

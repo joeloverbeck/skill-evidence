@@ -142,31 +142,48 @@ set and their rules — this glossary names the concept, not the roster, so the 
 _Avoid_: outcome, resolution, verdict, status
 
 **Adjudicating disposition**:
-A disposition that retires its triggering evidence from the active set, because the review actually
-reached a conclusion about it. A *non-adjudicating* disposition closes the review while leaving the
-trigger evidence active, because no conclusion was reached.
+A disposition that retires from the active set the evidence it reached a conclusion about — its
+coverage list, less any untestable coverage the close named. A *non-adjudicating* disposition closes
+the review while leaving the trigger evidence active, because no conclusion was reached about any of
+it.
 _Avoid_: terminal disposition, final disposition
 
 **Coverage list**:
 The event IDs a review records as covered when it closes — the trigger list frozen when the
 threshold fired, plus any events an adjudicating close explicitly names. It is what the close writes
-down, which is not the same as what the close costs.
+down, which is not the same as what the close costs, and not the same as what it concluded.
 _Avoid_: adjudicated set, trigger list, covered events
+
+**Untestable coverage**:
+The events an adjudicating close names within its coverage list as ones this review could not decide —
+either because no trial could express the mechanism's binding constraint, or because the acceptance
+gate grades outcome and the event's evidence bears no outcome claim. They stop being adjudicated, and
+retire from the gate unless they still drive it on their own: what an instrument-limited disposition
+does for a whole review, done one event at a time, for the ordinary case where one review's mechanisms
+reached different readings. Naming an event here narrows what the close concluded; it never narrows
+what the close covered, and it says nothing about whether the mechanism reproduced.
+_Avoid_: partial adjudication, excluded triggers, untested set, uncovered evidence
 
 **Instrument-limited disposition**:
 A non-adjudicating disposition that nonetheless retires evidence from the gate, because the review
 established that this instrument cannot test it. It adjudicates nothing — the incidents stay open and
 unresolved in the ledger — but they stop clustering, so they can never again reach a threshold the
-review already proved untestable. The one such disposition is `blocked_no_valid_test`. See
+review already proved untestable. The one such disposition is `blocked_no_valid_test`. Untestable
+coverage does the same job for single events inside an adjudicating close — it stops them clustering
+without adjudicating them — but on the narrower claim that this review could not decide them, which
+is not a claim about what any instrument can test. See
 [`docs/adr/0002-blocked-no-valid-test-retires-its-evidence-from-the-gate.md`](docs/adr/0002-blocked-no-valid-test-retires-its-evidence-from-the-gate.md).
 _Avoid_: dismissed, wontfix, closed-untestable
 
 **Retirement reach**:
-The open incidents one instrument-limited close moves out of the gate: the ones its review's own
-authorization reason still names when re-evaluated at the close. Wider than the coverage list,
-because that list froze when the threshold fired, and never wider than what opened the gate. Distinct
-from the gate projection's standing retired set — a live per-hash view that later closes can grow or
-shrink. A close reports its own reach; the projection reports the standing set.
+The open incidents one close moves out of the gate, at whichever scope that close retires. An
+instrument-limited close reaches the ones its review's own authorization reason still names when
+re-evaluated at the close: wider than the coverage list, because that list froze when the threshold
+fired, and never wider than what opened the gate. An adjudicating close reaches the untestable
+coverage it named, less anything the derivation declined to retire: always inside its coverage list,
+and never a contemporaneous severe incident. Distinct from the gate projection's standing retired
+set — a live per-hash view that later closes can grow or shrink. A close reports its own reach; the
+projection reports the standing set.
 _Avoid_: retired set, instrument-limited set, covered evidence
 
 **Reach bound**:

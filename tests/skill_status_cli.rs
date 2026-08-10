@@ -1137,8 +1137,8 @@ fn skill_evolution_status_distinguishes_evidence_queued_behind_an_instrument_lim
     );
     assert!(
         report.contains(
-            "- Retired as untestable: 3 open incidents. An earlier `blocked_no_valid_test` \
-             close removed that evidence from this gate."
+            "- Retired as untestable: 3 open incidents. An earlier close could not \
+             decide that evidence, and removed it from this gate."
         ),
         "the deferred entry must also account for what the same close retired: report={report}"
     );
@@ -1211,10 +1211,74 @@ fn skill_evolution_status_reports_retired_evidence_on_a_target_that_is_also_read
     assert!(report.contains("## Ready to evolve"), "report={report}");
     assert!(
         report.contains(
-            "- Retired as untestable: 3 open incidents. An earlier `blocked_no_valid_test` \
-             close removed that evidence from this gate."
+            "- Retired as untestable: 3 open incidents. An earlier close could not \
+             decide that evidence, and removed it from this gate."
         ),
         "a ready target must still declare what an earlier close retired: report={report}"
+    );
+}
+
+/// Evidence also retires as untestable when an adjudicating close names the coverage its
+/// instrument could not test. The projection records one flat retired set and never which
+/// close produced which member, so no report may name a disposition it cannot see.
+#[test]
+fn skill_evolution_status_does_not_attribute_a_retirement_to_an_unrecorded_disposition() {
+    let root = tempfile::tempdir().expect("temporary repository");
+    for name in ["skill-evolution", "mixed-close"] {
+        create_fixture_skill(root.path(), name);
+    }
+    let hash = skill_hash(root.path(), ".claude/skills/mixed-close");
+    let mut events = vec![
+        fixture_use_event(
+            "mixed-close",
+            &hash,
+            "evt_tested",
+            "2026-07-21T11:59:40.000Z",
+            "session-a",
+            "friction",
+        ),
+        fixture_use_event(
+            "mixed-close",
+            &hash,
+            "evt_untestable",
+            "2026-07-21T11:59:45.000Z",
+            "session-b",
+            "friction",
+        ),
+    ];
+    let mut close = fixture_blocked_close(
+        "mixed-close",
+        &hash,
+        "rev_mixed",
+        "friction_recurrence:execution",
+        &["evt_tested", "evt_untestable"],
+    );
+    close[1]["payload"]["disposition"] = json!("monitor_for_recurrence");
+    close[1]["payload"]["instrument_limited_event_ids"] = json!(["evt_untestable"]);
+    events.extend(close);
+    write_events(root.path(), "mixed-close", &events);
+
+    let output = skill_evidence()
+        .args(["skills", "evolution-status", "--root"])
+        .arg(root.path())
+        .args([
+            "--now-epoch-milliseconds",
+            "1784635200000",
+            "--session-id",
+            "fresh-session",
+        ])
+        .output()
+        .expect("run Skill Evolution Status");
+
+    assert!(output.status.success());
+    let report = String::from_utf8(output.stdout).expect("UTF-8 status report");
+    assert!(
+        report.contains("## Retired as untestable"),
+        "report={report}"
+    );
+    assert!(
+        !report.contains("blocked_no_valid_test"),
+        "this retirement came from an adjudicating close, so naming that disposition is a claim the projection cannot support: report={report}"
     );
 }
 
@@ -1260,9 +1324,9 @@ fn skill_evolution_status_renders_a_single_retired_incident_grammatically() {
     let report = String::from_utf8(output.stdout).expect("UTF-8 status report");
     assert!(
         report.contains(
-            "- Retired as untestable: 1 open incident, covered by a review that closed \
-             `blocked_no_valid_test`. That evidence no longer drives this gate, and remains \
-             in the event stream."
+            "- Retired as untestable: 1 open incident, covered by a review that could \
+             not decide it. That evidence no longer drives this gate, and remains in \
+             the event stream."
         ),
         "report={report}"
     );

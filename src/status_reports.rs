@@ -40,7 +40,7 @@ struct MethodGapTargetInventory {
     evidence_integrity_errors: Vec<String>,
     current_evidence: CurrentEvidence,
     current_candidate_clusters: Vec<CandidateCluster>,
-    /// Open incidents an instrument-limited close retired from the evolution gate.
+    /// Open incidents a close retired from the evolution gate as untestable.
     ///
     /// `current_candidate_clusters` drops them, because they no longer cluster, while
     /// `current_evidence` still lists them individually — without this the difference
@@ -781,8 +781,9 @@ fn render_deferred_entry(entry: &EvolutionDeferredEntry) -> String {
     rendered
 }
 
-/// A target whose open evidence a review covered under an instrument-limited
-/// disposition, so it no longer drives the gate.
+/// A target whose open evidence a review could not decide, so it no longer drives the
+/// gate — whether the review carried an instrument-limited disposition or named that
+/// coverage as untestable inside an adjudicating close.
 ///
 /// Without its own section these targets fall into `omitted as not eligible`, which is
 /// where skills that never recorded an incident go. Reporting real retired evidence as
@@ -807,7 +808,7 @@ fn open_incidents(count: usize) -> String {
 
 fn render_retired_entry(entry: &EvolutionRetiredEntry) -> String {
     let mut rendered = format!(
-        "### {}\n\n- Retired as untestable: {}, covered by a review that closed `blocked_no_valid_test`. That evidence no longer drives this gate, and remains in the event stream.\n",
+        "### {}\n\n- Retired as untestable: {}, covered by a review that could not decide it. That evidence no longer drives this gate, and remains in the event stream.\n",
         entry.target_path,
         open_incidents(entry.incidents)
     );
@@ -1149,7 +1150,7 @@ fn explain_authorization_reason(reason: &str) -> String {
 fn retired_line(count: usize) -> Option<String> {
     (count > 0).then(|| {
         format!(
-            "- Retired as untestable: {}. An earlier `blocked_no_valid_test` close removed that evidence from this gate.",
+            "- Retired as untestable: {}. An earlier close could not decide that evidence, and removed it from this gate.",
             open_incidents(count)
         )
     })

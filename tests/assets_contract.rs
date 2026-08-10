@@ -297,6 +297,64 @@ fn installed_event_schema_declares_close_validation_effort_as_optional() {
 }
 
 #[test]
+fn installed_status_package_does_not_tie_retirement_to_one_disposition() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let package = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution-status/SKILL.md"),
+    )
+    .expect("read installed skill-evolution-status package");
+
+    assert!(
+        package.contains(
+            "`Retired as untestable` names stores whose open incidents left the gate because a review could not decide them"
+        ),
+        "an adjudicating close naming untestable coverage retires evidence too, so the relay may not attribute the section to one disposition"
+    );
+    assert!(
+        package.contains(
+            "An adjudicating close contributes the coverage it named as untestable, by name and never wider, less anything that still drives the gate on its own"
+        ),
+        "the relay explains how the standing retired set is composed, so it must carry the second contribution path too"
+    );
+}
+
+#[test]
+fn installed_event_schema_keeps_untestable_coverage_optional_and_open() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let schema: serde_json::Value = serde_json::from_slice(
+        &fs::read(
+            root.path()
+                .join("schemas/skill-evidence/event.v1.schema.json"),
+        )
+        .expect("read installed event schema"),
+    )
+    .expect("installed event schema JSON");
+    let payload = schema
+        .pointer("/allOf/1/then/properties/payload")
+        .expect("review_disposition payload schema");
+
+    assert_eq!(
+        payload["properties"]["instrument_limited_event_ids"]["type"],
+        "array"
+    );
+    assert!(
+        !payload["required"]
+            .as_array()
+            .expect("required review_disposition properties")
+            .iter()
+            .any(|field| field == "instrument_limited_event_ids"),
+        "absent means the review concluded about everything it covered, which is what every close written before this key existed asserts"
+    );
+    assert!(
+        payload.get("additionalProperties").is_none(),
+        "a consumer still on a stale installed schema must keep validating streams that carry this key"
+    );
+}
+
+#[test]
 fn installed_skill_evolution_reference_reports_the_close_retirement_reach() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
@@ -317,6 +375,137 @@ fn installed_skill_evolution_reference_reports_the_close_retirement_reach() {
     assert!(
         reference.contains("- Retirement reach event IDs:"),
         "the durable review report needs a home for the close's retirement reach"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_routes_untestable_coverage_out_of_adjudication() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains("--instrument-limited <event-id>"),
+        "the close surface must expose the per-trigger channel the operator has to reach for"
+    );
+    assert!(
+        reference.contains("stays open in the ledger and stops clustering"),
+        "the operator must know what naming a trigger untestable claims about it"
+    );
+    assert!(
+        reference
+            .contains("so an event this review could not decide can never again reach a threshold"),
+        "ground 2 names mechanisms step 7 did grade, so the paragraph must not claim the instrument failed to test them"
+    );
+    assert!(
+        reference.contains("- Coverage named untestable:"),
+        "the durable review report needs a home for the triggers the instrument could not test"
+    );
+    assert!(
+        reference
+            .contains("retire from the active set, except any the close names as untestable below"),
+        "the sentence introducing adjudicating dispositions must not still promise that all covered ids retire"
+    );
+    assert!(
+        reference.contains(
+            "Naming a contemporaneous severe incident stops it being adjudicated without retiring it"
+        ),
+        "the naming paragraph promises retirement unconditionally; the carve-out sentences elsewhere are scoped to the blocked disposition and do not reach it"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_bars_a_verdict_conformance_only_evidence_cannot_bear() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains("conformance-only") && reference.contains("outcome-graded"),
+        "the reviewer must classify what claim each trigger's evidence actually bears"
+    );
+    assert!(
+        reference.contains("Read `consequence` from each raw trigger event"),
+        "the classification reads a recorded field rather than the reviewer's impression"
+    );
+    assert!(
+        reference.contains(
+            "A trigger step 3 classified conformance-only, whose mechanism step 7 graded, is adjudicated only when those trials demonstrated an outcome deficit for it"
+        ),
+        "a gate graded on outcome may not reach a verdict on evidence bearing no outcome claim"
+    );
+    assert!(
+        reference.contains("- Trigger event → evidence class:"),
+        "the close requires the class to be on record beforehand, so the durable report needs a home for it"
+    );
+    assert!(
+        reference.contains("A trigger this gate never graded is untouched by that bar"),
+        "step 7 states the bar before step 9 qualifies it, so an ungraded trigger must not read as routed away from its verdict"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_names_which_instrument_limit_a_conformance_only_trigger_hits()
+ {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains("Naming has two grounds, and they are different limits"),
+        "the two grounds carry different limits, so one unqualified sentence cannot describe both"
+    );
+    assert!(
+        reference.contains(
+            "A non-proceeding class from step 3 never reaches that gate, so this ground does not touch it"
+        ),
+        "an ownership or independence verdict is reached without step 7, so the outcome bar cannot make it name every conformance-only trigger"
+    );
+    assert!(
+        reference.contains(
+            "Expect it to re-authorize every session until a later review adjudicates it"
+        ),
+        "naming a contemporaneous severe trigger keeps the gate open indefinitely, and the operator must be told before choosing it"
+    );
+    assert!(
+        reference.contains(
+            "Choose `blocked_no_valid_test` only when no trial could express any mechanism"
+        ),
+        "that disposition reaches its authorization reason's whole cluster, so a review that merely could not decide its coverage must not be sent there"
+    );
+    assert!(
+        reference.contains("Both grounds must already be on record before the close"),
+        "naming has two grounds, so a pre-recording rule written for only the first would forbid the second"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_keeps_its_no_candidate_route_consistent_with_close() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains(
+            "Otherwise carry `monitor_for_recurrence` and name every unexpressible mechanism's triggers at step 9"
+        ),
+        "a review with one unexpressible mechanism and one merely not reproduced must not be sent to the whole-cluster disposition"
     );
 }
 
