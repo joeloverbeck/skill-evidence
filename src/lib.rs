@@ -1402,8 +1402,8 @@ pub fn evolution_close(
             )));
         }
     }
-    let mut adjudicated = trigger_event_ids;
-    extend_without_duplicates(&mut adjudicated, &request.adjudicate);
+    let mut coverage = trigger_event_ids;
+    extend_without_duplicates(&mut coverage, &request.adjudicate);
     for (flag, routes) in [
         ("--concluded", request.concluded.as_slice()),
         (
@@ -1419,7 +1419,7 @@ pub fn evolution_close(
         }
     }
     for identity in &request.concluded {
-        if !adjudicated.contains(identity) {
+        if !coverage.contains(identity) {
             return Err(refusal(format!(
                 "--concluded {identity} is not in this review's coverage list. Nothing done."
             )));
@@ -1430,14 +1430,14 @@ pub fn evolution_close(
     // no standing to report anything about, testable or not — so refuse rather than
     // silently widen the reach past what the threshold froze.
     for identity in &request.instrument_limited {
-        if !adjudicated.contains(identity) {
+        if !coverage.contains(identity) {
             return Err(refusal(format!(
                 "--instrument-limited {identity} is not in this review's coverage list; it can only narrow what the close concluded, never widen what it covered. Nothing done."
             )));
         }
     }
     if EVOLUTION_ADJUDICATING_DISPOSITIONS.contains(&request.disposition.as_str()) {
-        for identity in &adjudicated {
+        for identity in &coverage {
             match (
                 request.concluded.contains(identity),
                 request.instrument_limited.contains(identity),
@@ -1502,7 +1502,7 @@ pub fn evolution_close(
     let mut payload = serde_json::json!({
         "review_id": request.review_id,
         "disposition": request.disposition,
-        "adjudicated_event_ids": adjudicated,
+        "adjudicated_event_ids": coverage,
         "note": request.note,
         "operating_skill_hash": operating_package.skill_hash,
         "operating_package_matches_shipped": operating_package.matches_shipped
@@ -1536,7 +1536,7 @@ pub fn evolution_close(
     let mut receipt = serde_json::json!({
         "closed": request.review_id,
         "disposition": request.disposition,
-        "adjudicated_event_ids": adjudicated,
+        "adjudicated_event_ids": coverage,
         "state": after.state
     });
     // One channel reported at two scopes. A close reports what *it* moved out of the gate,
@@ -2924,6 +2924,18 @@ fn read_event_stream(path: &Path) -> Result<(Vec<EvidenceEvent>, Vec<String>), E
     Ok((events, errors))
 }
 
+fn is_valid_external_owner_entry(owner: &Value) -> bool {
+    owner.as_object().is_some_and(|entry| {
+        entry.len() == 3
+            && ["event_id", "kind", "reference"]
+                .iter()
+                .all(|field| entry.contains_key(*field))
+    }) && non_empty_string(owner.get("event_id")).is_some()
+        && non_empty_string(owner.get("kind"))
+            .is_some_and(|kind| EXTERNAL_OWNER_KINDS.contains(&kind))
+        && non_empty_string(owner.get("reference")).is_some()
+}
+
 fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
     let mut errors = Vec::new();
     let Some(event) = event.as_object() else {
@@ -3153,17 +3165,9 @@ fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
         if payload.get("external_owners").is_some_and(|value| {
             value.as_array().is_none_or(|owners| {
                 owners.is_empty()
-                    || owners.iter().any(|owner| {
-                        owner.as_object().is_none_or(|entry| {
-                            entry.len() != 3
-                                || !["event_id", "kind", "reference"]
-                                    .iter()
-                                    .all(|field| entry.contains_key(*field))
-                        }) || non_empty_string(owner.get("event_id")).is_none()
-                            || non_empty_string(owner.get("kind"))
-                                .is_none_or(|kind| !EXTERNAL_OWNER_KINDS.contains(&kind))
-                            || non_empty_string(owner.get("reference")).is_none()
-                    })
+                    || owners
+                        .iter()
+                        .any(|owner| !is_valid_external_owner_entry(owner))
             })
         }) {
             errors.push(format!(
@@ -3173,17 +3177,7 @@ fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
         }
         if let Some(owners) = payload.get("external_owners").and_then(Value::as_array)
             && !owners.is_empty()
-            && owners.iter().all(|owner| {
-                owner.as_object().is_some_and(|entry| {
-                    entry.len() == 3
-                        && ["event_id", "kind", "reference"]
-                            .iter()
-                            .all(|field| entry.contains_key(*field))
-                }) && non_empty_string(owner.get("event_id")).is_some()
-                    && non_empty_string(owner.get("kind"))
-                        .is_some_and(|kind| EXTERNAL_OWNER_KINDS.contains(&kind))
-                    && non_empty_string(owner.get("reference")).is_some()
-            })
+            && owners.iter().all(is_valid_external_owner_entry)
         {
             let coverage = payload
                 .get("adjudicated_event_ids")
