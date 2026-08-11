@@ -25,11 +25,20 @@ mind when deciding whether a change is really additive.
 |---|---|
 | Private helpers, tests, docs, fixtures (additively) | patch |
 | Added a public API item, a subcommand, an optional flag, a new installed package | patch or minor; minor if a consumer would want to opt in deliberately |
+| Changed the bytes of a live installed package — its prose or one of its references | **minor while `0.x`** |
 | Removed or renamed anything public, changed a flag or exit code, retired or renamed an installed package | **minor while `0.x`, major after `1.0.0`** |
 | Anything at all about the shape of a recorded event | Stop. Go to §2 before choosing a number. |
 
 While the crate is `0.x`, Cargo treats the minor position as the breaking one: `0.1.0` ↔ `0.1.1`
 compatible, `0.1.0` ↔ `0.2.0` not.
+
+The installed-package row is about the operational consequence, not about severity. A byte change
+to a live package is recoverable and breaks nothing —
+[`principles/consumer-contract.md`](principles/consumer-contract.md) reserves *breaking* on that
+surface for retiring or renaming a package. But it makes the consumer's next unforced
+`skills evidence install` refuse atomically with exit 3, and §6 then has to run once for each
+consumer. A patch says *take this automatically inside a compatible range*, which is the one thing
+such a release cannot be. Retiring or renaming is the row below, and §7 governs it.
 
 Do not cut `1.0.0` as a milestone. Cut it when the recorded-event shape has stopped moving.
 

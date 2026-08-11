@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-11T18:31:15.053739028Z",
+  "generated_at": "2026-08-11T20:22:16.999908766Z",
   "target_content_hash": "58ee690ec479d13e9ff51567f4e57087f319ac7a1aca6511d61c8628f5e43fa6",
-  "qualifying_uses_on_current_hash": 24,
+  "qualifying_uses_on_current_hash": 25,
   "open_incident_ids": [
     "evt_7814cfa8-ad78-4511-b202-f78ad96902d3",
     "evt_c5666704-0654-4a6f-9626-2deb557e1302",
@@ -50,5 +50,5 @@
   "review_reentry_basis": "post_review_incident",
   "target_name": "code-review",
   "target_repo_relative_path": ".claude/skills/code-review",
-  "derivation_session_id": "019ff1fd-82bb-7f00-8f59-d01a22ad00db"
+  "derivation_session_id": "019ff218-cdc3-7033-a3f0-03853108f7f4"
 }

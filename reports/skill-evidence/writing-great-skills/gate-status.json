@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-11T17:21:14.492204329Z",
+  "generated_at": "2026-08-11T20:21:33.578351796Z",
   "target_content_hash": "b243e73f963b932b4898e089a4babe97a2678ceb9b032f465485223d6905f570",
-  "qualifying_uses_on_current_hash": 7,
+  "qualifying_uses_on_current_hash": 8,
   "open_incident_ids": [
     "evt_ee269434-1b57-4abe-818b-c30a87a9e7d5",
     "evt_681398fd-9eda-4ff0-8053-12365f75a69f",
@@ -45,5 +45,5 @@
   "review_reentry_basis": null,
   "target_name": "writing-great-skills",
   "target_repo_relative_path": ".claude/skills/writing-great-skills",
-  "derivation_session_id": "019ff0d0-f8aa-7222-85f8-a44fe21cf323"
+  "derivation_session_id": "019ff218-cdc3-7033-a3f0-03853108f7f4"
 }

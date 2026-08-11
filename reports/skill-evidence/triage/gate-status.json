@@ -1,14 +1,15 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-11T18:01:54.623103112Z",
+  "generated_at": "2026-08-11T19:29:19.850693178Z",
   "target_content_hash": "9968ebd3d4508f01bb91ddac011c09330651bcea7c9a5fdcd9dcad593cb4f4bc",
-  "qualifying_uses_on_current_hash": 5,
+  "qualifying_uses_on_current_hash": 6,
   "open_incident_ids": [
     "evt_a6eaf146-e80f-4d8c-9346-16becd84a91d",
     "evt_35a84c74-5fa9-4319-aaa1-772400136d1d",
     "evt_ca0e092c-4275-48db-bb5a-d95ff7040473",
     "evt_ebe48487-5c26-4fd4-af46-20a06ede8ee8",
-    "evt_8059f523-efc3-4fe0-bb88-3082bebc2d53"
+    "evt_8059f523-efc3-4fe0-bb88-3082bebc2d53",
+    "evt_741ccc97-a4f0-445b-ab0c-64420bb4b31d"
   ],
   "candidate_clusters": [
     {
@@ -23,9 +24,10 @@
     {
       "symptom_key": "execution",
       "open_event_ids": [
-        "evt_8059f523-efc3-4fe0-bb88-3082bebc2d53"
+        "evt_8059f523-efc3-4fe0-bb88-3082bebc2d53",
+        "evt_741ccc97-a4f0-445b-ab0c-64420bb4b31d"
       ],
-      "independent_incidents": 1,
+      "independent_incidents": 2,
       "max_severity": "friction"
     }
   ],
@@ -40,7 +42,7 @@
   "review_reentry_basis": null,
   "target_name": "triage",
   "target_repo_relative_path": ".claude/skills/triage",
-  "derivation_session_id": "019ff1e8-2c87-7380-9441-d51458d04703",
+  "derivation_session_id": "1dd84272-5837-4931-b9ea-69a8583875bf",
   "instrument_limited_incident_ids": [
     "evt_35a84c74-5fa9-4319-aaa1-772400136d1d",
     "evt_ebe48487-5c26-4fd4-af46-20a06ede8ee8"
