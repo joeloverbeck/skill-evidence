@@ -1001,6 +1001,36 @@ fn installed_skill_evolution_reference_requires_pre_close_reach_bound_review() {
 }
 
 #[test]
+fn installed_skill_evolution_reference_freezes_coverage_at_claim() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains(
+            "The coverage list freezes when the review is claimed, so it includes every incident the authorization reason names at that point"
+        ),
+        "the installed operator must use the claim as the coverage freeze point"
+    );
+    assert!(
+        reference.contains(
+            "Incidents recorded after the claim and before the close remain outside coverage and inside the reason-specific reach"
+        ),
+        "the installed operator must disclose the residual claim-to-close span"
+    );
+    assert!(
+        !reference.contains(
+            "including incidents recorded before the threshold fired; incidents recorded after the close"
+        ),
+        "the installed operator must not partition coverage at first eligibility"
+    );
+}
+
+#[test]
 fn installed_skill_evolution_reference_ties_mismatch_disclosure_to_unvouched_sibling() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");

@@ -119,6 +119,29 @@ fn record_incident(root: &Path, label: &str, session: &str) {
     record_outcome(root, label, session, "execution", "friction");
 }
 
+fn record_clean_use(root: &Path, label: &str, session: &str) {
+    let output = skill_evidence()
+        .args(["skills", "evidence", "record", "--root"])
+        .arg(root)
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--outcome",
+            "clean",
+            "--task-label",
+            label,
+            "--session-id",
+            session,
+        ])
+        .output()
+        .expect("record clean fixture use");
+    assert!(
+        output.status.success(),
+        "clean record failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 fn record_outcome(root: &Path, label: &str, session: &str, symptom: &str, outcome: &str) -> String {
     let output = skill_evidence()
         .args(["skills", "evidence", "record", "--root"])
@@ -701,6 +724,259 @@ fn skill_evolution_preflight_authorizes_a_fresh_session_with_the_bounded_packet(
     assert_eq!(
         receipt["evidence_packet"]["prior_reviews"],
         serde_json::json!([])
+    );
+}
+
+#[test]
+fn skill_evolution_claim_freezes_current_reason_scoped_coverage() {
+    let fixture = repository_with_demo_skill();
+    let covered = [
+        ("task a", "session-a"),
+        ("task b", "session-b"),
+        ("task c", "session-c"),
+        ("task d", "session-d"),
+        ("task e", "session-e"),
+    ]
+    .map(|(label, session)| {
+        record_outcome(fixture.path(), label, session, "execution", "friction")
+    });
+    let covered_json = serde_json::to_value(&covered).expect("coverage JSON");
+
+    let output = run_evolution_preflight(
+        fixture.path(),
+        "lock_claim_time_coverage_preflight",
+        "fixture-session",
+    );
+
+    assert!(
+        output.status.success(),
+        "preflight failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let preflight: Value = serde_json::from_slice(&output.stdout).expect("preflight receipt JSON");
+    assert_eq!(preflight["gate"]["state"], "eligible");
+    assert_eq!(
+        preflight["gate"]["authorization_reason"],
+        "friction_recurrence:execution"
+    );
+    assert_eq!(preflight["gate"]["threshold_session_id"], "session-c");
+    assert_eq!(preflight["gate"]["trigger_event_ids"], covered_json);
+    assert_eq!(
+        preflight["evidence_packet"]["trigger_events"]
+            .as_array()
+            .expect("trigger events")
+            .iter()
+            .map(|event| event["event_id"].as_str().expect("trigger event id"))
+            .collect::<Vec<_>>(),
+        covered
+    );
+    assert_eq!(
+        gate(fixture.path())["review_reentry_basis"],
+        "first_eligibility"
+    );
+
+    let claim = claim_existing_evolution(fixture.path());
+
+    assert_eq!(claim["authorizing_rule"], "friction_recurrence:execution");
+    assert_eq!(claim["trigger_event_ids"], covered_json);
+    let stream = fs::read_to_string(
+        fixture
+            .path()
+            .join("reports/skill-evidence/demo-skill/events.jsonl"),
+    )
+    .expect("read event stream");
+    let started: Value = stream
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("event JSON"))
+        .find(|event| event["event_type"] == "review_started")
+        .expect("review_started event");
+    assert_eq!(started["payload"]["trigger_event_ids"], covered_json);
+    assert_eq!(
+        started["payload"]["authorizing_rule"],
+        "friction_recurrence:execution"
+    );
+    assert_eq!(
+        started["payload"]["session_or_cooldown_proof"],
+        serde_json::json!({
+            "type": "different_session",
+            "threshold_session_id": "session-c",
+            "review_session_id": "fixture-session"
+        })
+    );
+
+    let close = run_evolution_close(
+        fixture.path(),
+        "evt_claim_time_coverage_close",
+        "blocked_no_valid_test",
+        Some("the execution cluster cannot be tested by this instrument"),
+    );
+
+    assert!(
+        close.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&close.stderr)
+    );
+    let close: Value = serde_json::from_slice(&close.stdout).expect("close receipt JSON");
+    assert_eq!(close["adjudicated_event_ids"], covered_json);
+    assert_eq!(close["retired_from_gate_event_ids"], covered_json);
+}
+
+#[test]
+fn skill_evolution_claim_reanchors_material_coverage_without_absorbing_friction() {
+    let fixture = repository_with_demo_skill();
+    let friction_before = record_outcome(
+        fixture.path(),
+        "friction before eligibility",
+        "session-a",
+        "execution",
+        "friction",
+    );
+    let material_one = record_outcome(
+        fixture.path(),
+        "material one",
+        "session-b",
+        "execution",
+        "material_failure",
+    );
+    let material_two = record_outcome(
+        fixture.path(),
+        "material two",
+        "session-c",
+        "execution",
+        "material_failure",
+    );
+    let material_three = record_outcome(
+        fixture.path(),
+        "material after eligibility",
+        "session-d",
+        "execution",
+        "material_failure",
+    );
+    let friction_after = record_outcome(
+        fixture.path(),
+        "friction after eligibility",
+        "session-e",
+        "execution",
+        "friction",
+    );
+    let covered = serde_json::json!([material_one, material_two, material_three]);
+
+    let preflight = run_evolution_preflight(
+        fixture.path(),
+        "lock_material_claim_time_coverage",
+        "fixture-session",
+    );
+
+    assert!(
+        preflight.status.success(),
+        "preflight failed: {}",
+        String::from_utf8_lossy(&preflight.stderr)
+    );
+    let preflight: Value =
+        serde_json::from_slice(&preflight.stdout).expect("preflight receipt JSON");
+    assert_eq!(
+        preflight["gate"]["authorization_reason"],
+        "material_recurrence:execution"
+    );
+    assert_eq!(preflight["gate"]["threshold_session_id"], "session-c");
+    assert_eq!(preflight["gate"]["trigger_event_ids"], covered);
+
+    let claim = claim_existing_evolution(fixture.path());
+    assert_eq!(claim["trigger_event_ids"], covered);
+
+    let close = run_evolution_close(
+        fixture.path(),
+        "evt_material_claim_time_coverage_close",
+        "blocked_no_valid_test",
+        Some("the material execution cluster cannot be tested by this instrument"),
+    );
+    assert!(
+        close.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&close.stderr)
+    );
+    let close: Value = serde_json::from_slice(&close.stdout).expect("close receipt JSON");
+    assert_eq!(close["adjudicated_event_ids"], covered);
+    assert_eq!(close["retired_from_gate_event_ids"], covered);
+    assert_eq!(
+        gate(fixture.path())["candidate_clusters"][0]["open_event_ids"],
+        serde_json::json!([friction_before, friction_after])
+    );
+}
+
+#[test]
+fn skill_evolution_claim_reanchors_ten_use_coverage_within_its_anchor_cluster() {
+    let fixture = repository_with_demo_skill();
+    for serial in 1..=9 {
+        record_clean_use(
+            fixture.path(),
+            &format!("clean task {serial}"),
+            &format!("clean-session-{serial}"),
+        );
+    }
+    let anchor = record_outcome(
+        fixture.path(),
+        "ten-use anchor",
+        "anchor-session",
+        "output",
+        "friction",
+    );
+    let later_same_cluster = record_outcome(
+        fixture.path(),
+        "later output incident",
+        "later-output-session",
+        "output",
+        "friction",
+    );
+    let different_cluster = record_outcome(
+        fixture.path(),
+        "later execution incident",
+        "later-execution-session",
+        "execution",
+        "friction",
+    );
+    let covered = serde_json::json!([anchor, later_same_cluster]);
+
+    let preflight = run_evolution_preflight(
+        fixture.path(),
+        "lock_ten_use_claim_time_coverage",
+        "fixture-session",
+    );
+
+    assert!(
+        preflight.status.success(),
+        "preflight failed: {}",
+        String::from_utf8_lossy(&preflight.stderr)
+    );
+    let preflight: Value =
+        serde_json::from_slice(&preflight.stdout).expect("preflight receipt JSON");
+    assert_eq!(
+        preflight["gate"]["authorization_reason"],
+        "ten_use_unresolved"
+    );
+    assert_eq!(preflight["gate"]["threshold_session_id"], "anchor-session");
+    assert_eq!(preflight["gate"]["trigger_event_ids"], covered);
+
+    let claim = claim_existing_evolution(fixture.path());
+    assert_eq!(claim["trigger_event_ids"], covered);
+
+    let close = run_evolution_close(
+        fixture.path(),
+        "evt_ten_use_claim_time_coverage_close",
+        "blocked_no_valid_test",
+        Some("the output cluster cannot be tested by this instrument"),
+    );
+    assert!(
+        close.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&close.stderr)
+    );
+    let close: Value = serde_json::from_slice(&close.stdout).expect("close receipt JSON");
+    assert_eq!(close["adjudicated_event_ids"], covered);
+    assert_eq!(close["retired_from_gate_event_ids"], covered);
+    assert_eq!(
+        gate(fixture.path())["candidate_clusters"][0]["open_event_ids"],
+        serde_json::json!([different_cluster])
     );
 }
 

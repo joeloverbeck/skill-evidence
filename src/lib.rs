@@ -646,6 +646,34 @@ impl ThresholdReason {
     }
 }
 
+fn authorization_reason_names_incident(
+    reason: Option<&ThresholdReason>,
+    anchor_symptoms: &HashSet<&str>,
+    recorded: &UseRecordedEvent,
+) -> bool {
+    match reason {
+        Some(ThresholdReason::Severe) => false,
+        Some(ThresholdReason::TenUseUnresolved) => {
+            !recorded.retrospective
+                && recorded
+                    .symptom_key
+                    .as_deref()
+                    .is_some_and(|symptom| anchor_symptoms.contains(symptom))
+        }
+        Some(ThresholdReason::MaterialRecurrence(symptom)) => {
+            recorded.symptom_key.as_deref() == Some(symptom.as_str())
+                && recorded.outcome.severity() >= Outcome::MaterialFailure.severity()
+        }
+        Some(ThresholdReason::FrictionRecurrence(symptom)) => {
+            recorded.symptom_key.as_deref() == Some(symptom.as_str())
+        }
+        None => recorded
+            .symptom_key
+            .as_deref()
+            .is_some_and(|symptom| anchor_symptoms.contains(symptom)),
+    }
+}
+
 #[derive(Debug)]
 struct ThresholdTrigger {
     reason: ThresholdReason,
@@ -1413,13 +1441,14 @@ fn authorize_evolution(
     let hash = hash_target_directory(&target.target_real)?;
     let (events, integrity_errors) =
         read_event_stream(&target.evidence_directory.join("events.jsonl"))?;
-    let status = derive_gate(
+    let mut status = derive_gate(
         target,
         &hash.content_hash,
         &events,
         integrity_errors,
         inputs,
     );
+    reanchor_authorized_coverage(&mut status, &events);
     write_gate_status(&target.evidence_directory, &status)?;
     if status.state == "blocked" {
         return Err(evolution_refusal(
@@ -1470,6 +1499,55 @@ fn authorize_evolution(
         ));
     }
     Ok((events, hash, status))
+}
+
+fn reanchor_authorized_coverage(status: &mut GateStatus, events: &[EvidenceEvent]) {
+    let Some(reason) = status
+        .authorization_reason
+        .as_deref()
+        .and_then(ThresholdReason::parse)
+    else {
+        return;
+    };
+    let symptom = match &reason {
+        ThresholdReason::MaterialRecurrence(symptom)
+        | ThresholdReason::FrictionRecurrence(symptom) => symptom.clone(),
+        ThresholdReason::TenUseUnresolved => {
+            let Some(symptom) = status.trigger_event_ids.iter().find_map(|identity| {
+                events
+                    .iter()
+                    .find(|event| event.event_id == *identity)
+                    .and_then(EvidenceEvent::use_recorded)
+                    .and_then(|recorded| recorded.symptom_key.clone())
+            }) else {
+                return;
+            };
+            symptom
+        }
+        ThresholdReason::Severe => return,
+    };
+    let Some(cluster) = status
+        .candidate_clusters
+        .iter()
+        .find(|cluster| cluster.symptom_key == symptom)
+    else {
+        return;
+    };
+    let anchor_symptoms = [symptom.as_str()].into_iter().collect::<HashSet<_>>();
+    status.trigger_event_ids = cluster
+        .open_event_ids
+        .iter()
+        .filter(|identity| {
+            events
+                .iter()
+                .find(|event| event.event_id == **identity)
+                .and_then(EvidenceEvent::use_recorded)
+                .is_some_and(|recorded| {
+                    authorization_reason_names_incident(Some(&reason), &anchor_symptoms, recorded)
+                })
+        })
+        .cloned()
+        .collect();
 }
 
 fn read_valid_lifecycle_stream(target: &TargetContext) -> Result<Vec<EvidenceEvent>, Error> {
@@ -3020,10 +3098,11 @@ fn derive_gate(
     }
     // What an instrument-limited close retires, and how far.
     //
-    // The trigger list is frozen when the threshold fires, so incidents that arrive while
-    // the review runs are never in it. Retirement re-evaluates the review's own
-    // authorization reason at the close: it can reach later members of the authorized set,
-    // but not incidents that could never have contributed to that authorization.
+    // Current claims freeze coverage at the claim. Historical claims retain the coverage
+    // they recorded; neither shape is reinterpreted. Retirement re-evaluates the review's
+    // own authorization reason at the close: for current claims it can reach reason-scoped
+    // incidents that arrived between claim and close, but not incidents that could never
+    // have contributed to that authorization.
     //
     // Restricted to closes whose review ran against the current hash. A finding about what
     // this instrument cannot test says nothing about a target that has since changed.
@@ -3205,28 +3284,11 @@ fn derive_gate(
                     |(close, covered, symptoms, authorizing_reason)| {
                         covered.contains(event.event_id.as_str())
                             || (event_index < *close
-                                && match authorizing_reason {
-                                    Some(ThresholdReason::Severe) => false,
-                                    Some(ThresholdReason::TenUseUnresolved) => {
-                                        !recorded.retrospective
-                                            && recorded
-                                                .symptom_key
-                                                .as_deref()
-                                                .is_some_and(|symptom| symptoms.contains(symptom))
-                                    }
-                                    Some(ThresholdReason::MaterialRecurrence(symptom)) => {
-                                        recorded.symptom_key.as_deref() == Some(symptom.as_str())
-                                            && recorded.outcome.severity()
-                                                >= Outcome::MaterialFailure.severity()
-                                    }
-                                    Some(ThresholdReason::FrictionRecurrence(symptom)) => {
-                                        recorded.symptom_key.as_deref() == Some(symptom.as_str())
-                                    }
-                                    None => recorded
-                                        .symptom_key
-                                        .as_deref()
-                                        .is_some_and(|symptom| symptoms.contains(symptom)),
-                                })
+                                && authorization_reason_names_incident(
+                                    authorizing_reason.as_ref(),
+                                    symptoms,
+                                    recorded,
+                                ))
                     },
                 ));
         if open_incident {

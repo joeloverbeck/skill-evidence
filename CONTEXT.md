@@ -175,9 +175,11 @@ it.
 _Avoid_: terminal disposition, final disposition
 
 **Coverage list**:
-The event IDs a review records as covered when it closes — the trigger list frozen when the
-threshold fired, plus any events an adjudicating close explicitly names. It is what the close writes
-down, which is not the same as what the close costs, and not the same as what it concluded.
+The event IDs a review records as covered when it closes — for a newly claimed review, the trigger
+list re-derived from its authorization reason and frozen when the review is claimed, plus any events
+an adjudicating close explicitly names. Historical claims retain the trigger list they recorded; no
+stream is reinterpreted. It is what the close writes down, which is not the same as what the close
+costs, and not the same as what it concluded.
 _Avoid_: adjudicated set, trigger list, covered events
 
 **Untestable coverage**:
@@ -204,12 +206,12 @@ _Avoid_: dismissed, wontfix, closed-untestable
 **Retirement reach**:
 The open incidents one close moves out of the gate, at whichever scope that close retires. An
 instrument-limited close reaches the ones its review's own authorization reason still names when
-re-evaluated at the close: wider than the coverage list, because that list froze when the threshold
-fired, and never wider than what opened the gate. An adjudicating close reaches the untestable
-coverage it named, less anything the derivation declined to retire: always inside its coverage list,
-and never a contemporaneous severe incident. Distinct from the gate projection's standing retired
-set — a live per-hash view that later closes can grow or shrink. A close reports its own reach; the
-projection reports the standing set.
+re-evaluated at the close: wider than the coverage list only by incidents the reason names that
+arrived after the claim and before the close, and never wider than what opened the gate. An
+adjudicating close reaches the untestable coverage it named, less anything the derivation declined to
+retire: always inside its coverage list, and never a contemporaneous severe incident. Distinct from
+the gate projection's standing retired set — a live per-hash view that later closes can grow or
+shrink. A close reports its own reach; the projection reports the standing set.
 _Avoid_: retired set, instrument-limited set, covered evidence
 
 **Reach bound**:
