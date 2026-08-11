@@ -251,6 +251,14 @@ pub struct EvolutionCloseArgs {
     #[arg(long)]
     adjudicate: Vec<String>,
     #[arg(long)]
+    concluded: Vec<String>,
+    #[arg(
+        long,
+        num_args = 3,
+        value_names = ["EVENT_ID", "KIND", "REFERENCE"]
+    )]
+    external_owner: Vec<String>,
+    #[arg(long)]
     instrument_limited: Vec<String>,
     #[arg(long)]
     trials: Option<String>,
@@ -462,16 +470,36 @@ fn run_skill_evolution(
                 disposition,
                 note,
                 adjudicate,
+                concluded,
+                external_owner,
                 instrument_limited,
                 trials,
                 artifacts,
             } = args;
             let (root, target, inputs) = lifecycle_event_inputs(event, "skill-evolution", host)?;
+            let external_owners = external_owner
+                .chunks_exact(3)
+                .map(|owner| {
+                    let kind = crate::ExternalOwnerKind::parse(&owner[1]).ok_or_else(|| {
+                        CliError::MissingInput(format!(
+                            "--external-owner KIND must be one of {}.",
+                            crate::ExternalOwnerKind::roster().join("|")
+                        ))
+                    })?;
+                    Ok(crate::ExternalOwner {
+                        event_id: owner[0].clone(),
+                        kind,
+                        reference: owner[2].clone(),
+                    })
+                })
+                .collect::<Result<Vec<_>, CliError>>()?;
             let request = crate::EvolutionCloseRequest {
                 review_id: review_id.unwrap_or_default(),
                 disposition: disposition.unwrap_or_default(),
                 note: note.unwrap_or_default(),
                 adjudicate,
+                concluded,
+                external_owners,
                 instrument_limited,
                 trials,
                 artifacts,

@@ -62,6 +62,14 @@ const EVOLUTION_ADJUDICATING_DISPOSITIONS: &[&str] = &[
 /// The events stay in the stream forever and stay open in the projection; they
 /// stop driving a gate whose own instrument proved unable to act on them.
 const EVOLUTION_INSTRUMENT_LIMITED_DISPOSITIONS: &[&str] = &["blocked_no_valid_test"];
+const EXTERNAL_OWNER_KINDS: &[&str] = &[
+    "skill",
+    "contract",
+    "tool",
+    "environment",
+    "model_limitation",
+    "user_instruction",
+];
 const USE_PAYLOAD_KEYS: &[&str] = &[
     "qualifying_use",
     "retrospective",
@@ -198,12 +206,58 @@ pub struct EvolutionLandRequest {
     pub candidate: PathBuf,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExternalOwnerKind {
+    Skill,
+    Contract,
+    Tool,
+    Environment,
+    ModelLimitation,
+    UserInstruction,
+}
+
+impl ExternalOwnerKind {
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "skill" => Some(Self::Skill),
+            "contract" => Some(Self::Contract),
+            "tool" => Some(Self::Tool),
+            "environment" => Some(Self::Environment),
+            "model_limitation" => Some(Self::ModelLimitation),
+            "user_instruction" => Some(Self::UserInstruction),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn roster() -> &'static [&'static str] {
+        EXTERNAL_OWNER_KINDS
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ExternalOwner {
+    pub event_id: String,
+    pub kind: ExternalOwnerKind,
+    pub reference: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvolutionCloseRequest {
     pub review_id: String,
     pub disposition: String,
     pub note: String,
     pub adjudicate: Vec<String>,
+    /// Coverage this adjudicating close reached a conclusion about. Together with
+    /// [`Self::instrument_limited`], this must explicitly partition the complete
+    /// coverage list before the close can append its irreversible event.
+    pub concluded: Vec<String>,
+    /// The positive external owner of each concluded event when the disposition is
+    /// `outside_target`. Each owner is bound to one event rather than asserted once for
+    /// the whole review.
+    pub external_owners: Vec<ExternalOwner>,
     /// Coverage this review could not decide: either no trial could express the
     /// mechanism they record, or the acceptance gate grades outcome while their evidence
     /// bears no outcome claim. A subset of the coverage list, and possibly all of it —
@@ -1173,8 +1227,8 @@ pub fn evolution_land(
 
 /// Appends the identities not already present, preserving caller order.
 ///
-/// Both event-id lists a close writes go through this: they land in an append-only event
-/// that can never be corrected, so a repeated flag must not record a duplicate.
+/// The coverage list uses this for additional `--adjudicate` names. Explicit terminal
+/// routes are stricter: repeating either route is refused rather than deduplicated.
 fn extend_without_duplicates(destination: &mut Vec<String>, additions: &[String]) {
     for identity in additions {
         if !destination.contains(identity) {
@@ -1226,6 +1280,14 @@ pub fn evolution_close(
     {
         return Err(refusal(format!(
             "--adjudicate is not allowed with non-adjudicating disposition {}. Nothing done.",
+            request.disposition
+        )));
+    }
+    if !EVOLUTION_ADJUDICATING_DISPOSITIONS.contains(&request.disposition.as_str())
+        && !request.concluded.is_empty()
+    {
+        return Err(refusal(format!(
+            "--concluded is not allowed with non-adjudicating disposition {}. Nothing done.",
             request.disposition
         )));
     }
@@ -1342,6 +1404,27 @@ pub fn evolution_close(
     }
     let mut adjudicated = trigger_event_ids;
     extend_without_duplicates(&mut adjudicated, &request.adjudicate);
+    for (flag, routes) in [
+        ("--concluded", request.concluded.as_slice()),
+        (
+            "--instrument-limited",
+            request.instrument_limited.as_slice(),
+        ),
+    ] {
+        let mut seen = HashSet::new();
+        if let Some(duplicate) = routes.iter().find(|identity| !seen.insert(*identity)) {
+            return Err(refusal(format!(
+                "{flag} names event {duplicate} more than once. Nothing done."
+            )));
+        }
+    }
+    for identity in &request.concluded {
+        if !adjudicated.contains(identity) {
+            return Err(refusal(format!(
+                "--concluded {identity} is not in this review's coverage list. Nothing done."
+            )));
+        }
+    }
     // Naming untestable coverage narrows what the close concluded; it never widens what
     // the close accounted for. An event outside the coverage list is one this review has
     // no standing to report anything about, testable or not — so refuse rather than
@@ -1351,6 +1434,60 @@ pub fn evolution_close(
             return Err(refusal(format!(
                 "--instrument-limited {identity} is not in this review's coverage list; it can only narrow what the close concluded, never widen what it covered. Nothing done."
             )));
+        }
+    }
+    if EVOLUTION_ADJUDICATING_DISPOSITIONS.contains(&request.disposition.as_str()) {
+        for identity in &adjudicated {
+            match (
+                request.concluded.contains(identity),
+                request.instrument_limited.contains(identity),
+            ) {
+                (true, false) | (false, true) => {}
+                (false, false) => {
+                    return Err(refusal(format!(
+                        "Covered event {identity} has no explicit route; pass --concluded {identity} or --instrument-limited {identity}. Nothing done."
+                    )));
+                }
+                (true, true) => {
+                    return Err(refusal(format!(
+                        "Covered event {identity} has conflicting --concluded and --instrument-limited routes. Nothing done."
+                    )));
+                }
+            }
+        }
+    }
+    if request.disposition != "outside_target" && !request.external_owners.is_empty() {
+        return Err(refusal(format!(
+            "--external-owner is allowed only with disposition outside_target, not {}. Nothing done.",
+            request.disposition
+        )));
+    }
+    if request.disposition == "outside_target" {
+        for owner in &request.external_owners {
+            if owner.reference.is_empty() {
+                return Err(refusal(format!(
+                    "--external-owner REFERENCE must be non-empty for event {}. Nothing done.",
+                    owner.event_id
+                )));
+            }
+            if !request.concluded.contains(&owner.event_id) {
+                return Err(refusal(format!(
+                    "--external-owner event {} is not in this close's concluded route. Nothing done.",
+                    owner.event_id
+                )));
+            }
+        }
+        for identity in &request.concluded {
+            let owner_count = request
+                .external_owners
+                .iter()
+                .filter(|owner| owner.event_id == *identity)
+                .count();
+            if owner_count != 1 {
+                return Err(refusal(format!(
+                    "Concluded outside_target event {identity} requires exactly one --external-owner {identity} <KIND> <REFERENCE>. Nothing done."
+                )));
+            }
         }
     }
     // Naming the whole coverage list is allowed, and deliberately so. A review can decide
@@ -1371,12 +1508,14 @@ pub fn evolution_close(
         "operating_package_matches_shipped": operating_package.matches_shipped
     });
     if !request.instrument_limited.is_empty() {
-        // Deduplicated like the coverage list beside it. The event is append-only and this
-        // list can never be corrected, so a repeated flag must not record a shape
-        // `adjudicated_event_ids` could never take.
-        let mut named = Vec::new();
-        extend_without_duplicates(&mut named, &request.instrument_limited);
-        payload["instrument_limited_event_ids"] = serde_json::json!(named);
+        // Route validation above already refused repetition. Preserve the operator's
+        // explicit order so the immutable event remains an inspectable rendering of the
+        // accepted request.
+        payload["instrument_limited_event_ids"] = serde_json::json!(request.instrument_limited);
+    }
+    if !request.external_owners.is_empty() {
+        payload["external_owners"] = serde_json::to_value(&request.external_owners)
+            .expect("external owners always serialize");
     }
     if let Some(trial_count) = trial_count {
         payload["trial_count"] = serde_json::json!(trial_count);
@@ -1392,7 +1531,8 @@ pub fn evolution_close(
         payload,
         inputs,
     );
-    let after = append_lifecycle_event(&target, &hash, &mut events, event, &derivation_inputs)?;
+    let prepared = prepare_lifecycle_event(&target, &hash, &mut events, event, &derivation_inputs)?;
+    let after = &prepared.status;
     let mut receipt = serde_json::json!({
         "closed": request.review_id,
         "disposition": request.disposition,
@@ -1431,6 +1571,7 @@ pub fn evolution_close(
             .collect::<Vec<_>>();
         receipt["retired_from_gate_event_ids"] = serde_json::json!(retirement_reach);
     }
+    append_prepared_lifecycle_event(&target, &prepared)?;
     Ok(receipt)
 }
 
@@ -1693,7 +1834,7 @@ fn evolution_evidence_packet(
                 if target.evidence_directory.join(&report).is_file() {
                     prior["report"] = serde_json::json!(report);
                 }
-                for field in ["trial_count", "artifacts_path"] {
+                for field in ["trial_count", "artifacts_path", "external_owners"] {
                     if let Some(value) = event.raw.pointer(&format!("/payload/{field}")) {
                         prior[field] = value.clone();
                     }
@@ -1806,13 +1947,19 @@ fn lifecycle_event(
     })
 }
 
-fn append_lifecycle_event(
+struct PreparedLifecycleEvent {
+    event: Value,
+    status: GateStatus,
+    projection_temporary: PathBuf,
+}
+
+fn prepare_lifecycle_event(
     target: &TargetContext,
     current_hash: &str,
     events: &mut Vec<EvidenceEvent>,
     event: Value,
     inputs: &DerivationInputs,
-) -> Result<GateStatus, Error> {
+) -> Result<PreparedLifecycleEvent, Error> {
     let seen_ids = events
         .iter()
         .map(|existing| existing.event_id.clone())
@@ -1828,13 +1975,24 @@ fn append_lifecycle_event(
     let status = derive_gate(target, current_hash, events, Vec::new(), inputs);
     let projection_temporary = target.evidence_directory.join(".gate-status.json.tmp");
     prepare_gate_status(&projection_temporary, &status)?;
+    Ok(PreparedLifecycleEvent {
+        event,
+        status,
+        projection_temporary,
+    })
+}
+
+fn append_prepared_lifecycle_event(
+    target: &TargetContext,
+    prepared: &PreparedLifecycleEvent,
+) -> Result<(), Error> {
     let events_path = target.evidence_directory.join("events.jsonl");
-    if let Err(error) = append_lifecycle_event_line(&events_path, &event) {
-        let _ = fs::remove_file(&projection_temporary);
+    if let Err(error) = append_lifecycle_event_line(&events_path, &prepared.event) {
+        let _ = fs::remove_file(&prepared.projection_temporary);
         return Err(error);
     }
     let projection = target.evidence_directory.join("gate-status.json");
-    fs::rename(&projection_temporary, &projection).map_err(|error| {
+    fs::rename(&prepared.projection_temporary, &projection).map_err(|error| {
         unsafe_failure_with_recovery(
             format!(
                 "Evidence event appended, but the gate projection could not be atomically replaced ({}).",
@@ -1843,6 +2001,19 @@ fn append_lifecycle_event(
             Recovery::RederiveGate,
         )
     })?;
+    Ok(())
+}
+
+fn append_lifecycle_event(
+    target: &TargetContext,
+    current_hash: &str,
+    events: &mut Vec<EvidenceEvent>,
+    event: Value,
+    inputs: &DerivationInputs,
+) -> Result<GateStatus, Error> {
+    let prepared = prepare_lifecycle_event(target, current_hash, events, event, inputs)?;
+    let status = prepared.status.clone();
+    append_prepared_lifecycle_event(target, &prepared)?;
     Ok(status)
 }
 
@@ -2473,6 +2644,9 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
                     encoded_json(instrument_limited),
                 ));
             }
+            if let Some(external_owners) = payload.get("external_owners") {
+                parts.push(("external_owners", encoded_json(external_owners)));
+            }
             parts.push(("note", encoded_json(&payload["note"])));
             if let Some(trial_count) = payload.get("trial_count") {
                 parts.push(("trial_count", encoded_json(trial_count)));
@@ -2975,6 +3149,75 @@ fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
                 "instrument_limited_event_ids must be a non-empty array of event ids when present"
                     .to_owned(),
             );
+        }
+        if payload.get("external_owners").is_some_and(|value| {
+            value.as_array().is_none_or(|owners| {
+                owners.is_empty()
+                    || owners.iter().any(|owner| {
+                        owner.as_object().is_none_or(|entry| {
+                            entry.len() != 3
+                                || !["event_id", "kind", "reference"]
+                                    .iter()
+                                    .all(|field| entry.contains_key(*field))
+                        }) || non_empty_string(owner.get("event_id")).is_none()
+                            || non_empty_string(owner.get("kind"))
+                                .is_none_or(|kind| !EXTERNAL_OWNER_KINDS.contains(&kind))
+                            || non_empty_string(owner.get("reference")).is_none()
+                    })
+            })
+        }) {
+            errors.push(format!(
+                "external_owners must be a non-empty array of objects containing exactly event_id, kind ({}), and reference when present",
+                EXTERNAL_OWNER_KINDS.join("|")
+            ));
+        }
+        if let Some(owners) = payload.get("external_owners").and_then(Value::as_array)
+            && !owners.is_empty()
+            && owners.iter().all(|owner| {
+                owner.as_object().is_some_and(|entry| {
+                    entry.len() == 3
+                        && ["event_id", "kind", "reference"]
+                            .iter()
+                            .all(|field| entry.contains_key(*field))
+                }) && non_empty_string(owner.get("event_id")).is_some()
+                    && non_empty_string(owner.get("kind"))
+                        .is_some_and(|kind| EXTERNAL_OWNER_KINDS.contains(&kind))
+                    && non_empty_string(owner.get("reference")).is_some()
+            })
+        {
+            let coverage = payload
+                .get("adjudicated_event_ids")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>();
+            let undecidable = payload
+                .get("instrument_limited_event_ids")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect::<HashSet<_>>();
+            let concluded = coverage
+                .iter()
+                .copied()
+                .filter(|identity| !undecidable.contains(identity))
+                .collect::<HashSet<_>>();
+            let owner_ids = owners
+                .iter()
+                .filter_map(|owner| owner["event_id"].as_str())
+                .collect::<Vec<_>>();
+            let owner_id_set = owner_ids.iter().copied().collect::<HashSet<_>>();
+            if payload.get("disposition").and_then(Value::as_str) != Some("outside_target")
+                || owner_ids.len() != owner_id_set.len()
+                || owner_id_set != concluded
+            {
+                errors.push(
+                    "external_owners, when present, must name each concluded coverage event exactly once on an outside_target disposition"
+                        .to_owned(),
+                );
+            }
         }
         if payload
             .get("trial_count")

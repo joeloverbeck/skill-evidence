@@ -537,6 +537,77 @@ fn installed_event_schema_keeps_untestable_coverage_optional_and_open() {
 }
 
 #[test]
+fn installed_outside_target_owner_contract_matches_the_published_schema() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let schema: serde_json::Value = serde_json::from_slice(
+        &fs::read(
+            root.path()
+                .join("schemas/skill-evidence/event.v1.schema.json"),
+        )
+        .expect("read installed event schema"),
+    )
+    .expect("installed event schema JSON");
+    let payload = schema
+        .pointer("/allOf/1/then/properties/payload")
+        .expect("review_disposition payload schema");
+    let owners = &payload["properties"]["external_owners"];
+    assert_eq!(owners["type"], "array");
+    assert_eq!(
+        owners["items"]["required"],
+        serde_json::json!(["event_id", "kind", "reference"])
+    );
+    let kinds = owners["items"]["properties"]["kind"]["enum"]
+        .as_array()
+        .expect("external owner kind enum")
+        .iter()
+        .map(|kind| kind.as_str().expect("external owner kind"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        kinds,
+        vec![
+            "skill",
+            "contract",
+            "tool",
+            "environment",
+            "model_limitation",
+            "user_instruction"
+        ]
+    );
+    assert_eq!(
+        kinds,
+        skill_evidence::ExternalOwnerKind::roster(),
+        "compiled close and installed schema must share one owner-kind roster"
+    );
+    assert!(!kinds.contains(&"caller"));
+    assert!(!kinds.contains(&"session"));
+    assert!(
+        !payload["required"]
+            .as_array()
+            .expect("required review_disposition properties")
+            .iter()
+            .any(|field| field == "external_owners"),
+        "absent means no owner was recorded; historical outside_target events stay readable"
+    );
+    assert!(
+        payload.get("additionalProperties").is_none(),
+        "a stale installed schema must keep accepting the new optional payload key"
+    );
+
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+    for kind in kinds {
+        assert!(
+            reference.contains(&format!("| `{kind}` |")),
+            "installed ownership table must expose schema kind `{kind}`: {reference}"
+        );
+    }
+}
+
+#[test]
 fn installed_event_schema_declares_operating_skill_hash_as_optional_and_open() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
@@ -868,6 +939,31 @@ fn installed_skill_evolution_reference_routes_untestable_coverage_out_of_adjudic
 }
 
 #[test]
+fn installed_skill_evolution_reference_makes_every_close_route_explicit_and_inspectable() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    for required in [
+        "For every event in the coverage list, add exactly one `--concluded <event-id>` or `--instrument-limited <event-id>`",
+        "Missing, duplicate, conflicting, unknown, and out-of-coverage routes refuse before any write",
+        "For every concluded `outside_target` event, add `--external-owner <event-id> <kind> <stable-reference>`",
+        "- Trigger event → ownership class → owning source → discriminating evidence:",
+        "- Trigger event → binding constraint → terminal route:",
+        "- Undecidable ground: reproduction instrument/acceptance gate/not applicable",
+    ] {
+        assert!(
+            reference.contains(required),
+            "installed close workflow must preserve `{required}`: {reference}"
+        );
+    }
+}
+
+#[test]
 fn installed_skill_evolution_reference_bars_a_verdict_conformance_only_evidence_cannot_bear() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
@@ -918,9 +1014,9 @@ fn installed_skill_evolution_reference_names_which_instrument_limit_a_conformanc
     );
     assert!(
         reference.contains(
-            "A non-proceeding class from step 3 never reaches that gate, so this ground does not touch it"
+            "A candidate target or target-compliance defect whose ownership the packet cannot decide proceeds to step 4"
         ),
-        "an ownership or independence verdict is reached without step 7, so the outcome bar cannot make it name every conformance-only trigger"
+        "an unresolved ownership candidate must reach the existing reproduction-instrument ground rather than becoming an outside_target conclusion by omission"
     );
     assert!(
         reference.contains(
@@ -930,9 +1026,9 @@ fn installed_skill_evolution_reference_names_which_instrument_limit_a_conformanc
     );
     assert!(
         reference.contains(
-            "Choose `blocked_no_valid_test` only when no trial could express any mechanism"
+            "Choose `blocked_no_valid_test` only when the review has concluded about no covered trigger and no trial could express any mechanism"
         ),
-        "that disposition reaches its authorization reason's whole cluster, so a review that merely could not decide its coverage must not be sent there"
+        "an adjudicating sibling conclusion must keep the review on its honest mixed close even when another trigger is instrument-limited"
     );
     assert!(
         reference.contains("Both grounds must already be on record before the close"),
@@ -952,9 +1048,9 @@ fn installed_skill_evolution_reference_keeps_its_no_candidate_route_consistent_w
 
     assert!(
         reference.contains(
-            "Otherwise carry `monitor_for_recurrence` and name every unexpressible mechanism's triggers at step 9"
+            "Otherwise keep the disposition for a conclusion already reached, or carry `monitor_for_recurrence`, and route every unable-to-be-expressed mechanism's triggers undecidable at step 9"
         ),
-        "a review with one unexpressible mechanism and one merely not reproduced must not be sent to the whole-cluster disposition"
+        "a review with one concluded trigger and one unexpressible mechanism must retain its conclusion instead of falling onto the whole-cluster disposition"
     );
 }
 

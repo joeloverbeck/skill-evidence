@@ -211,6 +211,30 @@
                 "items": { "type": "string", "minLength": 1 },
                 "description": "Subset of adjudicated_event_ids this review could not decide: either no trial could express the mechanism those events record, or the acceptance gate grades outcome while their evidence bears no outcome claim. Asserts nothing about whether the mechanism reproduced. Omitted when the review decided everything it covered, which is what every close written before this key existed asserts."
               },
+              "external_owners": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["event_id", "kind", "reference"],
+                  "properties": {
+                    "event_id": { "type": "string", "minLength": 1 },
+                    "kind": {
+                      "enum": [
+                        "skill",
+                        "contract",
+                        "tool",
+                        "environment",
+                        "model_limitation",
+                        "user_instruction"
+                      ]
+                    },
+                    "reference": { "type": "string", "minLength": 1 }
+                  },
+                  "additionalProperties": false
+                },
+                "description": "Positive external owner recorded per concluded event by an outside_target close. Omitted when no owner was recorded, including every close written before this key existed."
+              },
               "trial_count": {
                 "type": "integer",
                 "minimum": 1,

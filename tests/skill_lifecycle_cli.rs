@@ -234,6 +234,36 @@ fn claim_existing_evolution_as(
     serde_json::from_slice(&output.stdout).expect("claim receipt JSON")
 }
 
+fn review_coverage(root: &Path, review_id: &str) -> Vec<String> {
+    let stream = fs::read_to_string(root.join("reports/skill-evidence/demo-skill/events.jsonl"))
+        .expect("read event stream for review coverage");
+    stream
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("event JSON"))
+        .find(|event| {
+            event["event_type"] == "review_started" && event["payload"]["review_id"] == review_id
+        })
+        .expect("review_started event for coverage")["payload"]["trigger_event_ids"]
+        .as_array()
+        .expect("trigger event ids")
+        .iter()
+        .map(|identity| identity.as_str().expect("trigger event id").to_owned())
+        .collect()
+}
+
+fn add_concluded_coverage_routes(
+    command: &mut Command,
+    root: &Path,
+    review_id: &str,
+    undecidable: &[&str],
+) {
+    for identity in review_coverage(root, review_id) {
+        if !undecidable.contains(&identity.as_str()) {
+            command.args(["--concluded", &identity]);
+        }
+    }
+}
+
 fn make_candidate(root: &Path, body: &str) -> std::path::PathBuf {
     let candidate = root.join("reports/skill-evidence/demo-skill/reviews/candidate");
     fs::create_dir_all(&candidate).expect("create candidate");
@@ -359,6 +389,18 @@ fn run_evolution_close_for_review(
         ]);
     if let Some(note) = note {
         command.args(["--note", note]);
+    }
+    if [
+        "resolved_by_change",
+        "closed_no_skill_defect",
+        "outside_target",
+        "insufficient_independence",
+        "monitor_for_recurrence",
+        "candidate_rejected_validation",
+    ]
+    .contains(&disposition)
+    {
+        add_concluded_coverage_routes(&mut command, root, review_id, &[]);
     }
     lifecycle_clock(
         &mut command,
@@ -1223,6 +1265,7 @@ fn skill_evolution_preflight_carries_prior_close_validation_effort() {
             "--artifacts",
             "reports/skill-evidence/demo-skill/reviews/rev_fixture/trials",
         ]);
+    add_concluded_coverage_routes(&mut close, fixture.path(), "rev_fixture", &[]);
     lifecycle_clock(&mut close, "lock_prior_close_with_effort");
     let close = close.output().expect("close review with asserted effort");
     assert!(
@@ -2026,6 +2069,7 @@ fn naming_already_retired_coverage_adds_nothing_to_this_closes_reach() {
             "--instrument-limited",
             &already_retired,
         ]);
+    add_concluded_coverage_routes(&mut command, fixture.path(), "rev_second", &[]);
     lifecycle_clock(&mut command, "lock_second_close");
 
     let output = command.output().expect("close second review");
@@ -2147,6 +2191,7 @@ fn skill_evolution_close_records_optional_validation_effort_as_asserted() {
             "--artifacts",
             "reports/skill-evidence/demo-skill/reviews/rev_fixture/trials",
         ]);
+    add_concluded_coverage_routes(&mut command, fixture.path(), "rev_fixture", &[]);
     lifecycle_clock(&mut command, "lock_close_with_effort");
 
     let output = command.output().expect("close review with asserted effort");
@@ -2256,6 +2301,7 @@ fn skill_evolution_close_records_the_disposition_and_retires_the_trigger_events(
             "--note",
             "mechanism repaired and validated",
         ]);
+    add_concluded_coverage_routes(&mut command, fixture.path(), "rev_fixture", &[]);
     lifecycle_clock(&mut command, "lock_evolution_close");
 
     let output = command.output().expect("close Skill Evolution review");
@@ -2327,6 +2373,7 @@ fn skill_evolution_close_records_coverage_its_instrument_could_not_test() {
             "--instrument-limited",
             &untestable,
         ]);
+    add_concluded_coverage_routes(&mut command, fixture.path(), "rev_fixture", &[&untestable]);
     lifecycle_clock(&mut command, "lock_evolution_close");
 
     let output = command.output().expect("close Skill Evolution review");
@@ -2375,6 +2422,799 @@ fn skill_evolution_close_records_coverage_its_instrument_could_not_test() {
     assert_event_stream_matches_the_published_schema(fixture.path());
 }
 
+#[test]
+fn adjudicating_close_refuses_when_any_covered_event_has_no_explicit_route() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let triggers = claim["trigger_event_ids"]
+        .as_array()
+        .expect("trigger event ids");
+    let store = fixture.path().join("reports/skill-evidence/demo-skill");
+    let stream_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("read gate projection before refusal");
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_close_with_omitted_route",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "monitor_for_recurrence",
+            "--note",
+            "two triggers were decided and one route was omitted",
+            "--concluded",
+            triggers[0].as_str().expect("first trigger event id"),
+            "--concluded",
+            triggers[1].as_str().expect("second trigger event id"),
+        ]);
+    lifecycle_clock(&mut command, "lock_close_with_omitted_route");
+
+    let output = command.output().expect("close with omitted route");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        error.contains(triggers[2].as_str().expect("omitted trigger event id")),
+        "refusal must name the covered event without a route: {error}"
+    );
+    assert_eq!(
+        fs::read(&stream_path).expect("read event stream after refusal"),
+        stream_before,
+        "a missing route must append no event"
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before,
+        "a missing route must not rewrite the projection"
+    );
+}
+
+#[test]
+fn outside_target_close_records_one_owned_conclusion_and_one_undecidable_trigger() {
+    let fixture = repository_with_demo_skill();
+    let concluded = record_outcome(
+        fixture.path(),
+        "owned by another skill",
+        "owner-session",
+        "execution",
+        "material_failure",
+    );
+    let undecidable = record_outcome(
+        fixture.path(),
+        "requires accumulated context",
+        "instrument-session",
+        "execution",
+        "material_failure",
+    );
+    let claim = claim_existing_evolution(fixture.path());
+    assert_eq!(
+        claim["trigger_event_ids"],
+        serde_json::json!([concluded, undecidable]),
+        "the fixture must reproduce the issue's exact two-trigger coverage shape"
+    );
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_mixed_outside_target_close",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "outside_target",
+            "--note",
+            "one trigger belongs to code-review; one cannot be tested here",
+            "--concluded",
+            &concluded,
+            "--instrument-limited",
+            &undecidable,
+            "--external-owner",
+            &concluded,
+            "skill",
+            ".claude/skills/code-review",
+        ]);
+    lifecycle_clock(&mut command, "lock_mixed_outside_target_close");
+
+    let output = command.output().expect("close mixed outside-target review");
+
+    assert!(
+        output.status.success(),
+        "mixed close failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stream = fs::read_to_string(
+        fixture
+            .path()
+            .join("reports/skill-evidence/demo-skill/events.jsonl"),
+    )
+    .expect("read event stream");
+    let disposition: Value = stream
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("event JSON"))
+        .find(|event| event["event_id"] == "evt_mixed_outside_target_close")
+        .expect("mixed review_disposition event");
+    assert_eq!(
+        disposition["payload"]["external_owners"],
+        serde_json::json!([{
+            "event_id": concluded,
+            "kind": "skill",
+            "reference": ".claude/skills/code-review"
+        }])
+    );
+    assert_eq!(
+        disposition["payload"]["instrument_limited_event_ids"],
+        serde_json::json!([undecidable])
+    );
+    let projection = gate(fixture.path());
+    assert_eq!(
+        projection["open_incident_ids"],
+        serde_json::json!([undecidable])
+    );
+    assert_eq!(
+        projection["instrument_limited_incident_ids"],
+        serde_json::json!([undecidable])
+    );
+    assert_event_stream_matches_the_published_schema(fixture.path());
+}
+
+#[test]
+fn later_review_packet_preserves_each_outside_target_conclusions_external_owner() {
+    let fixture = repository_with_demo_skill();
+    let first = record_outcome(
+        fixture.path(),
+        "owned by a skill",
+        "first-owner-session",
+        "execution",
+        "material_failure",
+    );
+    let second = record_outcome(
+        fixture.path(),
+        "owned by a contract",
+        "second-owner-session",
+        "execution",
+        "material_failure",
+    );
+    claim_existing_evolution(fixture.path());
+    let mut close = skill_evidence();
+    close
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_owned_green_control_close",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "outside_target",
+            "--note",
+            "each trigger has a distinct positive owner",
+            "--concluded",
+            &first,
+            "--external-owner",
+            &first,
+            "skill",
+            ".claude/skills/code-review",
+            "--concluded",
+            &second,
+            "--external-owner",
+            &second,
+            "contract",
+            "docs/principles/consumer-contract.md#recorded-evidence",
+        ]);
+    lifecycle_clock(&mut close, "lock_owned_green_control_close");
+    let close = close.output().expect("close owned green control");
+    assert!(
+        close.status.success(),
+        "green-control close failed: {}",
+        String::from_utf8_lossy(&close.stderr)
+    );
+
+    record_outcome(
+        fixture.path(),
+        "later output one",
+        "later-session-one",
+        "output",
+        "material_failure",
+    );
+    record_outcome(
+        fixture.path(),
+        "later output two",
+        "later-session-two",
+        "output",
+        "material_failure",
+    );
+    let preflight = run_evolution_preflight(
+        fixture.path(),
+        "lock_preflight_owned_green_control",
+        "next-review-session",
+    );
+    assert!(
+        preflight.status.success(),
+        "later preflight failed: {}",
+        String::from_utf8_lossy(&preflight.stderr)
+    );
+    let receipt: Value =
+        serde_json::from_slice(&preflight.stdout).expect("later preflight receipt JSON");
+
+    assert_eq!(
+        receipt["evidence_packet"]["prior_reviews"][0]["external_owners"],
+        serde_json::json!([
+            {
+                "event_id": first,
+                "kind": "skill",
+                "reference": ".claude/skills/code-review"
+            },
+            {
+                "event_id": second,
+                "kind": "contract",
+                "reference": "docs/principles/consumer-contract.md#recorded-evidence"
+            }
+        ])
+    );
+}
+
+#[test]
+fn outside_target_close_refuses_a_conclusion_without_an_external_owner_write_free() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let triggers = claim["trigger_event_ids"]
+        .as_array()
+        .expect("trigger event ids");
+    let store = fixture.path().join("reports/skill-evidence/demo-skill");
+    let stream_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("read gate projection before refusal");
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_ownerless_outside_target_close",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "outside_target",
+            "--note",
+            "an owner was not named",
+        ]);
+    for trigger in triggers {
+        command.args([
+            "--concluded",
+            trigger.as_str().expect("concluded trigger event id"),
+        ]);
+    }
+    lifecycle_clock(&mut command, "lock_ownerless_outside_target_close");
+
+    let output = command.output().expect("close without an external owner");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        error.contains(triggers[0].as_str().expect("ownerless trigger event id")),
+        "refusal must name a concluded event without an owner: {error}"
+    );
+    assert_eq!(
+        fs::read(&stream_path).expect("read event stream after refusal"),
+        stream_before,
+        "an ownerless outside-target conclusion must append no event"
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before,
+        "an ownerless outside-target conclusion must not rewrite the projection"
+    );
+}
+
+#[test]
+fn adjudicating_close_refuses_duplicate_route_names_write_free() {
+    for duplicated_route in ["--concluded", "--instrument-limited"] {
+        let fixture = repository_with_demo_skill();
+        let claim = claim_evolution(fixture.path());
+        let triggers = claim["trigger_event_ids"]
+            .as_array()
+            .expect("trigger event ids");
+        let store = fixture.path().join("reports/skill-evidence/demo-skill");
+        let stream_path = store.join("events.jsonl");
+        let projection_path = store.join("gate-status.json");
+        let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+        let projection_before =
+            fs::read(&projection_path).expect("read gate projection before refusal");
+        let mut command = skill_evidence();
+        command
+            .args(["skills", "evolution", "close", "--root"])
+            .arg(fixture.path())
+            .args([
+                "--target",
+                ".claude/skills/demo-skill",
+                "--event-id",
+                "evt_duplicate_route_close",
+                "--repository-head",
+                "fixture-head",
+                "--review-id",
+                "rev_fixture",
+                "--disposition",
+                "monitor_for_recurrence",
+                "--note",
+                "one route was supplied twice",
+            ]);
+        for (index, trigger) in triggers.iter().enumerate() {
+            let identity = trigger.as_str().expect("trigger event id");
+            let route = if index == 0 {
+                duplicated_route
+            } else {
+                "--concluded"
+            };
+            command.args([route, identity]);
+            if index == 0 {
+                command.args([route, identity]);
+            }
+        }
+        lifecycle_clock(&mut command, "lock_duplicate_route_close");
+
+        let output = command.output().expect("close with duplicate route");
+
+        assert_eq!(
+            output.status.code(),
+            Some(3),
+            "duplicated route {duplicated_route}"
+        );
+        assert!(output.stdout.is_empty());
+        let error = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            error.contains(duplicated_route) && error.contains("more than once"),
+            "duplicate refusal must name the repeated route: {error}"
+        );
+        assert_eq!(
+            fs::read(&stream_path).expect("read event stream after refusal"),
+            stream_before,
+            "a duplicate {duplicated_route} route must append no event"
+        );
+        assert_eq!(
+            fs::read(&projection_path).expect("read gate projection after refusal"),
+            projection_before,
+            "a duplicate {duplicated_route} route must not rewrite the projection"
+        );
+    }
+}
+
+#[test]
+fn adjudicating_close_refuses_conflicting_unknown_and_out_of_coverage_routes_write_free() {
+    for case in ["conflicting", "unknown", "out-of-coverage"] {
+        let fixture = repository_with_demo_skill();
+        let claim = claim_evolution(fixture.path());
+        let triggers = claim["trigger_event_ids"]
+            .as_array()
+            .expect("trigger event ids");
+        let invalid = match case {
+            "conflicting" => triggers[0]
+                .as_str()
+                .expect("conflicting trigger event id")
+                .to_owned(),
+            "unknown" => "evt_unknown_route".to_owned(),
+            "out-of-coverage" => record_outcome(
+                fixture.path(),
+                "arrived after claim",
+                "late-route-session",
+                "execution",
+                "friction",
+            ),
+            _ => unreachable!("finite route case roster"),
+        };
+        let store = fixture.path().join("reports/skill-evidence/demo-skill");
+        let stream_path = store.join("events.jsonl");
+        let projection_path = store.join("gate-status.json");
+        let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+        let projection_before =
+            fs::read(&projection_path).expect("read gate projection before refusal");
+        let mut command = skill_evidence();
+        command
+            .args(["skills", "evolution", "close", "--root"])
+            .arg(fixture.path())
+            .args([
+                "--target",
+                ".claude/skills/demo-skill",
+                "--event-id",
+                "evt_invalid_route_close",
+                "--repository-head",
+                "fixture-head",
+                "--review-id",
+                "rev_fixture",
+                "--disposition",
+                "monitor_for_recurrence",
+                "--note",
+                "the explicit route is invalid",
+            ]);
+        for trigger in triggers {
+            command.args([
+                "--concluded",
+                trigger.as_str().expect("concluded trigger event id"),
+            ]);
+        }
+        command.args([
+            if case == "conflicting" {
+                "--instrument-limited"
+            } else {
+                "--concluded"
+            },
+            &invalid,
+        ]);
+        lifecycle_clock(&mut command, "lock_invalid_route_close");
+
+        let output = command.output().expect("close with invalid route");
+
+        assert_eq!(output.status.code(), Some(3), "route case {case}");
+        assert!(output.stdout.is_empty());
+        let error = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            error.contains(&invalid),
+            "refusal must name the invalid route for {case}: {error}"
+        );
+        assert_eq!(
+            fs::read(&stream_path).expect("read event stream after refusal"),
+            stream_before,
+            "route case {case} must append no event"
+        );
+        assert_eq!(
+            fs::read(&projection_path).expect("read gate projection after refusal"),
+            projection_before,
+            "route case {case} must not rewrite the projection"
+        );
+    }
+}
+
+#[test]
+fn every_target_owning_no_change_disposition_accepts_a_complete_concluded_partition() {
+    for disposition in ["closed_no_skill_defect", "insufficient_independence"] {
+        let fixture = repository_with_demo_skill();
+        let claim = claim_evolution(fixture.path());
+        let triggers = claim["trigger_event_ids"]
+            .as_array()
+            .expect("trigger event ids");
+        let mut command = skill_evidence();
+        command
+            .args(["skills", "evolution", "close", "--root"])
+            .arg(fixture.path())
+            .args([
+                "--target",
+                ".claude/skills/demo-skill",
+                "--event-id",
+                "evt_target_owning_close",
+                "--repository-head",
+                "fixture-head",
+                "--review-id",
+                "rev_fixture",
+                "--disposition",
+                disposition,
+                "--note",
+                "every covered trigger has a concluded route",
+            ]);
+        for trigger in triggers {
+            command.args([
+                "--concluded",
+                trigger.as_str().expect("concluded trigger event id"),
+            ]);
+        }
+        lifecycle_clock(&mut command, "lock_target_owning_close");
+
+        let output = command.output().expect("close target-owning review");
+
+        assert!(
+            output.status.success(),
+            "{disposition} close failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let receipt: Value =
+            serde_json::from_slice(&output.stdout).expect("target-owning close receipt JSON");
+        assert_eq!(receipt["disposition"], disposition);
+        assert_eq!(
+            receipt["adjudicated_event_ids"],
+            Value::Array(triggers.clone())
+        );
+    }
+}
+
+#[test]
+fn outside_target_close_refuses_an_owner_not_bound_to_a_concluded_event_write_free() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let triggers = claim["trigger_event_ids"]
+        .as_array()
+        .expect("trigger event ids");
+    let concluded = triggers[0].as_str().expect("concluded trigger event id");
+    let undecidable = triggers[1].as_str().expect("undecidable trigger event id");
+    let store = fixture.path().join("reports/skill-evidence/demo-skill");
+    let stream_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("read gate projection before refusal");
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_owner_on_undecidable_close",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "outside_target",
+            "--note",
+            "an owner was incorrectly attached to an undecidable event",
+            "--concluded",
+            concluded,
+            "--instrument-limited",
+            undecidable,
+            "--instrument-limited",
+            triggers[2].as_str().expect("second undecidable event id"),
+            "--external-owner",
+            concluded,
+            "skill",
+            ".claude/skills/code-review",
+            "--external-owner",
+            undecidable,
+            "tool",
+            "trial-instrument",
+        ]);
+    lifecycle_clock(&mut command, "lock_owner_on_undecidable_close");
+
+    let output = command
+        .output()
+        .expect("close with owner on undecidable event");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        error.contains(undecidable) && error.contains("concluded"),
+        "refusal must name the owner whose event is not concluded: {error}"
+    );
+    assert_eq!(
+        fs::read(&stream_path).expect("read event stream after refusal"),
+        stream_before,
+        "an owner on undecidable coverage must append no event"
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before,
+        "an owner on undecidable coverage must not rewrite the projection"
+    );
+}
+
+#[test]
+fn non_outside_target_close_refuses_an_external_owner_write_free() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let triggers = claim["trigger_event_ids"]
+        .as_array()
+        .expect("trigger event ids");
+    let store = fixture.path().join("reports/skill-evidence/demo-skill");
+    let stream_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("read gate projection before refusal");
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_owner_on_target_disposition_close",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "monitor_for_recurrence",
+            "--note",
+            "this disposition concludes about the target itself",
+        ]);
+    for trigger in triggers {
+        command.args([
+            "--concluded",
+            trigger.as_str().expect("concluded trigger event id"),
+        ]);
+    }
+    command.args([
+        "--external-owner",
+        triggers[0].as_str().expect("externally owned event id"),
+        "skill",
+        ".claude/skills/code-review",
+    ]);
+    lifecycle_clock(&mut command, "lock_owner_on_target_disposition_close");
+
+    let output = command
+        .output()
+        .expect("close target-owning disposition with an external owner");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        error.contains("--external-owner") && error.contains("outside_target"),
+        "refusal must reserve external owners for outside_target: {error}"
+    );
+    assert_eq!(
+        fs::read(&stream_path).expect("read event stream after refusal"),
+        stream_before,
+        "a target-owning disposition with an external owner must append no event"
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before,
+        "a target-owning disposition with an external owner must not rewrite the projection"
+    );
+}
+
+#[test]
+fn outside_target_close_refuses_an_empty_external_owner_reference_write_free() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let triggers = claim["trigger_event_ids"]
+        .as_array()
+        .expect("trigger event ids");
+    let store = fixture.path().join("reports/skill-evidence/demo-skill");
+    let stream_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("read gate projection before refusal");
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_empty_owner_reference_close",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "outside_target",
+            "--note",
+            "the owner reference is empty",
+        ]);
+    for trigger in triggers {
+        let identity = trigger.as_str().expect("concluded trigger event id");
+        command.args([
+            "--concluded",
+            identity,
+            "--external-owner",
+            identity,
+            "skill",
+            "",
+        ]);
+    }
+    lifecycle_clock(&mut command, "lock_empty_owner_reference_close");
+
+    let output = command.output().expect("close with empty owner reference");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        error.contains("--external-owner") && error.contains("REFERENCE"),
+        "refusal must identify the empty stable reference: {error}"
+    );
+    assert_eq!(
+        fs::read(&stream_path).expect("read event stream after refusal"),
+        stream_before,
+        "an empty owner reference must append no event"
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before,
+        "an empty owner reference must not rewrite the projection"
+    );
+}
+
+#[test]
+fn caller_and_session_are_unsupplyable_as_external_owner_kinds_write_free() {
+    for kind in ["caller", "session"] {
+        let fixture = repository_with_demo_skill();
+        let claim = claim_evolution(fixture.path());
+        let triggers = claim["trigger_event_ids"]
+            .as_array()
+            .expect("trigger event ids");
+        let store = fixture.path().join("reports/skill-evidence/demo-skill");
+        let stream_path = store.join("events.jsonl");
+        let projection_path = store.join("gate-status.json");
+        let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+        let projection_before =
+            fs::read(&projection_path).expect("read gate projection before refusal");
+        let mut command = skill_evidence();
+        command
+            .args(["skills", "evolution", "close", "--root"])
+            .arg(fixture.path())
+            .args([
+                "--target",
+                ".claude/skills/demo-skill",
+                "--event-id",
+                "evt_invalid_owner_kind_close",
+                "--repository-head",
+                "fixture-head",
+                "--review-id",
+                "rev_fixture",
+                "--disposition",
+                "outside_target",
+                "--note",
+                "the claimed owner kind is not external",
+            ]);
+        for trigger in triggers {
+            let identity = trigger.as_str().expect("concluded trigger event id");
+            command.args([
+                "--concluded",
+                identity,
+                "--external-owner",
+                identity,
+                kind,
+                "not-an-external-owner",
+            ]);
+        }
+        lifecycle_clock(&mut command, "lock_invalid_owner_kind_close");
+
+        let output = command.output().expect("close with invalid owner kind");
+
+        assert_eq!(output.status.code(), Some(3), "owner kind {kind}");
+        assert!(output.stdout.is_empty());
+        let error = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            error.contains("--external-owner KIND")
+                && error.contains("model_limitation")
+                && error.contains("user_instruction"),
+            "refusal must print the closed owner roster: {error}"
+        );
+        assert_eq!(
+            fs::read(&stream_path).expect("read event stream after refusal"),
+            stream_before,
+            "owner kind {kind} must append no event"
+        );
+        assert_eq!(
+            fs::read(&projection_path).expect("read gate projection after refusal"),
+            projection_before,
+            "owner kind {kind} must not rewrite the projection"
+        );
+    }
+}
+
 fn close_naming_untestable_coverage(
     root: &Path,
     event_id: &str,
@@ -2401,6 +3241,18 @@ fn close_naming_untestable_coverage(
         ]);
     for identity in named {
         command.args(["--instrument-limited", identity]);
+    }
+    if [
+        "resolved_by_change",
+        "closed_no_skill_defect",
+        "outside_target",
+        "insufficient_independence",
+        "monitor_for_recurrence",
+        "candidate_rejected_validation",
+    ]
+    .contains(&disposition)
+    {
+        add_concluded_coverage_routes(&mut command, root, "rev_fixture", named);
     }
     lifecycle_clock(&mut command, "lock_untestable_close");
     command.output().expect("close Skill Evolution review")
@@ -2553,48 +3405,6 @@ fn an_adjudicating_close_may_name_its_whole_coverage_list_without_widening() {
     );
 }
 
-/// `--adjudicate` dedups before it writes. This list lands in the same append-only
-/// event and can never be corrected, so it must too — `["X","X"]` is a shape
-/// `adjudicated_event_ids` can never take.
-#[test]
-fn close_records_repeated_untestable_names_once() {
-    let fixture = repository_with_demo_skill();
-    let claim = claim_evolution(fixture.path());
-    let untestable = claim["trigger_event_ids"][0]
-        .as_str()
-        .expect("trigger event id")
-        .to_owned();
-
-    let output = close_naming_untestable_coverage(
-        fixture.path(),
-        "evt_repeated_names_close",
-        "monitor_for_recurrence",
-        &[&untestable, &untestable],
-    );
-
-    assert!(
-        output.status.success(),
-        "close failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stream = fs::read_to_string(
-        fixture
-            .path()
-            .join("reports/skill-evidence/demo-skill/events.jsonl"),
-    )
-    .expect("read event stream");
-    let disposition: Value = stream
-        .lines()
-        .map(|line| serde_json::from_str::<Value>(line).expect("event JSON"))
-        .find(|event| event["event_id"] == "evt_repeated_names_close")
-        .expect("review_disposition event");
-    assert_eq!(
-        disposition["payload"]["instrument_limited_event_ids"],
-        serde_json::json!([untestable])
-    );
-    assert_event_stream_matches_the_published_schema(fixture.path());
-}
-
 #[test]
 fn an_adjudicating_close_reports_the_coverage_it_retired_as_untestable() {
     let fixture = repository_with_demo_skill();
@@ -2623,6 +3433,7 @@ fn an_adjudicating_close_reports_the_coverage_it_retired_as_untestable() {
             "--instrument-limited",
             &untestable,
         ]);
+    add_concluded_coverage_routes(&mut command, fixture.path(), "rev_fixture", &[&untestable]);
     lifecycle_clock(&mut command, "lock_evolution_close");
 
     let output = command.output().expect("close Skill Evolution review");
@@ -3131,6 +3942,12 @@ fn rust_appended_lifecycle_events_keep_the_javascript_byte_order() {
             "--note",
             "pre-migration fixture evolution completed",
         ]);
+    add_concluded_coverage_routes(
+        &mut evolution_close,
+        fixture.path(),
+        "rev_e32e7983-e876-4cf3-8537-019d2e37ce84",
+        &[],
+    );
     add_event_inputs(
         &mut evolution_close,
         "evt_8a4ad6aa-70d6-4189-a8de-976c60774af2",

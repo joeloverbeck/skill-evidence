@@ -335,7 +335,7 @@ fn close(root: &Path, host: &Host, review_id: &str, serial: i64) -> Value {
     fs::create_dir_all(report.parent().expect("review directory"))
         .expect("create review directory");
     fs::write(&report, "# Review report\n").expect("write review report");
-    let parsed = TestCli::try_parse_from([
+    let mut arguments = vec![
         "test-host".to_owned(),
         "skills".to_owned(),
         "evolution".to_owned(),
@@ -362,15 +362,30 @@ fn close(root: &Path, host: &Host, review_id: &str, serial: i64) -> Value {
         format!("review-session-{review_id}"),
         "--lock-owner".to_owned(),
         format!("lock-close-{review_id}"),
-    ])
-    .expect("parse mounted Skill Evolution close");
+    ];
+    let stream_path = root.join("reports/skill-evidence/demo-skill/events.jsonl");
+    let stream = fs::read_to_string(&stream_path).expect("read review claim");
+    let claim = stream
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .find(|event| {
+            event["event_type"] == "review_started" && event["payload"]["review_id"] == review_id
+        })
+        .expect("review claim for close");
+    for event_id in claim["payload"]["trigger_event_ids"]
+        .as_array()
+        .expect("review trigger event IDs")
+    {
+        arguments.push("--concluded".to_owned());
+        arguments.push(event_id.as_str().expect("trigger event ID").to_owned());
+    }
+    let parsed = TestCli::try_parse_from(arguments).expect("parse mounted Skill Evolution close");
     let TestCommand::Skills(args) = parsed.command;
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let exit = cli::run(args, host, &mut stdout, &mut stderr);
     assert_eq!(exit, Exit::Success, "{}", String::from_utf8_lossy(&stderr));
 
-    let stream_path = root.join("reports/skill-evidence/demo-skill/events.jsonl");
     let validated = skill_evidence::read_validated_event_stream(&stream_path)
         .expect("round-trip close event through the crate reader");
     assert!(validated.integrity_errors.is_empty());
