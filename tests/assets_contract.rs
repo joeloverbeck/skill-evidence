@@ -545,6 +545,106 @@ fn installed_skill_evolution_reference_preserves_established_run_condition_routi
 }
 
 #[test]
+fn installed_skill_evolution_reference_keeps_trial_prompts_behavior_neutral_in_step_four() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    for required in [
+        "an observable the raw task naturally produces",
+        "The harness must not compel the executor to emit it",
+        "may only make the held package and raw artifacts findable",
+        "changes what a compliant run would do or output",
+        "behavioral scope, output requirements, or search directives",
+        "expose the witness or make the mechanism under test salient",
+    ] {
+        assert!(
+            plan.contains(required),
+            "installed step 4 must preserve `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
+fn installed_skill_evolution_reference_distinguishes_location_from_behavioral_scope() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    assert!(
+        plan.contains("naming where one is located is logistics"),
+        "installed step 4 must permit location-only logistics: reference={reference}"
+    );
+    assert!(
+        plan.contains(
+            "Declaring which repositories or artifacts form the complete task scope is behavioral"
+        ),
+        "installed step 4 must reject a completeness declaration that supplies behavioral scope: reference={reference}"
+    );
+    assert!(
+        plan.contains("even when it also makes inputs findable"),
+        "findability must not excuse answer-shaping scope: reference={reference}"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_separates_raw_tasks_from_executor_logistics_in_step_six() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let validation = reference
+        .find("### 6. Run blind comparative validation")
+        .expect("the blind-validation step remains explicit");
+    let acceptance = reference
+        .find("### 7. Apply the acceptance gate")
+        .expect("the acceptance step remains explicit");
+    let executor_custody = &reference[validation..acceptance];
+
+    for required in [
+        "the original raw task and artifacts plus only the frozen executor logistics",
+        "may locate an opaque held package or raw artifact",
+        "must not change what a compliant run would do or output",
+        "Retain the original raw task separately from executor logistics",
+        "distinct artifacts or marked sections",
+        "under `reviews/<review-id>/`",
+    ] {
+        assert!(
+            executor_custody.contains(required),
+            "installed step 6 must preserve `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
 fn installed_event_schema_declares_close_validation_effort_as_optional() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
