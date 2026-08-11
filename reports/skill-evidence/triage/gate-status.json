@@ -1,13 +1,12 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-11T11:16:10.837894295Z",
+  "generated_at": "2026-08-11T12:19:48.084217497Z",
   "target_content_hash": "9968ebd3d4508f01bb91ddac011c09330651bcea7c9a5fdcd9dcad593cb4f4bc",
   "qualifying_uses_on_current_hash": 4,
   "open_incident_ids": [
     "evt_a6eaf146-e80f-4d8c-9346-16becd84a91d",
     "evt_35a84c74-5fa9-4319-aaa1-772400136d1d",
     "evt_ca0e092c-4275-48db-bb5a-d95ff7040473",
-    "evt_a5230399-e37c-444a-b050-d959e5944357",
     "evt_ebe48487-5c26-4fd4-af46-20a06ede8ee8",
     "evt_8059f523-efc3-4fe0-bb88-3082bebc2d53"
   ],
@@ -24,28 +23,26 @@
     {
       "symptom_key": "execution",
       "open_event_ids": [
-        "evt_35a84c74-5fa9-4319-aaa1-772400136d1d",
-        "evt_a5230399-e37c-444a-b050-d959e5944357",
-        "evt_ebe48487-5c26-4fd4-af46-20a06ede8ee8",
         "evt_8059f523-efc3-4fe0-bb88-3082bebc2d53"
       ],
-      "independent_incidents": 3,
-      "max_severity": "material_failure"
+      "independent_incidents": 1,
+      "max_severity": "friction"
     }
   ],
-  "state": "eligible",
-  "authorized_workflow": "skill-evolution",
-  "authorization_reason": "material_recurrence:execution",
-  "trigger_event_ids": [
-    "evt_35a84c74-5fa9-4319-aaa1-772400136d1d",
-    "evt_a5230399-e37c-444a-b050-d959e5944357"
-  ],
-  "threshold_session_id": "cb818fd6-c7f6-44a8-ba7c-ed9e7d629564",
+  "state": "collecting",
+  "authorized_workflow": null,
+  "authorization_reason": null,
+  "trigger_event_ids": [],
+  "threshold_session_id": null,
   "not_before": null,
   "active_review_id": null,
-  "last_completed_review_id": "1a00f33c-19d3-4e28-ba1e-d17d8e61f205",
-  "review_reentry_basis": "first_eligibility",
+  "last_completed_review_id": "5833275e-4998-450e-98dd-49a0bd8939a6",
+  "review_reentry_basis": null,
   "target_name": "triage",
   "target_repo_relative_path": ".claude/skills/triage",
-  "derivation_session_id": "9619b858-6d41-4c6e-ad50-f271a74e2198"
+  "derivation_session_id": "019ff0b5-d605-7e91-9355-3cc9ed0fffc2",
+  "instrument_limited_incident_ids": [
+    "evt_35a84c74-5fa9-4319-aaa1-772400136d1d",
+    "evt_ebe48487-5c26-4fd4-af46-20a06ede8ee8"
+  ]
 }

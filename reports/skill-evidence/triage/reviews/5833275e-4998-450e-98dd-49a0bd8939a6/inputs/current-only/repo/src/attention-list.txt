@@ -1,0 +1,3 @@
+Current filter: include unlabeled; include needs-triage; exclude every needs-info issue.
+
+Fixture issue 14: state needs-info; last triage note 09:10; reporter comment 10:05.

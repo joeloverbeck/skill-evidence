@@ -1,0 +1,2 @@
+StableView captures the stream length and digest before reading, repeats both observations after
+reading, and refuses the result if either changed. It reports the before and after identities.
