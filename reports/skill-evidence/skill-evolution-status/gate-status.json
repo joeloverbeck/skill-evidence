@@ -1,31 +1,36 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-11T12:51:44.090935499Z",
+  "generated_at": "2026-08-11T17:16:28.782812206Z",
   "target_content_hash": "9eb7c59cee52e2c5cf7aa49da1ba9abcdfc9720c2cc6862db88780094eeb3697",
-  "qualifying_uses_on_current_hash": 3,
+  "qualifying_uses_on_current_hash": 4,
   "open_incident_ids": [
-    "evt_55374fb2-af26-4875-8081-3222a754d76a"
+    "evt_55374fb2-af26-4875-8081-3222a754d76a",
+    "evt_7aefc2d1-6f5e-4f40-b96d-ae37169a113b"
   ],
   "candidate_clusters": [
     {
       "symptom_key": "output",
       "open_event_ids": [
-        "evt_55374fb2-af26-4875-8081-3222a754d76a"
+        "evt_55374fb2-af26-4875-8081-3222a754d76a",
+        "evt_7aefc2d1-6f5e-4f40-b96d-ae37169a113b"
       ],
-      "independent_incidents": 1,
+      "independent_incidents": 2,
       "max_severity": "material_failure"
     }
   ],
-  "state": "collecting",
-  "authorized_workflow": null,
-  "authorization_reason": null,
-  "trigger_event_ids": [],
-  "threshold_session_id": null,
+  "state": "eligible_pending_cooldown",
+  "authorized_workflow": "skill-evolution",
+  "authorization_reason": "material_recurrence:output",
+  "trigger_event_ids": [
+    "evt_55374fb2-af26-4875-8081-3222a754d76a",
+    "evt_7aefc2d1-6f5e-4f40-b96d-ae37169a113b"
+  ],
+  "threshold_session_id": "019ff0d0-f8aa-7222-85f8-a44fe21cf323",
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": null,
-  "review_reentry_basis": null,
+  "review_reentry_basis": "first_eligibility",
   "target_name": "skill-evolution-status",
   "target_repo_relative_path": ".claude/skills/skill-evolution-status",
-  "derivation_session_id": "019ff0b5-d605-7e91-9355-3cc9ed0fffc2"
+  "derivation_session_id": "019ff0d0-f8aa-7222-85f8-a44fe21cf323"
 }
