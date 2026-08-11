@@ -137,6 +137,9 @@ pub enum SkillEvidenceCommand {
     },
     Record(Box<SkillEvidenceRecordArgs>),
     /// Writes this crate's skill packages and schemas into a repository.
+    ///
+    /// Without --force, differing installed files cause an atomic refusal:
+    /// nothing is written, and the command exits 3.
     Install(InstallArgs),
     /// Removes packages this crate shipped and has since retired.
     Withdraw(WithdrawArgs),

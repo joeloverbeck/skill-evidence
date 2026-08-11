@@ -102,13 +102,14 @@ cargo update -p skill-evidence          # or edit the pinned version first
 # 2. Confirm it still builds and the consumer's own suites pass.
 cargo test --all-targets --locked
 
-# 3. Dry-run the asset install. Without --force this REFUSES on any file that
-#    differs, names every one of them, and writes nothing at all.
+# 3. Check the asset install without --force. On a consumer with any differing
+#    installed file, this is expected to refuse atomically with exit 3. It writes
+#    nothing and names every differing file.
 <host-command> skills evidence install --root .
 
-# 4. If it refused, read the list. Files that differ because the crate changed
-#    are the upgrade; files that differ because you edited them locally are not.
-#    Resolve the second kind first, then:
+# 4. Read the refusal's file list before re-running. Files that differ because
+#    the crate changed are the upgrade; files that differ because you edited
+#    them locally are not. Resolve the second kind first, then:
 <host-command> skills evidence install --root . --force
 
 # 5. Withdraw packages the install receipt named as retired. Without --force,
@@ -122,10 +123,10 @@ git diff
 git status --short reports/skill-evidence/    # events.jsonl must not appear
 ```
 
-Step 3 is the useful one. Because `install` decides every write before the first byte lands and
-refuses atomically, running it *without* `--force` is a free, side-effect-free preview of exactly
-which files the upgrade will change. It also reports any retired package still present, but never
-removes one under any flag.
+Step 3 is the useful one. Because `install` decides every write before the first byte lands,
+running it *without* `--force` writes nothing when files differ. Its exit-3 refusal is the expected
+result in that case, and the refusal's file list identifies exactly which files the upgrade would
+change. It also reports any retired package still present, but never removes one under any flag.
 
 Step 5 is deliberately separate. `withdraw` compares every retired file with the last copy this
 crate shipped and decides every removal before the first one occurs. A difference refuses the

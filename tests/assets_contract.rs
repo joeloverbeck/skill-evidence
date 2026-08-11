@@ -1432,6 +1432,26 @@ fn install_refusal_leaves_the_whole_tree_byte_identical() {
 }
 
 #[test]
+fn install_help_explains_atomic_exit_3_refusal_without_force() {
+    let output = Command::new(env!("CARGO_BIN_EXE_skill-evidence"))
+        .args(["skills", "evidence", "install", "--help"])
+        .output()
+        .expect("run compiled install help");
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let help = String::from_utf8(output.stdout).expect("UTF-8 install help");
+    assert!(
+        help.contains("Without --force, differing installed files cause an atomic refusal"),
+        "install help must identify the no-force refusal: {help}"
+    );
+    assert!(
+        help.contains("nothing is written") && help.contains("exits 3"),
+        "install help must state the refusal's write and exit semantics: {help}"
+    );
+}
+
+#[test]
 fn withdraw_force_removes_an_edited_retired_file_and_names_it() {
     let root = tempfile::tempdir().expect("temporary repository root");
     write_reference_host_retired_package(root.path());
