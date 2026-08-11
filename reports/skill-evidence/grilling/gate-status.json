@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-11T17:18:58.114993126Z",
+  "generated_at": "2026-08-11T19:00:46.075028954Z",
   "target_content_hash": "b9f458b0917db5368c6826732f0daf19b63f157b11d22034c023c8d465794ee6",
-  "qualifying_uses_on_current_hash": 12,
+  "qualifying_uses_on_current_hash": 13,
   "open_incident_ids": [
     "evt_496d5648-cd6d-454c-ac34-5177fb95e107",
     "evt_74edc4d5-9777-484c-a861-995a7480e9f9",
@@ -10,30 +10,44 @@
     "evt_f1a05d84-35fb-4622-a273-fc11e783bc90",
     "evt_4dc3f0a0-f2c0-4a10-bb4f-1a4ae84a8c31",
     "evt_931980a3-dea6-4e98-9354-b847f3034a7b",
-    "evt_1558a3f1-860d-4258-bad0-f594f2ae8f7c"
+    "evt_1558a3f1-860d-4258-bad0-f594f2ae8f7c",
+    "evt_e575ccb0-d7c8-4677-a750-487c6ce6c18a",
+    "evt_b09e51af-9ba6-441c-9d62-5656bb298c0e"
   ],
   "candidate_clusters": [
     {
       "symptom_key": "output",
       "open_event_ids": [
-        "evt_1558a3f1-860d-4258-bad0-f594f2ae8f7c"
+        "evt_1558a3f1-860d-4258-bad0-f594f2ae8f7c",
+        "evt_e575ccb0-d7c8-4677-a750-487c6ce6c18a"
+      ],
+      "independent_incidents": 2,
+      "max_severity": "material_failure"
+    },
+    {
+      "symptom_key": "execution",
+      "open_event_ids": [
+        "evt_b09e51af-9ba6-441c-9d62-5656bb298c0e"
       ],
       "independent_incidents": 1,
       "max_severity": "material_failure"
     }
   ],
-  "state": "collecting",
-  "authorized_workflow": null,
-  "authorization_reason": null,
-  "trigger_event_ids": [],
-  "threshold_session_id": null,
+  "state": "eligible_pending_cooldown",
+  "authorized_workflow": "skill-evolution",
+  "authorization_reason": "material_recurrence:output",
+  "trigger_event_ids": [
+    "evt_1558a3f1-860d-4258-bad0-f594f2ae8f7c",
+    "evt_e575ccb0-d7c8-4677-a750-487c6ce6c18a"
+  ],
+  "threshold_session_id": "f2859d4b-c88c-47b9-8251-0b235765d8f5",
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": "rev_def0dbe1-2214-48d9-8282-1b7a9c6ff78a",
-  "review_reentry_basis": "queued_behind_instrument_limited_review",
+  "review_reentry_basis": "post_review_incident",
   "target_name": "grilling",
   "target_repo_relative_path": ".claude/skills/grilling",
-  "derivation_session_id": "019ff0d0-f8aa-7222-85f8-a44fe21cf323",
+  "derivation_session_id": "f2859d4b-c88c-47b9-8251-0b235765d8f5",
   "instrument_limited_incident_ids": [
     "evt_496d5648-cd6d-454c-ac34-5177fb95e107",
     "evt_74edc4d5-9777-484c-a861-995a7480e9f9",
