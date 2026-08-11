@@ -11,6 +11,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
+use crate::assets;
+
 use super::{
     CandidateCluster, DerivationInputs, Error, EvidenceEvent, Host, Outcome, SESSION_UNAVAILABLE,
     derive_gate, format_timestamp_milliseconds, hash_target_directory,
@@ -250,6 +252,7 @@ pub fn skill_evolution_status(
     root: &Path,
     now_epoch_milliseconds: i64,
     session_id: &str,
+    host: &Host,
 ) -> Result<String, Error> {
     let generated_at = report_timestamp(now_epoch_milliseconds)?;
     let root = root.canonicalize().map_err(|error| {
@@ -275,6 +278,8 @@ pub fn skill_evolution_status(
                 evolution_skill.display()
             ))
         })?;
+    let operating_package =
+        assets::compare_installed_skill_evolution_package(&evolution_target, host)?;
     let evidence_root = root.join("reports/skill-evidence");
     let mut stores = if evidence_root.is_dir() {
         fs::read_dir(&evidence_root)
@@ -630,8 +635,18 @@ pub fn skill_evolution_status(
     } else {
         format!("retired as untestable: {}; ", retired.len())
     };
+    let operating_package_notice = if operating_package.matches_shipped {
+        String::new()
+    } else {
+        format!(
+            "Operating package mismatch: {} installed Skill Evolution files differ from the ones this crate ships: {}. Run `{} skills evidence install --root <repository> --force` before claiming a review; active reviews may continue.\n\n",
+            operating_package.differing_files.len(),
+            operating_package.differing_files.join(", "),
+            host.command
+        )
+    };
     let mut report = format!(
-        "# Skill Evolution Status\n\nScanned {stores_scanned} evidence {store_noun} read-only. Ready: {}; deferred after review: {}; {retired_census}blocked after eligibility: {}; indeterminate: {}; omitted as not eligible: {omitted}.",
+        "# Skill Evolution Status\n\n{operating_package_notice}Scanned {stores_scanned} evidence {store_noun} read-only. Ready: {}; deferred after review: {}; {retired_census}blocked after eligibility: {}; indeterminate: {}; omitted as not eligible: {omitted}.",
         ready.len(),
         deferred.len(),
         blocked.len(),

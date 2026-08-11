@@ -597,6 +597,10 @@ fn installed_event_schema_declares_operating_skill_hash_as_optional_and_open() {
         payload["properties"]["operating_skill_hash"]["minLength"],
         1
     );
+    assert_eq!(
+        payload["properties"]["operating_package_matches_shipped"]["type"],
+        "boolean"
+    );
     assert!(
         !payload["required"]
             .as_array()
@@ -604,6 +608,14 @@ fn installed_event_schema_declares_operating_skill_hash_as_optional_and_open() {
             .iter()
             .any(|field| field == "operating_skill_hash"),
         "absent means the event predates unconditional identity recording"
+    );
+    assert!(
+        !payload["required"]
+            .as_array()
+            .expect("required identity-bearing properties")
+            .iter()
+            .any(|field| field == "operating_package_matches_shipped"),
+        "absent means the event predates operating-package comparison, not mismatch"
     );
     assert!(
         payload.get("additionalProperties").is_none(),
@@ -657,6 +669,16 @@ fn installed_event_schema_declares_operating_skill_hash_as_optional_and_open() {
         assert!(
             validator.is_valid(&event),
             "the additive identity is valid on {event_type}"
+        );
+        event["payload"]["operating_package_matches_shipped"] = serde_json::json!(true);
+        assert!(
+            validator.is_valid(&event),
+            "a computed package match is valid on {event_type}"
+        );
+        event["payload"]["operating_package_matches_shipped"] = serde_json::json!(false);
+        assert!(
+            validator.is_valid(&event),
+            "a computed package mismatch is valid on {event_type}"
         );
     }
 }

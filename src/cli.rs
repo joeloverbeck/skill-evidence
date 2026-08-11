@@ -346,16 +346,21 @@ fn dispatch(command: SkillsCommand, host: &Host, out: &mut impl Write) -> Result
         SkillsCommand::MethodGapResearchStatus(args) => {
             run_method_gap_research_status(args, host, out)
         }
-        SkillsCommand::EvolutionStatus(args) => run_evolution_status(args, out),
+        SkillsCommand::EvolutionStatus(args) => run_evolution_status(args, host, out),
     }
 }
 
-fn run_evolution_status(args: EvolutionStatusArgs, out: &mut impl Write) -> Result<Exit, CliError> {
+fn run_evolution_status(
+    args: EvolutionStatusArgs,
+    host: &Host,
+    out: &mut impl Write,
+) -> Result<Exit, CliError> {
     let session_id = resolve_session_id(args.session_id.as_deref())?;
     let report = crate::skill_evolution_status(
         &selected_root(args.root),
         args.now_epoch_milliseconds,
         &session_id,
+        host,
     )?;
     // Already a rendered terminal reply, not a report to serialize.
     write!(out, "{report}").expect("writing to the output stream cannot fail");
@@ -390,7 +395,7 @@ fn run_skill_evolution(
     match command {
         SkillEvolutionCommand::Preflight(args) => {
             let (root, target, inputs) = lifecycle_context_inputs(args, "skill-evolution", host)?;
-            let receipt = crate::evolution_preflight(&root, &target, &inputs)?;
+            let receipt = crate::evolution_preflight(&root, &target, &inputs, host)?;
             Ok(print_successful_report(&receipt, out))
         }
         SkillEvolutionCommand::Claim(args) => {
@@ -406,7 +411,7 @@ fn run_skill_evolution(
                 risk_tier,
                 record_operating_skill_hash,
             };
-            let receipt = crate::evolution_claim(&root, &target, &request, &inputs)?;
+            let receipt = crate::evolution_claim(&root, &target, &request, &inputs, host)?;
             Ok(print_successful_report(&receipt, out))
         }
         SkillEvolutionCommand::RecordValidation(args) => {
@@ -431,7 +436,8 @@ fn run_skill_evolution(
                 artifacts: artifacts.unwrap_or_default(),
                 summary,
             };
-            let receipt = crate::evolution_record_validation(&root, &target, &request, &inputs)?;
+            let receipt =
+                crate::evolution_record_validation(&root, &target, &request, &inputs, host)?;
             Ok(print_successful_report(&receipt, out))
         }
         SkillEvolutionCommand::Land(args) => {
@@ -446,7 +452,7 @@ fn run_skill_evolution(
                 review_id: review_id.unwrap_or_default(),
                 candidate,
             };
-            let receipt = crate::evolution_land(&root, &target, &request, &inputs)?;
+            let receipt = crate::evolution_land(&root, &target, &request, &inputs, host)?;
             Ok(print_successful_report(&receipt, out))
         }
         SkillEvolutionCommand::Close(args) => {
@@ -470,7 +476,7 @@ fn run_skill_evolution(
                 trials,
                 artifacts,
             };
-            let receipt = crate::evolution_close(&root, &target, &request, &inputs)?;
+            let receipt = crate::evolution_close(&root, &target, &request, &inputs, host)?;
             Ok(print_successful_report(&receipt, out))
         }
     }

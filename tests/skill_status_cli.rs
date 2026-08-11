@@ -9,7 +9,8 @@ use std::{
 };
 
 use serde_json::{Value, json};
-use support::{repository_root, skill_evidence};
+use skill_evidence::assets;
+use support::{host, repository_root, skill_evidence};
 
 fn copy_tree(source: &Path, destination: &Path) {
     fs::create_dir_all(destination).expect("create copied fixture directory");
@@ -689,6 +690,26 @@ fn method_gap_research_status_preserves_the_legacy_audit_filename_classifier() {
 
 #[test]
 fn skill_evolution_status_renders_a_complete_zero_store_census() {
+    let matching_root = tempfile::tempdir().expect("temporary matching repository");
+    assets::install(matching_root.path(), &host(), false)
+        .expect("install current Skill Evolution package");
+    let matching_output = skill_evidence()
+        .args(["skills", "evolution-status", "--root"])
+        .arg(matching_root.path())
+        .args([
+            "--now-epoch-milliseconds",
+            "1784635200000",
+            "--session-id",
+            "unavailable",
+        ])
+        .output()
+        .expect("run matching Skill Evolution Status");
+    assert!(matching_output.status.success());
+    assert_eq!(
+        String::from_utf8(matching_output.stdout).expect("UTF-8 matching status report"),
+        "# Skill Evolution Status\n\nScanned 0 evidence stores read-only. Ready: 0; deferred after review: 0; blocked after eligibility: 0; indeterminate: 0; omitted as not eligible: 0.\n\nNo eligible targets found.\n"
+    );
+
     let root = tempfile::tempdir().expect("temporary repository");
     let operator = root.path().join(".claude/skills/skill-evolution");
     fs::create_dir_all(&operator).expect("create sibling evolution skill");
@@ -718,7 +739,7 @@ fn skill_evolution_status_renders_a_complete_zero_store_census() {
     );
     assert_eq!(
         String::from_utf8(output.stdout).expect("UTF-8 status report"),
-        "# Skill Evolution Status\n\nScanned 0 evidence stores read-only. Ready: 0; deferred after review: 0; blocked after eligibility: 0; indeterminate: 0; omitted as not eligible: 0.\n\nNo eligible targets found.\n"
+        "# Skill Evolution Status\n\nOperating package mismatch: 3 installed Skill Evolution files differ from the ones this crate ships: .claude/skills/skill-evolution/SKILL.md, .claude/skills/skill-evolution/agents/openai.yaml, .claude/skills/skill-evolution/references/authorized-review.md. Run `skill-evidence skills evidence install --root <repository> --force` before claiming a review; active reviews may continue.\n\nScanned 0 evidence stores read-only. Ready: 0; deferred after review: 0; blocked after eligibility: 0; indeterminate: 0; omitted as not eligible: 0.\n\nNo eligible targets found.\n"
     );
     assert!(!root.path().join("reports").exists());
 }
@@ -2001,7 +2022,13 @@ fn skill_evolution_status_marks_a_session_threshold_ready_in_another_session() {
         .expect("run compiled Skill Evolution Status");
 
     assert!(output.status.success());
-    assert_eq!(output.stdout, expected);
+    let report = String::from_utf8(output.stdout).expect("UTF-8 Skill Evolution status");
+    let mismatch_notice = "# Skill Evolution Status\n\nOperating package mismatch: 3 installed Skill Evolution files differ from the ones this crate ships: .claude/skills/skill-evolution/SKILL.md, .claude/skills/skill-evolution/agents/openai.yaml, .claude/skills/skill-evolution/references/authorized-review.md. Run `skill-evidence skills evidence install --root <repository> --force` before claiming a review; active reviews may continue.\n\n";
+    let unchanged_report = report
+        .strip_prefix(mismatch_notice)
+        .expect("status begins with the superseded-package notice");
+    let replayed_legacy_report = format!("# Skill Evolution Status\n\n{unchanged_report}");
+    assert_eq!(replayed_legacy_report.as_bytes(), expected);
     assert_files_unchanged(&governed_paths, &before);
     assert!(
         Command::new("git")

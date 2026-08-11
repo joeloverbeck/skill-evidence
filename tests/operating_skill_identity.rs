@@ -5,7 +5,7 @@ use std::{fs, path::Path};
 use clap::{Parser, Subcommand};
 use serde_json::Value;
 use skill_evidence::{
-    DerivationInputs, Host, RecordInputs, RecordUseRequest,
+    DerivationInputs, Host, RecordInputs, RecordUseRequest, assets,
     cli::{self, Exit},
 };
 
@@ -31,13 +31,8 @@ fn operator_host(operator_root: &Path) -> Host {
 }
 
 fn write_operator_package(operator_root: &Path) {
-    let package = operator_root.join(".claude/skills/skill-evolution");
-    fs::create_dir_all(&package).expect("create operating skill package");
-    fs::write(
-        package.join("SKILL.md"),
-        "---\nname: skill-evolution\n---\nReview instructions.\n",
-    )
-    .expect("write operating skill package");
+    let host = operator_host(operator_root);
+    assets::install(operator_root, &host, false).expect("install current operating skill package");
 }
 
 fn authorized_consumer(host: &Host) -> tempfile::TempDir {
@@ -92,7 +87,12 @@ fn record_authorizing_incidents(
     }
 }
 
-fn claim(root: &Path, host: &Host, suffix: &str, record_operating_hash: bool) -> (Value, String) {
+fn run_claim(
+    root: &Path,
+    host: &Host,
+    suffix: &str,
+    record_operating_hash: bool,
+) -> (Exit, Vec<u8>, Vec<u8>) {
     let mut arguments = vec![
         "test-host".to_owned(),
         "skills".to_owned(),
@@ -127,6 +127,11 @@ fn claim(root: &Path, host: &Host, suffix: &str, record_operating_hash: bool) ->
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let exit = cli::run(args, host, &mut stdout, &mut stderr);
+    (exit, stdout, stderr)
+}
+
+fn claim(root: &Path, host: &Host, suffix: &str, record_operating_hash: bool) -> (Value, String) {
+    let (exit, _stdout, stderr) = run_claim(root, host, suffix, record_operating_hash);
     assert_eq!(exit, Exit::Success, "{}", String::from_utf8_lossy(&stderr));
 
     let stream_path = root.join("reports/skill-evidence/demo-skill/events.jsonl");
@@ -142,6 +147,56 @@ fn claim(root: &Path, host: &Host, suffix: &str, record_operating_hash: bool) ->
     assert!(validated.integrity_errors.is_empty());
     assert_eq!(validated.events.last(), Some(&event));
     (event, line)
+}
+
+#[test]
+fn stale_operating_package_refuses_claim_without_changing_the_evidence_store() {
+    let operator = tempfile::tempdir().expect("temporary operator repository");
+    write_operator_package(operator.path());
+    let operating_entrypoint = operator
+        .path()
+        .join(".claude/skills/skill-evolution/SKILL.md");
+    fs::write(
+        &operating_entrypoint,
+        "---\nname: skill-evolution\n---\nSuperseded review instructions.\n",
+    )
+    .expect("replace current operating instructions with a superseded copy");
+    let host = operator_host(operator.path());
+    let consumer = authorized_consumer(&host);
+    let events_path = consumer
+        .path()
+        .join("reports/skill-evidence/demo-skill/events.jsonl");
+    let projection_path = consumer
+        .path()
+        .join("reports/skill-evidence/demo-skill/gate-status.json");
+    let events_before = fs::read(&events_path).expect("snapshot event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("snapshot gate projection before refusal");
+
+    let (exit, stdout, stderr) =
+        run_claim(consumer.path(), &host, "review-superseded-package", false);
+
+    assert_eq!(exit, Exit::Refusal);
+    assert!(stdout.is_empty());
+    let refusal = String::from_utf8(stderr).expect("UTF-8 refusal");
+    assert!(
+        refusal.contains(".claude/skills/skill-evolution/SKILL.md"),
+        "refusal must name the differing installed file: {refusal}"
+    );
+    assert!(
+        refusal.contains("skills evidence install") && refusal.contains("--force"),
+        "refusal must name the installer remedy: {refusal}"
+    );
+    assert_eq!(
+        fs::read(&events_path).expect("read event stream after refusal"),
+        events_before,
+        "claim refusal must append no event"
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before,
+        "claim refusal must not rewrite the projection"
+    );
 }
 
 fn model_latest_claim_as_historical_without_operating_hash(root: &Path) {
@@ -351,6 +406,40 @@ fn preflight(root: &Path, host: &Host) -> Value {
 }
 
 #[test]
+fn preflight_reports_a_superseded_operating_package_without_refusing() {
+    let operator = tempfile::tempdir().expect("temporary operator repository");
+    write_operator_package(operator.path());
+    let host = operator_host(operator.path());
+    let consumer = authorized_consumer(&host);
+
+    let matching = preflight(consumer.path(), &host);
+    assert!(
+        matching
+            .as_object()
+            .expect("preflight receipt")
+            .get("operating_package_matches_shipped")
+            .is_none(),
+        "matching-package preflight output stays byte-compatible"
+    );
+
+    fs::write(
+        operator
+            .path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+        "Superseded preflight instructions.\n",
+    )
+    .expect("replace the operating package before preflight");
+
+    let superseded = preflight(consumer.path(), &host);
+
+    assert_eq!(superseded["operating_package_matches_shipped"], false);
+    assert_eq!(
+        superseded["operating_package_differing_files"],
+        serde_json::json!([".claude/skills/skill-evolution/references/authorized-review.md"])
+    );
+}
+
+#[test]
 fn claim_records_a_stable_content_sensitive_operating_skill_hash_regardless_of_legacy_flag() {
     let operator = tempfile::tempdir().expect("temporary operator repository");
     write_operator_package(operator.path());
@@ -370,6 +459,10 @@ fn claim_records_a_stable_content_sensitive_operating_skill_hash_regardless_of_l
         expected_before
     );
     assert_eq!(
+        first_event["payload"]["operating_package_matches_shipped"], true,
+        "a claim under the current rendered package records matched provenance"
+    );
+    assert_eq!(
         second_event["payload"]["operating_skill_hash"], expected_before,
         "unchanged operating-package bytes must yield the same identity"
     );
@@ -379,9 +472,9 @@ fn claim_records_a_stable_content_sensitive_operating_skill_hash_regardless_of_l
     );
     assert!(
         first_line.ends_with(&format!(
-            ",\"operating_skill_hash\":\"{expected_before}\"}}}}"
+            ",\"operating_skill_hash\":\"{expected_before}\",\"operating_package_matches_shipped\":true}}}}"
         )),
-        "the optional key must be appended deterministically: {first_line}"
+        "the computed provenance keys must be appended deterministically: {first_line}"
     );
 
     fs::write(
@@ -423,6 +516,30 @@ fn validation_records_current_operating_skill_hash() {
 
     assert_eq!(event["event_type"], "validation_completed");
     assert_eq!(event["payload"]["operating_skill_hash"], expected);
+    assert_eq!(event["payload"]["operating_package_matches_shipped"], true);
+
+    let stale_consumer = authorized_consumer(&host);
+    claim(
+        stale_consumer.path(),
+        &host,
+        "review-stale-validation",
+        false,
+    );
+    fs::write(
+        operator
+            .path()
+            .join(".claude/skills/skill-evolution/SKILL.md"),
+        "---\nname: skill-evolution\n---\nSuperseded validation instructions.\n",
+    )
+    .expect("replace the operating package after claim");
+
+    let stale_event = record_validation(stale_consumer.path(), &host, "review-stale-validation");
+
+    assert_eq!(stale_event["event_type"], "validation_completed");
+    assert_eq!(
+        stale_event["payload"]["operating_package_matches_shipped"], false,
+        "validation must proceed and record the superseded operating package"
+    );
 }
 
 #[test]
@@ -445,6 +562,26 @@ fn landing_records_current_operating_skill_hash() {
 
     assert_eq!(event["event_type"], "change_landed");
     assert_eq!(event["payload"]["operating_skill_hash"], expected);
+    assert_eq!(event["payload"]["operating_package_matches_shipped"], true);
+
+    let stale_consumer = authorized_consumer(&host);
+    claim(stale_consumer.path(), &host, "review-stale-landing", false);
+    record_validation(stale_consumer.path(), &host, "review-stale-landing");
+    fs::write(
+        operator
+            .path()
+            .join(".claude/skills/skill-evolution/SKILL.md"),
+        "---\nname: skill-evolution\n---\nSuperseded landing instructions.\n",
+    )
+    .expect("replace the operating package after validation");
+
+    let stale_event = land(stale_consumer.path(), &host, "review-stale-landing");
+
+    assert_eq!(stale_event["event_type"], "change_landed");
+    assert_eq!(
+        stale_event["payload"]["operating_package_matches_shipped"], false,
+        "landing must proceed and record the superseded operating package"
+    );
 }
 
 #[test]
@@ -452,6 +589,20 @@ fn close_records_the_changed_operating_skill_hash() {
     let operator = tempfile::tempdir().expect("temporary operator repository");
     write_operator_package(operator.path());
     let host = operator_host(operator.path());
+
+    let matching_consumer = authorized_consumer(&host);
+    claim(
+        matching_consumer.path(),
+        &host,
+        "review-matching-close",
+        false,
+    );
+    let matching_close = close(matching_consumer.path(), &host, "review-matching-close", 6);
+    assert_eq!(
+        matching_close["payload"]["operating_package_matches_shipped"],
+        true
+    );
+
     let consumer = authorized_consumer(&host);
     let (claim_event, _) = claim(consumer.path(), &host, "review-close", false);
     let claim_hash = claim_event["payload"]["operating_skill_hash"]
@@ -462,7 +613,7 @@ fn close_records_the_changed_operating_skill_hash() {
     fs::write(
         operator
             .path()
-            .join(".claude/skills/skill-evolution/references.md"),
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
         "Changed operating rule.\n",
     )
     .expect("edit operating package between claim and close");
@@ -478,6 +629,10 @@ fn close_records_the_changed_operating_skill_hash() {
 
     assert_eq!(close_event["event_type"], "review_disposition");
     assert_eq!(close_event["payload"]["operating_skill_hash"], close_hash);
+    assert_eq!(
+        close_event["payload"]["operating_package_matches_shipped"], false,
+        "close must proceed and record the superseded operating package"
+    );
     assert_ne!(
         claim_hash, close_hash,
         "each event must identify the package operating when that event was written"
@@ -530,7 +685,13 @@ fn prior_reviews_surface_recorded_operating_hashes_and_omit_unknown_ones() {
     );
 }
 
-fn assert_reader_blocks_malformed_identity_on_latest_event(root: &Path, event_type: &str) {
+fn assert_reader_blocks_malformed_provenance_on_latest_event(
+    root: &Path,
+    event_type: &str,
+    field: &str,
+    malformed: Value,
+    expected_error: &str,
+) {
     let stream_path = root.join("reports/skill-evidence/demo-skill/events.jsonl");
     let stream = fs::read_to_string(&stream_path).expect("read event stream");
     let mut events = stream
@@ -539,7 +700,7 @@ fn assert_reader_blocks_malformed_identity_on_latest_event(root: &Path, event_ty
         .collect::<Vec<_>>();
     let latest = events.last_mut().expect("identity-bearing event");
     assert_eq!(latest["event_type"], event_type);
-    latest["payload"]["operating_skill_hash"] = serde_json::json!(42);
+    latest["payload"][field] = malformed;
     fs::write(
         &stream_path,
         format!(
@@ -558,9 +719,8 @@ fn assert_reader_blocks_malformed_identity_on_latest_event(root: &Path, event_ty
     assert!(
         read.integrity_errors
             .iter()
-            .any(|error| error
-                .contains("operating_skill_hash must be a non-empty string when present")),
-        "a malformed present identity must not collapse into historical absence: {:?}",
+            .any(|error| error.contains(expected_error)),
+        "malformed present provenance must not collapse into historical absence: {:?}",
         read.integrity_errors
     );
     let status = skill_evidence::derive_store(
@@ -586,24 +746,106 @@ fn reader_blocks_a_malformed_present_operating_skill_hash_on_each_review_event()
 
     let claimed = authorized_consumer(&host);
     claim(claimed.path(), &host, "review-malformed-claim", true);
-    assert_reader_blocks_malformed_identity_on_latest_event(claimed.path(), "review_started");
+    assert_reader_blocks_malformed_provenance_on_latest_event(
+        claimed.path(),
+        "review_started",
+        "operating_skill_hash",
+        serde_json::json!(42),
+        "operating_skill_hash must be a non-empty string when present",
+    );
 
     let validated = authorized_consumer(&host);
     claim(validated.path(), &host, "review-malformed-validation", true);
     record_validation(validated.path(), &host, "review-malformed-validation");
-    assert_reader_blocks_malformed_identity_on_latest_event(
+    assert_reader_blocks_malformed_provenance_on_latest_event(
         validated.path(),
         "validation_completed",
+        "operating_skill_hash",
+        serde_json::json!(42),
+        "operating_skill_hash must be a non-empty string when present",
     );
 
     let landed = authorized_consumer(&host);
     claim(landed.path(), &host, "review-malformed-landing", true);
     record_validation(landed.path(), &host, "review-malformed-landing");
     land(landed.path(), &host, "review-malformed-landing");
-    assert_reader_blocks_malformed_identity_on_latest_event(landed.path(), "change_landed");
+    assert_reader_blocks_malformed_provenance_on_latest_event(
+        landed.path(),
+        "change_landed",
+        "operating_skill_hash",
+        serde_json::json!(42),
+        "operating_skill_hash must be a non-empty string when present",
+    );
 
     let closed = authorized_consumer(&host);
     claim(closed.path(), &host, "review-malformed-close", true);
     close(closed.path(), &host, "review-malformed-close", 7);
-    assert_reader_blocks_malformed_identity_on_latest_event(closed.path(), "review_disposition");
+    assert_reader_blocks_malformed_provenance_on_latest_event(
+        closed.path(),
+        "review_disposition",
+        "operating_skill_hash",
+        serde_json::json!(42),
+        "operating_skill_hash must be a non-empty string when present",
+    );
+}
+
+#[test]
+fn reader_blocks_a_malformed_present_operating_package_match_on_each_review_event() {
+    let operator = tempfile::tempdir().expect("temporary operator repository");
+    write_operator_package(operator.path());
+    let host = operator_host(operator.path());
+
+    let claimed = authorized_consumer(&host);
+    claim(claimed.path(), &host, "review-malformed-match-claim", false);
+    assert_reader_blocks_malformed_provenance_on_latest_event(
+        claimed.path(),
+        "review_started",
+        "operating_package_matches_shipped",
+        serde_json::json!("unknown"),
+        "operating_package_matches_shipped must be boolean when present",
+    );
+
+    let validated = authorized_consumer(&host);
+    claim(
+        validated.path(),
+        &host,
+        "review-malformed-match-validation",
+        false,
+    );
+    record_validation(validated.path(), &host, "review-malformed-match-validation");
+    assert_reader_blocks_malformed_provenance_on_latest_event(
+        validated.path(),
+        "validation_completed",
+        "operating_package_matches_shipped",
+        serde_json::json!("unknown"),
+        "operating_package_matches_shipped must be boolean when present",
+    );
+
+    let landed = authorized_consumer(&host);
+    claim(
+        landed.path(),
+        &host,
+        "review-malformed-match-landing",
+        false,
+    );
+    record_validation(landed.path(), &host, "review-malformed-match-landing");
+    land(landed.path(), &host, "review-malformed-match-landing");
+    assert_reader_blocks_malformed_provenance_on_latest_event(
+        landed.path(),
+        "change_landed",
+        "operating_package_matches_shipped",
+        serde_json::json!("unknown"),
+        "operating_package_matches_shipped must be boolean when present",
+    );
+
+    let closed = authorized_consumer(&host);
+    claim(closed.path(), &host, "review-malformed-match-close", false);
+    close(closed.path(), &host, "review-malformed-match-close", 7);
+    assert_reader_blocks_malformed_provenance_on_latest_event(
+        closed.path(),
+        "review_disposition",
+        "operating_package_matches_shipped",
+        serde_json::json!("unknown"),
+        "operating_package_matches_shipped must be boolean when present",
+    );
 }

@@ -251,6 +251,10 @@
                 "type": "string",
                 "minLength": 1,
                 "description": "Content hash computed from the operating Skill Evolution package when this lifecycle event was written. Optional only for compatibility with history written before unconditional identity recording; absence never means the package matched the one operating now."
+              },
+              "operating_package_matches_shipped": {
+                "type": "boolean",
+                "description": "Whether the installed Skill Evolution package matched the copy this crate rendered for the consumer when this lifecycle event was written. Computed by the crate, never asserted by the caller. Optional only for compatibility with history written before package comparison; absence means unknown, not false."
               }
             }
           }

@@ -29,6 +29,31 @@ struct Asset {
     template: &'static str,
 }
 
+struct RenderedAsset {
+    destination: PathBuf,
+    contents: String,
+    relative_path: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InstalledAssetState {
+    Missing,
+    Matching,
+    Differing,
+}
+
+struct InstalledAssetComparison {
+    relative_path: &'static str,
+    state: InstalledAssetState,
+}
+
+/// Whether the installed Skill Evolution package matches the files this crate ships.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct InstalledSkillEvolutionPackageComparison {
+    pub(crate) matches_shipped: bool,
+    pub(crate) differing_files: Vec<String>,
+}
+
 /// Pairs an installed skill file with the shipped copy that fills it.
 ///
 /// The two live at different paths — `assets/skills/…` here, `.claude/skills/…`
@@ -178,29 +203,21 @@ pub struct WithdrawalReceipt {
 /// repository that has edited its own copy finds out instead of losing it.
 /// `force` converts those into replacements.
 pub fn install(root: &Path, host: &Host, force: bool) -> Result<InstallReceipt, Error> {
-    let rendered: Vec<(PathBuf, String, &str)> = ASSETS
-        .iter()
-        .map(|asset| {
-            (
-                root.join(asset.relative_path),
-                render(asset.template, host),
-                asset.relative_path,
-            )
-        })
-        .collect();
+    let rendered = render_assets(root, ASSETS, host);
+    let comparison = compare_rendered_assets(&rendered)?;
 
     let mut conflicts = Vec::new();
     let mut written = Vec::new();
     let mut unchanged = Vec::new();
     let mut replaced = Vec::new();
 
-    for (destination, contents, relative_path) in &rendered {
-        match read_existing(destination)? {
-            None => written.push((*relative_path).to_owned()),
-            Some(existing) if &existing == contents => unchanged.push((*relative_path).to_owned()),
-            Some(_) => {
-                replaced.push((*relative_path).to_owned());
-                conflicts.push((*relative_path).to_owned());
+    for compared in comparison {
+        match compared.state {
+            InstalledAssetState::Missing => written.push(compared.relative_path.to_owned()),
+            InstalledAssetState::Matching => unchanged.push(compared.relative_path.to_owned()),
+            InstalledAssetState::Differing => {
+                replaced.push(compared.relative_path.to_owned());
+                conflicts.push(compared.relative_path.to_owned());
             }
         }
     }
@@ -215,17 +232,19 @@ pub fn install(root: &Path, host: &Host, force: bool) -> Result<InstallReceipt, 
 
     // Every decision is made before the first byte lands, so a refusal above
     // leaves the tree exactly as it found it.
-    for (destination, contents, relative_path) in &rendered {
-        if let Some(parent) = destination.parent() {
+    for asset in &rendered {
+        if let Some(parent) = asset.destination.parent() {
             fs::create_dir_all(parent).map_err(|error| {
                 unsafe_failure(format!(
-                    "Could not create {} for {relative_path}: {error}",
-                    parent.display()
+                    "Could not create {} for {}: {error}",
+                    parent.display(),
+                    asset.relative_path
                 ))
             })?;
         }
-        fs::write(destination, contents)
-            .map_err(|error| unsafe_failure(format!("Could not write {relative_path}: {error}")))?;
+        fs::write(&asset.destination, &asset.contents).map_err(|error| {
+            unsafe_failure(format!("Could not write {}: {error}", asset.relative_path))
+        })?;
     }
 
     let linked = install_discovery_links(root)?;
@@ -246,6 +265,71 @@ pub fn install(root: &Path, host: &Host, force: bool) -> Result<InstallReceipt, 
         linked,
         orphaned_packages,
     })
+}
+
+/// Compares only the installed Skill Evolution package with this crate's rendered copy.
+///
+/// Missing shipped files and shipped files with different bytes are both mismatches.
+/// The relative paths are the same paths [`install`] reports, and the byte comparison
+/// is deliberately shared with that command so the lifecycle gate cannot disagree with
+/// the installer about whether a shipped file is current.
+pub(crate) fn compare_installed_skill_evolution_package(
+    package: &Path,
+    host: &Host,
+) -> Result<InstalledSkillEvolutionPackageComparison, Error> {
+    const PREFIX: &str = ".claude/skills/skill-evolution/";
+    let rendered = ASSETS
+        .iter()
+        .filter_map(|asset| {
+            asset
+                .relative_path
+                .strip_prefix(PREFIX)
+                .map(|within_package| RenderedAsset {
+                    destination: package.join(within_package),
+                    contents: render(asset.template, host),
+                    relative_path: asset.relative_path,
+                })
+        })
+        .collect::<Vec<_>>();
+    let differing_files = compare_rendered_assets(&rendered)?
+        .into_iter()
+        .filter(|comparison| comparison.state != InstalledAssetState::Matching)
+        .map(|comparison| comparison.relative_path.to_owned())
+        .collect::<Vec<_>>();
+    Ok(InstalledSkillEvolutionPackageComparison {
+        matches_shipped: differing_files.is_empty(),
+        differing_files,
+    })
+}
+
+fn render_assets(root: &Path, assets: &[Asset], host: &Host) -> Vec<RenderedAsset> {
+    assets
+        .iter()
+        .map(|asset| RenderedAsset {
+            destination: root.join(asset.relative_path),
+            contents: render(asset.template, host),
+            relative_path: asset.relative_path,
+        })
+        .collect()
+}
+
+fn compare_rendered_assets(
+    rendered: &[RenderedAsset],
+) -> Result<Vec<InstalledAssetComparison>, Error> {
+    rendered
+        .iter()
+        .map(|asset| {
+            let state = match read_existing(&asset.destination)? {
+                None => InstalledAssetState::Missing,
+                Some(existing) if existing == asset.contents => InstalledAssetState::Matching,
+                Some(_) => InstalledAssetState::Differing,
+            };
+            Ok(InstalledAssetComparison {
+                relative_path: asset.relative_path,
+                state,
+            })
+        })
+        .collect()
 }
 
 /// Removes every retired package this crate can still identify.

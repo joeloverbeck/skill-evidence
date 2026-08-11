@@ -789,9 +789,12 @@ pub fn evolution_preflight(
     root: &Path,
     target: &Path,
     inputs: &LifecycleInputs,
+    host: &Host,
 ) -> Result<Value, Error> {
     let derivation_inputs = lifecycle_derivation_inputs(inputs)?;
     let target = lifecycle_target_context(root, target, &inputs.operator_skill)?;
+    let operating_package =
+        assets::compare_installed_skill_evolution_package(&inputs.operator_skill, host)?;
     fs::create_dir_all(&target.evidence_directory).map_err(|error| {
         unsafe_failure(format!(
             "Could not create evidence directory {}: {error}",
@@ -800,7 +803,7 @@ pub fn evolution_preflight(
     })?;
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
     let (events, hash, status) = authorize_evolution(&target, &derivation_inputs)?;
-    Ok(serde_json::json!({
+    let mut receipt = serde_json::json!({
         "authorized": true,
         "target": {
             "name": target.target_name,
@@ -820,11 +823,32 @@ pub fn evolution_preflight(
             "threshold_session_id": status.threshold_session_id
         },
         "evidence_packet": evolution_evidence_packet(&target, &events, &status)
-    }))
+    });
+    if !operating_package.matches_shipped {
+        receipt["operating_package_matches_shipped"] = serde_json::json!(false);
+        receipt["operating_package_differing_files"] =
+            serde_json::json!(operating_package.differing_files);
+    }
+    Ok(receipt)
 }
 
-fn operating_skill_hash(inputs: &LifecycleEventInputs) -> Result<String, Error> {
-    Ok(hash_target_directory(&inputs.operator_skill)?.content_hash)
+struct OperatingPackageProvenance {
+    skill_hash: String,
+    matches_shipped: bool,
+    differing_files: Vec<String>,
+}
+
+fn operating_package_provenance(
+    inputs: &LifecycleEventInputs,
+    host: &Host,
+) -> Result<OperatingPackageProvenance, Error> {
+    let comparison =
+        assets::compare_installed_skill_evolution_package(&inputs.operator_skill, host)?;
+    Ok(OperatingPackageProvenance {
+        skill_hash: hash_target_directory(&inputs.operator_skill)?.content_hash,
+        matches_shipped: comparison.matches_shipped,
+        differing_files: comparison.differing_files,
+    })
 }
 
 pub fn evolution_claim(
@@ -832,6 +856,7 @@ pub fn evolution_claim(
     target: &Path,
     request: &EvolutionClaimRequest,
     inputs: &LifecycleEventInputs,
+    host: &Host,
 ) -> Result<Value, Error> {
     if !matches!(
         request.risk_tier.as_str(),
@@ -846,7 +871,15 @@ pub fn evolution_claim(
     }
     let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
     let target = lifecycle_target_context(root, target, &inputs.operator_skill)?;
-    let operating_skill_hash = operating_skill_hash(inputs)?;
+    let operating_package = operating_package_provenance(inputs, host)?;
+    if !operating_package.matches_shipped {
+        return Err(refusal(format!(
+            "{} installed Skill Evolution file(s) differ from the ones this crate ships: {}. Run `{} skills evidence install --root <repository> --force` before claiming. Nothing modified.",
+            operating_package.differing_files.len(),
+            operating_package.differing_files.join(", "),
+            host.command
+        )));
+    }
     fs::create_dir_all(&target.evidence_directory).map_err(|error| {
         unsafe_failure(format!(
             "Could not create evidence directory {}: {error}",
@@ -879,7 +912,9 @@ pub fn evolution_claim(
         "risk_tier": request.risk_tier,
         "session_or_cooldown_proof": proof
     });
-    payload["operating_skill_hash"] = serde_json::json!(operating_skill_hash);
+    payload["operating_skill_hash"] = serde_json::json!(operating_package.skill_hash);
+    payload["operating_package_matches_shipped"] =
+        serde_json::json!(operating_package.matches_shipped);
     let event = lifecycle_event(
         &target,
         &hash.content_hash,
@@ -917,6 +952,7 @@ pub fn evolution_record_validation(
     target: &Path,
     request: &EvolutionValidationRequest,
     inputs: &LifecycleEventInputs,
+    host: &Host,
 ) -> Result<Value, Error> {
     if request.review_id.is_empty() {
         return Err(refusal("Missing required --review-id.".to_owned()));
@@ -968,7 +1004,7 @@ pub fn evolution_record_validation(
         .unwrap_or(&candidate_real)
         .to_string_lossy()
         .replace(std::path::MAIN_SEPARATOR, "/");
-    let operating_skill_hash = operating_skill_hash(inputs)?;
+    let operating_package = operating_package_provenance(inputs, host)?;
     let event = lifecycle_event(
         &target,
         &hash.content_hash,
@@ -983,7 +1019,8 @@ pub fn evolution_record_validation(
             "trial_count": trial_count,
             "artifacts_path": request.artifacts,
             "summary": request.summary,
-            "operating_skill_hash": operating_skill_hash
+            "operating_skill_hash": operating_package.skill_hash,
+            "operating_package_matches_shipped": operating_package.matches_shipped
         }),
         inputs,
     );
@@ -1008,6 +1045,7 @@ pub fn evolution_land(
     target: &Path,
     request: &EvolutionLandRequest,
     inputs: &LifecycleEventInputs,
+    host: &Host,
 ) -> Result<Value, Error> {
     if request.review_id.is_empty() {
         return Err(refusal("Missing required --review-id.".to_owned()));
@@ -1017,7 +1055,7 @@ pub fn evolution_land(
     let candidate_real = resolve_target(&target.repository_root, &request.candidate)?;
     // Resolve every fallible provenance input before landing mutates the live target: a hash
     // failure after that point could otherwise leave changed files without their event receipt.
-    let operating_skill_hash = operating_skill_hash(inputs)?;
+    let operating_package = operating_package_provenance(inputs, host)?;
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
     let mut events = read_valid_lifecycle_stream(&target)?;
     let review = find_review_start(&events, &request.review_id)?;
@@ -1078,7 +1116,8 @@ pub fn evolution_land(
             "after_hash": landing.after_hash,
             "changed_files": landing.changed_files,
             "mirror_status": landing.mirror_status,
-            "operating_skill_hash": operating_skill_hash
+            "operating_skill_hash": operating_package.skill_hash,
+            "operating_package_matches_shipped": operating_package.matches_shipped
         }),
         inputs,
     );
@@ -1121,6 +1160,7 @@ pub fn evolution_close(
     target: &Path,
     request: &EvolutionCloseRequest,
     inputs: &LifecycleEventInputs,
+    host: &Host,
 ) -> Result<Value, Error> {
     if request.review_id.is_empty() {
         return Err(refusal("Missing required --review-id.".to_owned()));
@@ -1293,13 +1333,14 @@ pub fn evolution_close(
     // whole cluster — wider than this close ever covered — while asserting an untestability
     // its own trials disprove. Which limit a review met is semantic, and the command cannot
     // see it; the reference decides it at step 9.
-    let operating_skill_hash = operating_skill_hash(inputs)?;
+    let operating_package = operating_package_provenance(inputs, host)?;
     let mut payload = serde_json::json!({
         "review_id": request.review_id,
         "disposition": request.disposition,
         "adjudicated_event_ids": adjudicated,
         "note": request.note,
-        "operating_skill_hash": operating_skill_hash
+        "operating_skill_hash": operating_package.skill_hash,
+        "operating_package_matches_shipped": operating_package.matches_shipped
     });
     if !request.instrument_limited.is_empty() {
         // Deduplicated like the coverage list beside it. The event is append-only and this
@@ -2288,6 +2329,12 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
             if let Some(operating_skill_hash) = payload.get("operating_skill_hash") {
                 parts.push(("operating_skill_hash", encoded_json(operating_skill_hash)));
             }
+            if let Some(matches_shipped) = payload.get("operating_package_matches_shipped") {
+                parts.push((
+                    "operating_package_matches_shipped",
+                    encoded_json(matches_shipped),
+                ));
+            }
             ordered_json_object(&parts)
         }
         Some("validation_completed") => ordered_json_object(&[
@@ -2302,6 +2349,10 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
             (
                 "operating_skill_hash",
                 encoded_json(&payload["operating_skill_hash"]),
+            ),
+            (
+                "operating_package_matches_shipped",
+                encoded_json(&payload["operating_package_matches_shipped"]),
             ),
         ]),
         Some("change_landed") => {
@@ -2320,6 +2371,10 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
                 (
                     "operating_skill_hash",
                     encoded_json(&payload["operating_skill_hash"]),
+                ),
+                (
+                    "operating_package_matches_shipped",
+                    encoded_json(&payload["operating_package_matches_shipped"]),
                 ),
             ])
         }
@@ -2350,6 +2405,10 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
             parts.push((
                 "operating_skill_hash",
                 encoded_json(&payload["operating_skill_hash"]),
+            ));
+            parts.push((
+                "operating_package_matches_shipped",
+                encoded_json(&payload["operating_package_matches_shipped"]),
             ));
             ordered_json_object(&parts)
         }
@@ -2676,6 +2735,20 @@ fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
         .is_some_and(|value| non_empty_string(Some(value)).is_none())
     {
         errors.push("operating_skill_hash must be a non-empty string when present".to_owned());
+    }
+    if matches!(
+        event_type,
+        Some(
+            EventType::ReviewStarted
+                | EventType::ValidationCompleted
+                | EventType::ChangeLanded
+                | EventType::ReviewDisposition
+        )
+    ) && payload
+        .get("operating_package_matches_shipped")
+        .is_some_and(|value| !value.is_boolean())
+    {
+        errors.push("operating_package_matches_shipped must be boolean when present".to_owned());
     }
 
     if event_type == Some(EventType::UseRecorded) {

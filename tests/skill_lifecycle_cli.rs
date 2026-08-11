@@ -1572,7 +1572,8 @@ fn skill_evolution_material_recurrence_close_reports_its_narrow_retirement_reach
             "disposition": "blocked_no_valid_test",
             "adjudicated_event_ids": coverage,
             "note": "no fresh trial can vary the binding run length",
-            "operating_skill_hash": expected_operating_skill_hash()
+            "operating_skill_hash": expected_operating_skill_hash(),
+            "operating_package_matches_shipped": true
         }),
         "the receipt-only retirement reach must not change recorded history"
     );
@@ -1899,7 +1900,8 @@ fn skill_evolution_close_records_optional_validation_effort_as_asserted() {
             "note": "two-run arm reproduced the condition without the failure",
             "trial_count": 2,
             "artifacts_path": "reports/skill-evidence/demo-skill/reviews/rev_fixture/trials",
-            "operating_skill_hash": expected_operating_skill_hash()
+            "operating_skill_hash": expected_operating_skill_hash(),
+            "operating_package_matches_shipped": true
         })
     );
     let projection = fs::read_to_string(
@@ -2878,7 +2880,9 @@ fn rust_appended_lifecycle_events_keep_the_javascript_byte_order() {
         assert!(line.ends_with("}}"), "lifecycle event closes payload last");
         line.insert_str(
             line.len() - 2,
-            &format!(",\"operating_skill_hash\":\"{operating_skill_hash}\""),
+            &format!(
+                ",\"operating_skill_hash\":\"{operating_skill_hash}\",\"operating_package_matches_shipped\":true"
+            ),
         );
     }
     let expected_prefix = format!("{}\n", expected_lines.join("\n"));
