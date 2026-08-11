@@ -1,12 +1,14 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-11T03:01:45.437541904Z",
+  "generated_at": "2026-08-11T04:15:59.589551661Z",
   "target_content_hash": "b9f458b0917db5368c6826732f0daf19b63f157b11d22034c023c8d465794ee6",
-  "qualifying_uses_on_current_hash": 9,
+  "qualifying_uses_on_current_hash": 10,
   "open_incident_ids": [
     "evt_496d5648-cd6d-454c-ac34-5177fb95e107",
     "evt_74edc4d5-9777-484c-a861-995a7480e9f9",
-    "evt_0d50a32c-5a66-4e1a-bdc2-458626fb8ef8"
+    "evt_0d50a32c-5a66-4e1a-bdc2-458626fb8ef8",
+    "evt_f1a05d84-35fb-4622-a273-fc11e783bc90",
+    "evt_4dc3f0a0-f2c0-4a10-bb4f-1a4ae84a8c31"
   ],
   "candidate_clusters": [
     {
@@ -14,22 +16,29 @@
       "open_event_ids": [
         "evt_496d5648-cd6d-454c-ac34-5177fb95e107",
         "evt_74edc4d5-9777-484c-a861-995a7480e9f9",
-        "evt_0d50a32c-5a66-4e1a-bdc2-458626fb8ef8"
+        "evt_0d50a32c-5a66-4e1a-bdc2-458626fb8ef8",
+        "evt_f1a05d84-35fb-4622-a273-fc11e783bc90",
+        "evt_4dc3f0a0-f2c0-4a10-bb4f-1a4ae84a8c31"
       ],
-      "independent_incidents": 2,
+      "independent_incidents": 3,
       "max_severity": "material_failure"
     }
   ],
-  "state": "collecting",
-  "authorized_workflow": null,
-  "authorization_reason": null,
-  "trigger_event_ids": [],
-  "threshold_session_id": null,
+  "state": "eligible_pending_cooldown",
+  "authorized_workflow": "skill-evolution",
+  "authorization_reason": "friction_recurrence:execution",
+  "trigger_event_ids": [
+    "evt_496d5648-cd6d-454c-ac34-5177fb95e107",
+    "evt_74edc4d5-9777-484c-a861-995a7480e9f9",
+    "evt_0d50a32c-5a66-4e1a-bdc2-458626fb8ef8",
+    "evt_f1a05d84-35fb-4622-a273-fc11e783bc90"
+  ],
+  "threshold_session_id": "4b869774-46b3-4b51-b454-fa4f46af1171",
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": "rev_65e6399b-b582-4a6b-a1fb-68d8c2e42ba1",
-  "review_reentry_basis": null,
+  "review_reentry_basis": "post_review_incident",
   "target_name": "grilling",
   "target_repo_relative_path": ".claude/skills/grilling",
-  "derivation_session_id": "20756fb1-c768-4e26-ba38-df968e399320"
+  "derivation_session_id": "4b869774-46b3-4b51-b454-fa4f46af1171"
 }

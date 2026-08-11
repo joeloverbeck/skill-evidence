@@ -251,6 +251,18 @@ A skill package still present in a consumer that this crate no longer ships. Dis
 the consumer created under the same directory, which was never this crate's to remove.
 _Avoid_: stale package, leftover, residue, dead skill
 
+**Operating package**:
+The installed skill package whose instructions an agent is following while it drives a lifecycle
+operation — always a different skill from the target the operation is about. The crate never reads
+its prose; it hashes it, and compares it against what this version ships.
+_Avoid_: operator skill, driving skill, workflow package
+
+**Superseded operating package**:
+An operating package whose installed bytes differ from the ones this crate renders for the
+consumer's `Host`. It says the consumer upgraded one surface and not the other; it does not say
+which instruction changed, because the crate cannot read the difference — only detect it.
+_Avoid_: stale package, incompatible package, outdated skill
+
 **Withdrawal**:
 The deliberate removal of every retired package the crate can still prove it shipped, including
 its discovery link and empty package directories. It refuses before the first removal when a

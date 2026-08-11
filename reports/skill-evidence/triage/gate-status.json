@@ -1,16 +1,27 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-11T02:58:35.888966105Z",
+  "generated_at": "2026-08-11T04:12:00.939362084Z",
   "target_content_hash": "9968ebd3d4508f01bb91ddac011c09330651bcea7c9a5fdcd9dcad593cb4f4bc",
-  "qualifying_uses_on_current_hash": 1,
+  "qualifying_uses_on_current_hash": 2,
   "open_incident_ids": [
-    "evt_a6eaf146-e80f-4d8c-9346-16becd84a91d"
+    "evt_a6eaf146-e80f-4d8c-9346-16becd84a91d",
+    "evt_35a84c74-5fa9-4319-aaa1-772400136d1d",
+    "evt_ca0e092c-4275-48db-bb5a-d95ff7040473"
   ],
   "candidate_clusters": [
     {
       "symptom_key": "output",
       "open_event_ids": [
-        "evt_a6eaf146-e80f-4d8c-9346-16becd84a91d"
+        "evt_a6eaf146-e80f-4d8c-9346-16becd84a91d",
+        "evt_ca0e092c-4275-48db-bb5a-d95ff7040473"
+      ],
+      "independent_incidents": 2,
+      "max_severity": "material_failure"
+    },
+    {
+      "symptom_key": "execution",
+      "open_event_ids": [
+        "evt_35a84c74-5fa9-4319-aaa1-772400136d1d"
       ],
       "independent_incidents": 1,
       "max_severity": "material_failure"
@@ -27,5 +38,5 @@
   "review_reentry_basis": null,
   "target_name": "triage",
   "target_repo_relative_path": ".claude/skills/triage",
-  "derivation_session_id": "20756fb1-c768-4e26-ba38-df968e399320"
+  "derivation_session_id": "4b869774-46b3-4b51-b454-fa4f46af1171"
 }
