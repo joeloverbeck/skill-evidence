@@ -788,6 +788,45 @@ fn installed_skill_evolution_reference_reports_the_close_retirement_reach() {
 }
 
 #[test]
+fn installed_skill_evolution_reference_reports_external_owners_to_the_maintainer() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        !reference.contains("Route outside-target evidence to its owner factually"),
+        "the installed workflow must not instruct a routing act it cannot perform"
+    );
+    assert!(
+        reference.contains(
+            "Naming each outside-target owner in the close reports that attribution in the close receipt and user-facing completion for the maintainer to act on"
+        ),
+        "step 3 must state what the recorded owner actually accomplishes"
+    );
+    assert!(
+        reference.contains("without proposing an unsanctioned repair")
+            && reference.contains("never edit another owner from this review"),
+        "the replacement must preserve both outside-target prohibitions"
+    );
+    assert!(
+        reference.contains("Read `external_owners` from the close receipt whenever it is present"),
+        "the irreversible close receipt must be the completion's owner source"
+    );
+    assert!(
+        reference.contains("states each attributed owner kind and reference"),
+        "the user-facing completion must report every attributed owner"
+    );
+    assert!(
+        reference.contains("no owner clause and no empty-owner placeholder"),
+        "an ownerless close must not render a placeholder"
+    );
+}
+
+#[test]
 fn installed_skill_evolution_reference_records_the_unexpressible_mechanism_dead_end() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");

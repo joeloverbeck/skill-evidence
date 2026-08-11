@@ -1539,6 +1539,10 @@ pub fn evolution_close(
         "adjudicated_event_ids": coverage,
         "state": after.state
     });
+    if !request.external_owners.is_empty() {
+        receipt["external_owners"] = serde_json::to_value(&request.external_owners)
+            .expect("external owners always serialize");
+    }
     // One channel reported at two scopes. A close reports what *it* moved out of the gate,
     // so both scopes read the standing set after the close, drop whatever was already
     // retired before it, and keep only what this close can claim: every new member for a

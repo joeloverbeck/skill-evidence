@@ -58,7 +58,7 @@ For every trigger concluded **Outside target**, name one positive external owner
 | `model_limitation` | Named model family and limitation |
 | `user_instruction` | Stable task or instruction reference |
 
-For a non-proceeding class, carry the mapped disposition and a factual note to step 9. Route outside-target evidence to its owner factually without proposing an unsanctioned repair, and never edit another owner from this review.
+For a non-proceeding class, carry the mapped disposition and a factual note to step 9. Naming each outside-target owner in the close reports that attribution in the close receipt and user-facing completion for the maintainer to act on; it does not route evidence into the named owner's store. Do this without proposing an unsanctioned repair, and never edit another owner from this review.
 
 Each mechanism stays a *candidate* here. Only step 5's current arm can confirm it, so do not treat an unconfirmed mechanism as absent and do not close `not_reproducible` merely because no trial has run yet. Name one candidate mechanism for each trigger event, or explicitly group several trigger events under one shared mechanism and state why they share it.
 
@@ -255,7 +255,9 @@ When validation ran without building a candidate or recording `validation_comple
 
 After the close succeeds, amend the review report with the final disposition and every close-receipt value that was pending. Read `retired_from_gate_event_ids` from the close receipt whenever it is present: it names what this close moved out of the gate, including an empty reach, and never the adjudication retirement that `adjudicated_event_ids` carries. The projection's `instrument_limited_incident_ids` is instead the standing per-hash set and can include retirements from earlier reviews. Copy the receipt's list into the report and state that retirement reach in the user-facing completion. A close that neither carried an instrument-limited disposition nor named untestable coverage omits the key and has no retirement reach to report.
 
-The user-facing completion is concise, links the report, states whether the live skill changed, and, when the close receipt carries `retired_from_gate_event_ids`, states that retirement reach exactly, including an empty list. When any mechanism was marked unable to be expressed, add one clause stating that fact alongside the retirement reach.
+Read `external_owners` from the close receipt whenever it is present: it names exactly the external owners this close recorded, each by kind and stable reference.
+
+The user-facing completion is concise, links the report, states whether the live skill changed, and, when the close receipt carries `retired_from_gate_event_ids`, states that retirement reach exactly, including an empty list. When the close receipt carries `external_owners`, it states each attributed owner kind and reference. When that key is absent, add no owner clause and no empty-owner placeholder. When any mechanism was marked unable to be expressed, add one clause stating that fact alongside the retirement reach.
 
 *Done when the report existed before close, the disposition event exists, the report carries the close receipt's final values, and the completion was delivered.*
 

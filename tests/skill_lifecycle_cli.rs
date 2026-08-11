@@ -2481,7 +2481,7 @@ fn adjudicating_close_refuses_when_any_covered_event_has_no_explicit_route() {
 }
 
 #[test]
-fn outside_target_close_records_one_owned_conclusion_and_one_undecidable_trigger() {
+fn outside_target_close_reports_recorded_owners_and_other_closes_omit_them() {
     let fixture = repository_with_demo_skill();
     let concluded = record_outcome(
         fixture.path(),
@@ -2538,6 +2538,16 @@ fn outside_target_close_records_one_owned_conclusion_and_one_undecidable_trigger
         "mixed close failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+    let receipt: Value = serde_json::from_slice(&output.stdout).expect("mixed close receipt JSON");
+    assert_eq!(
+        receipt["external_owners"],
+        serde_json::json!([{
+            "event_id": concluded,
+            "kind": "skill",
+            "reference": ".claude/skills/code-review"
+        }]),
+        "the compiled close receipt must report the owner recorded by the close"
+    );
     let stream = fs::read_to_string(
         fixture
             .path()
@@ -2571,6 +2581,26 @@ fn outside_target_close_records_one_owned_conclusion_and_one_undecidable_trigger
         serde_json::json!([undecidable])
     );
     assert_event_stream_matches_the_published_schema(fixture.path());
+
+    let ownerless_fixture = repository_with_demo_skill();
+    claim_evolution(ownerless_fixture.path());
+    let ownerless_output = run_evolution_close(
+        ownerless_fixture.path(),
+        "evt_ownerless_close",
+        "monitor_for_recurrence",
+        Some("the target remains under observation"),
+    );
+    assert!(
+        ownerless_output.status.success(),
+        "ownerless close failed: {}",
+        String::from_utf8_lossy(&ownerless_output.stderr)
+    );
+    let ownerless_receipt: Value =
+        serde_json::from_slice(&ownerless_output.stdout).expect("ownerless close receipt JSON");
+    assert!(
+        ownerless_receipt.get("external_owners").is_none(),
+        "a close that recorded no external owner must omit the receipt key: {ownerless_receipt}"
+    );
 }
 
 #[test]
