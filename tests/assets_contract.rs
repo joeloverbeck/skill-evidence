@@ -455,6 +455,96 @@ fn installed_skill_evolution_reference_reserves_blocked_for_the_whole_review() {
 }
 
 #[test]
+fn installed_skill_evolution_reference_sources_each_binding_constraint_in_step_four() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    for required in [
+        "For each binding constraint, identify what in the evidence packet establishes it",
+        "`run_condition`, `observed`, `consequence`, or `workaround_taken`",
+        "a same-target predecessor's ruling",
+        "record it as unestablished rather than asserting it",
+        "An effect recorded as undetermined establishes nothing about that effect and does not establish its opposite",
+    ] {
+        assert!(
+            plan.contains(required),
+            "installed step 4 must preserve `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
+fn installed_skill_evolution_reference_keeps_unestablished_constraints_in_trial() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    assert!(
+        plan.contains(
+            "Only a constraint the evidence packet establishes can support an **unable to be expressed** marking"
+        ),
+        "an unestablished constraint must not retire a trial slot: reference={reference}"
+    );
+    assert!(
+        plan.contains(
+            "An unestablished constraint keeps its trial slot and proceeds to an ordinary reproduction trial"
+        ),
+        "the installed reference must name the safe fallback: reference={reference}"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_preserves_established_run_condition_routing() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    assert!(
+        plan.contains(
+            "When recorded run conditions agree that failures arrived at volume, late in a long run, or only intermittently, say so here and treat a fresh short-context single-run trial as unable to express that"
+        ),
+        "the provenance repair must preserve established run-condition routing for #41: reference={reference}"
+    );
+}
+
+#[test]
 fn installed_event_schema_declares_close_validation_effort_as_optional() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
@@ -1180,6 +1270,72 @@ fn installed_skill_evolution_reference_ties_mismatch_disclosure_to_unvouched_sib
             "Vouch only for incidents inside that reason-specific reach bound; same-symptom incidents outside it do not affect this close"
         ),
         "the reviewer must not import symptom-wide vouching into the narrowed rule"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_vouches_for_constraint_provenance_before_close() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let report_and_close = reference
+        .find("### 9. Report, close, amend, complete")
+        .expect("the close step remains explicit");
+    let report = reference
+        .find("Before any close, write the review report")
+        .expect("the pre-close report instruction remains explicit");
+    let pre_close = &reference[report_and_close..report];
+
+    assert!(
+        pre_close.contains(
+            "Vouch for every named binding constraint's provenance as well as its coverage"
+        ),
+        "the pre-close vouch must cover provenance: reference={reference}"
+    );
+    assert!(
+        pre_close.contains("the evidence-packet artifact establishing it is on record"),
+        "the vouch must name its observable: reference={reference}"
+    );
+    assert!(
+        pre_close.contains(
+            "If a binding constraint is unestablished, record that mismatch in the review report and user-facing completion"
+        ),
+        "an unestablished constraint must use the existing mismatch disclosure: reference={reference}"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_vouches_for_every_constraint_before_any_close() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let report_and_close = reference
+        .find("### 9. Report, close, amend, complete")
+        .expect("the close step remains explicit");
+    let report = reference
+        .find("Before any close, write the review report")
+        .expect("the pre-close report instruction remains explicit");
+    let pre_close = &reference[report_and_close..report];
+
+    assert!(
+        pre_close.contains("Before any close, perform the provenance vouch"),
+        "the provenance vouch must not depend on the eventual close route: reference={reference}"
+    );
+    assert!(
+        pre_close.contains(
+            "Vouch for every named binding constraint's provenance as well as its coverage"
+        ),
+        "the unconditional vouch must still cover every named constraint: reference={reference}"
     );
 }
 
