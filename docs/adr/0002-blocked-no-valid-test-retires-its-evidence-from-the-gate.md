@@ -12,6 +12,8 @@ Amended: 2026-08-10, GitHub [#23](https://github.com/joeloverbeck/skill-evidence
 
 Amended: 2026-08-11, GitHub [#32](https://github.com/joeloverbeck/skill-evidence/issues/32) and [#35](https://github.com/joeloverbeck/skill-evidence/issues/35) — the coverage list now freezes when the review is claimed rather than when the threshold first fires, because the reach consequence below described a concurrency that never occurred. The reopening clause fired, was tested against its first real occurrence, and correction/supersession is declined a second time on a condition that bites.
 
+Amended: 2026-08-11, GitHub [#33](https://github.com/joeloverbeck/skill-evidence/issues/33) — the re-anchored coverage list reaches the reviewer with full payloads, so the vouch's missing inputs narrow to the claim-to-close span. That residue is accepted under disclosure and carries no open tracker; the reopening condition is stated where the residue is.
+
 A Skill Evolution review that closes `blocked_no_valid_test` reached no conclusion, so it adjudicates
 nothing and its trigger evidence stays open. That close still laid a watermark, and the watermark
 deferred the very evidence that opened the gate — labelled `queued_pre_close_evidence`, as though a
@@ -250,12 +252,20 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
   re-evaluated at the close, so the treadmill argument re-runs unchanged and the next review's bar
   does not move; what shrinks is the span the vouch must cross, to what genuinely arrives between
   claim and close — for both measured occurrences, nothing.
-  **It does not make a failed vouch refuse, and that is deliberate.** The residual span is small but
-  real, and its facts are still withheld from the packet, which
-  [#33](https://github.com/joeloverbeck/skill-evidence/issues/33) tracks. A refusal keyed on a
+  **It does not make a failed vouch refuse, and that is deliberate.** A refusal keyed on a
   judgment whose inputs the protocol does not supply would either block every instrument-limited close
   or force the reviewer to author the vouch, which is the shape *records are generated, never
   authored* forbids. Disclosure stays the response for the residue.
+  **The vouch's inputs are supplied for everything the claim freezes, and that was the point.**
+  The packet's `trigger_events` is built from the projection's trigger identity list, so re-anchoring
+  that list to the reason-scoped cluster hands the reviewer every frozen coverage member's full raw
+  event with no packet change at all. What is left without payloads is only what arrives between the
+  claim and the close — the same span the freeze already narrowed, empty in both measured occurrences
+  — and step 9 already routes an unvouchable member to a disclosed mismatch rather than a judgment.
+  [#33](https://github.com/joeloverbeck/skill-evidence/issues/33) was filed against the withheld
+  payloads and is closed as delivered by this amendment; the residue it named is accepted here under
+  disclosure, with no open tracker. What would reopen it is a close whose reach turned on a
+  claim-to-close arrival the reviewer could not read — not the span merely being non-empty.
   `trigger_event_ids` on `review_started` changes meaning here, so the release carrying this moves an
   installed and a compiled surface together and requires `skills evidence install --force` per
   [`../releasing.md`](../releasing.md). The `Coverage list` and `Retirement reach` entries in
