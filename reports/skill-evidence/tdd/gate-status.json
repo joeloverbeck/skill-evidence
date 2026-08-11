@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-11T10:12:08.406085053Z",
+  "generated_at": "2026-08-11T10:53:24.551698877Z",
   "target_content_hash": "abeb2fa2eba3d255f523ac3ed4f207b941678e2521fddbb6dc5ab47fe57761e7",
-  "qualifying_uses_on_current_hash": 6,
+  "qualifying_uses_on_current_hash": 7,
   "open_incident_ids": [
     "evt_f38d3388-dede-460c-918c-24964cb0953e",
     "evt_c4d1538f-965b-42f4-9940-1fffe6dd61fc",
@@ -11,7 +11,8 @@
     "evt_b2ba7cbf-d2db-49cb-bc85-45f65a13e01a",
     "evt_101e4c1c-7eee-4a24-8e59-511be949f0dd",
     "evt_65ce02b0-35c8-42fc-afff-cb493072376b",
-    "evt_b5672bdd-ba99-46d7-af46-2c6eae2bcc80"
+    "evt_b5672bdd-ba99-46d7-af46-2c6eae2bcc80",
+    "evt_4b50621a-7990-44d8-837d-1f3a6521c7f2"
   ],
   "candidate_clusters": [
     {
@@ -28,6 +29,14 @@
       ],
       "independent_incidents": 4,
       "max_severity": "material_failure"
+    },
+    {
+      "symptom_key": "execution",
+      "open_event_ids": [
+        "evt_4b50621a-7990-44d8-837d-1f3a6521c7f2"
+      ],
+      "independent_incidents": 1,
+      "max_severity": "friction"
     }
   ],
   "state": "eligible",
@@ -47,5 +56,5 @@
   "review_reentry_basis": "first_eligibility",
   "target_name": "tdd",
   "target_repo_relative_path": ".claude/skills/tdd",
-  "derivation_session_id": "019fef99-898f-7143-aee5-5f29c3ac25b7"
+  "derivation_session_id": "019ff05b-0e4e-7533-82ea-30407d568ef2"
 }

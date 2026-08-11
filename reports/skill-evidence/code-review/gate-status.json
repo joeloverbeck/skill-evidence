@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-11T10:18:39.717166335Z",
+  "generated_at": "2026-08-11T10:54:04.649517082Z",
   "target_content_hash": "58ee690ec479d13e9ff51567f4e57087f319ac7a1aca6511d61c8628f5e43fa6",
-  "qualifying_uses_on_current_hash": 22,
+  "qualifying_uses_on_current_hash": 23,
   "open_incident_ids": [
     "evt_7814cfa8-ad78-4511-b202-f78ad96902d3",
     "evt_c5666704-0654-4a6f-9626-2deb557e1302",
@@ -33,7 +33,7 @@
       "max_severity": "material_failure"
     }
   ],
-  "state": "eligible_pending_cooldown",
+  "state": "eligible",
   "authorized_workflow": "skill-evolution",
   "authorization_reason": "friction_recurrence:output",
   "trigger_event_ids": [
@@ -50,5 +50,5 @@
   "review_reentry_basis": "post_review_incident",
   "target_name": "code-review",
   "target_repo_relative_path": ".claude/skills/code-review",
-  "derivation_session_id": "019fef99-898f-7143-aee5-5f29c3ac25b7"
+  "derivation_session_id": "019ff05b-0e4e-7533-82ea-30407d568ef2"
 }
