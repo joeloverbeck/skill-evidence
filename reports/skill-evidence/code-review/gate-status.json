@@ -1,14 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-10T19:23:42.418458043Z",
+  "generated_at": "2026-08-11T00:22:12.122608573Z",
   "target_content_hash": "58ee690ec479d13e9ff51567f4e57087f319ac7a1aca6511d61c8628f5e43fa6",
-  "qualifying_uses_on_current_hash": 18,
+  "qualifying_uses_on_current_hash": 19,
   "open_incident_ids": [
     "evt_7814cfa8-ad78-4511-b202-f78ad96902d3",
     "evt_d8187585-0e16-4fb6-b72d-380cdefb256d",
     "evt_734adee8-5bff-4703-ab93-7dc7392fb1e5",
     "evt_c5666704-0654-4a6f-9626-2deb557e1302",
-    "evt_d629f005-ff0e-4bda-8136-9f82d13c3c04"
+    "evt_d629f005-ff0e-4bda-8136-9f82d13c3c04",
+    "evt_79fba326-61ff-4ace-adbf-7091c4527429",
+    "evt_3ea9e7a9-f39c-4c9b-8dff-5dbeab0860f9"
   ],
   "candidate_clusters": [
     {
@@ -16,18 +18,20 @@
       "open_event_ids": [
         "evt_7814cfa8-ad78-4511-b202-f78ad96902d3",
         "evt_c5666704-0654-4a6f-9626-2deb557e1302",
-        "evt_d629f005-ff0e-4bda-8136-9f82d13c3c04"
+        "evt_d629f005-ff0e-4bda-8136-9f82d13c3c04",
+        "evt_3ea9e7a9-f39c-4c9b-8dff-5dbeab0860f9"
       ],
-      "independent_incidents": 3,
+      "independent_incidents": 4,
       "max_severity": "material_failure"
     },
     {
       "symptom_key": "execution",
       "open_event_ids": [
         "evt_d8187585-0e16-4fb6-b72d-380cdefb256d",
-        "evt_734adee8-5bff-4703-ab93-7dc7392fb1e5"
+        "evt_734adee8-5bff-4703-ab93-7dc7392fb1e5",
+        "evt_79fba326-61ff-4ace-adbf-7091c4527429"
       ],
-      "independent_incidents": 2,
+      "independent_incidents": 3,
       "max_severity": "material_failure"
     }
   ],
@@ -45,5 +49,5 @@
   "review_reentry_basis": "post_review_incident",
   "target_name": "code-review",
   "target_repo_relative_path": ".claude/skills/code-review",
-  "derivation_session_id": "019fed06-fc1c-75d3-ad10-fe27267f1d9e"
+  "derivation_session_id": "d0f94577-3fc6-439b-b6a7-17549a11cd62"
 }
