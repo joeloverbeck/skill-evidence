@@ -192,6 +192,15 @@ reached different readings. Naming an event here narrows what the close conclude
 what the close covered, and it says nothing about whether the mechanism reproduced.
 _Avoid_: partial adjudication, excluded triggers, untested set, uncovered evidence
 
+**External owner**:
+The party an `outside_target` conclusion names as responsible for a trigger it covered — a kind drawn
+from the shipped ownership taxonomy, plus a stable reference — recorded for each concluded event
+rather than once per close, so a review whose triggers are owned differently still has an honest
+close. Naming one records a conclusion and reports it; it moves no evidence, and the named party's
+gate still opens only on that party's own recorded uses. See
+[`docs/adr/0007-an-outside-target-conclusion-reports-its-owner-and-routes-nothing.md`](docs/adr/0007-an-outside-target-conclusion-reports-its-owner-and-routes-nothing.md).
+_Avoid_: owning skill, responsible party, culprit, routed owner
+
 **Instrument-limited disposition**:
 A non-adjudicating disposition that nonetheless retires evidence from the gate, because the review
 established that this instrument cannot test it. It adjudicates nothing — the incidents stay open and

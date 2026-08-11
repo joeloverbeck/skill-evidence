@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-11T03:04:25.260311384Z",
+  "generated_at": "2026-08-11T09:02:08.916187994Z",
   "target_content_hash": "97f7208528885b6bf219d45525f5e086b45291c8b1f66090915d6e8bd6709dc8",
-  "qualifying_uses_on_current_hash": 8,
+  "qualifying_uses_on_current_hash": 9,
   "open_incident_ids": [
     "evt_4833594e-7e25-4a2f-a94a-278e6e3b9e86",
     "evt_2aabfe78-d93c-48c4-b54e-346b838bfb83",
@@ -35,7 +35,7 @@
       "max_severity": "material_failure"
     }
   ],
-  "state": "eligible_pending_cooldown",
+  "state": "eligible",
   "authorized_workflow": "skill-evolution",
   "authorization_reason": "material_recurrence:output",
   "trigger_event_ids": [
@@ -49,7 +49,7 @@
   "review_reentry_basis": "post_review_incident",
   "target_name": "domain-modeling",
   "target_repo_relative_path": ".claude/skills/domain-modeling",
-  "derivation_session_id": "20756fb1-c768-4e26-ba38-df968e399320",
+  "derivation_session_id": "cb818fd6-c7f6-44a8-ba7c-ed9e7d629564",
   "instrument_limited_incident_ids": [
     "evt_2aabfe78-d93c-48c4-b54e-346b838bfb83",
     "evt_92d00622-339f-4004-86c9-60fbeb50d218",
