@@ -174,11 +174,10 @@ pub struct LifecycleEventInputs {
 pub struct EvolutionClaimRequest {
     pub review_id: String,
     pub risk_tier: String,
-    /// Record the content hash of the host's operating Skill Evolution package.
+    /// Legacy compatibility switch retained as an accepted no-op.
     ///
-    /// The caller chooses whether the receipt carries the identity but never supplies the
-    /// identity itself. The crate hashes `LifecycleEventInputs::operator_skill` when this is
-    /// true; false preserves the historical `review_started` payload byte-for-byte.
+    /// The crate always hashes `LifecycleEventInputs::operator_skill`; callers compiled against
+    /// the earlier opt-in API can continue to set this field without changing the event.
     pub record_operating_skill_hash: bool,
 }
 
@@ -824,6 +823,10 @@ pub fn evolution_preflight(
     }))
 }
 
+fn operating_skill_hash(inputs: &LifecycleEventInputs) -> Result<String, Error> {
+    Ok(hash_target_directory(&inputs.operator_skill)?.content_hash)
+}
+
 pub fn evolution_claim(
     root: &Path,
     target: &Path,
@@ -843,6 +846,7 @@ pub fn evolution_claim(
     }
     let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
     let target = lifecycle_target_context(root, target, &inputs.operator_skill)?;
+    let operating_skill_hash = operating_skill_hash(inputs)?;
     fs::create_dir_all(&target.evidence_directory).map_err(|error| {
         unsafe_failure(format!(
             "Could not create evidence directory {}: {error}",
@@ -875,10 +879,7 @@ pub fn evolution_claim(
         "risk_tier": request.risk_tier,
         "session_or_cooldown_proof": proof
     });
-    if request.record_operating_skill_hash {
-        payload["operating_skill_hash"] =
-            serde_json::json!(hash_target_directory(&inputs.operator_skill)?.content_hash);
-    }
+    payload["operating_skill_hash"] = serde_json::json!(operating_skill_hash);
     let event = lifecycle_event(
         &target,
         &hash.content_hash,
@@ -967,6 +968,7 @@ pub fn evolution_record_validation(
         .unwrap_or(&candidate_real)
         .to_string_lossy()
         .replace(std::path::MAIN_SEPARATOR, "/");
+    let operating_skill_hash = operating_skill_hash(inputs)?;
     let event = lifecycle_event(
         &target,
         &hash.content_hash,
@@ -980,7 +982,8 @@ pub fn evolution_record_validation(
             "candidate_path": candidate_path,
             "trial_count": trial_count,
             "artifacts_path": request.artifacts,
-            "summary": request.summary
+            "summary": request.summary,
+            "operating_skill_hash": operating_skill_hash
         }),
         inputs,
     );
@@ -1012,6 +1015,9 @@ pub fn evolution_land(
     let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
     let target = lifecycle_target_context(root, target, &inputs.operator_skill)?;
     let candidate_real = resolve_target(&target.repository_root, &request.candidate)?;
+    // Resolve every fallible provenance input before landing mutates the live target: a hash
+    // failure after that point could otherwise leave changed files without their event receipt.
+    let operating_skill_hash = operating_skill_hash(inputs)?;
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
     let mut events = read_valid_lifecycle_stream(&target)?;
     let review = find_review_start(&events, &request.review_id)?;
@@ -1071,7 +1077,8 @@ pub fn evolution_land(
             "before_hash": baseline,
             "after_hash": landing.after_hash,
             "changed_files": landing.changed_files,
-            "mirror_status": landing.mirror_status
+            "mirror_status": landing.mirror_status,
+            "operating_skill_hash": operating_skill_hash
         }),
         inputs,
     );
@@ -1286,11 +1293,13 @@ pub fn evolution_close(
     // whole cluster — wider than this close ever covered — while asserting an untestability
     // its own trials disprove. Which limit a review met is semantic, and the command cannot
     // see it; the reference decides it at step 9.
+    let operating_skill_hash = operating_skill_hash(inputs)?;
     let mut payload = serde_json::json!({
         "review_id": request.review_id,
         "disposition": request.disposition,
         "adjudicated_event_ids": adjudicated,
-        "note": request.note
+        "note": request.note,
+        "operating_skill_hash": operating_skill_hash
     });
     if !request.instrument_limited.is_empty() {
         // Deduplicated like the coverage list beside it. The event is append-only and this
@@ -2290,6 +2299,10 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
             ("trial_count", encoded_json(&payload["trial_count"])),
             ("artifacts_path", encoded_json(&payload["artifacts_path"])),
             ("summary", encoded_json(&payload["summary"])),
+            (
+                "operating_skill_hash",
+                encoded_json(&payload["operating_skill_hash"]),
+            ),
         ]),
         Some("change_landed") => {
             let changed = &payload["changed_files"];
@@ -2304,6 +2317,10 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
                 ("after_hash", encoded_json(&payload["after_hash"])),
                 ("changed_files", changed),
                 ("mirror_status", encoded_json(&payload["mirror_status"])),
+                (
+                    "operating_skill_hash",
+                    encoded_json(&payload["operating_skill_hash"]),
+                ),
             ])
         }
         Some("review_disposition") => {
@@ -2330,6 +2347,10 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
             if let Some(artifacts_path) = payload.get("artifacts_path") {
                 parts.push(("artifacts_path", encoded_json(artifacts_path)));
             }
+            parts.push((
+                "operating_skill_hash",
+                encoded_json(&payload["operating_skill_hash"]),
+            ));
             ordered_json_object(&parts)
         }
         Some(event_type) => {
@@ -2642,6 +2663,20 @@ fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
         errors.push("payload missing".to_owned());
         return errors;
     };
+    if matches!(
+        event_type,
+        Some(
+            EventType::ReviewStarted
+                | EventType::ValidationCompleted
+                | EventType::ChangeLanded
+                | EventType::ReviewDisposition
+        )
+    ) && payload
+        .get("operating_skill_hash")
+        .is_some_and(|value| non_empty_string(Some(value)).is_none())
+    {
+        errors.push("operating_skill_hash must be a non-empty string when present".to_owned());
+    }
 
     if event_type == Some(EventType::UseRecorded) {
         let missing = USE_PAYLOAD_KEYS
@@ -2746,12 +2781,6 @@ fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
     } else if event_type == Some(EventType::ReviewStarted) {
         if non_empty_string(payload.get("review_id")).is_none() {
             errors.push("review_id missing".to_owned());
-        }
-        if payload
-            .get("operating_skill_hash")
-            .is_some_and(|value| non_empty_string(Some(value)).is_none())
-        {
-            errors.push("operating_skill_hash must be a non-empty string when present".to_owned());
         }
     } else if event_type == Some(EventType::ReviewDisposition) {
         if non_empty_string(payload.get("review_id")).is_none() {

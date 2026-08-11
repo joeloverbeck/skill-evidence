@@ -228,7 +228,16 @@
     },
     {
       "if": {
-        "properties": { "event_type": { "const": "review_started" } },
+        "properties": {
+          "event_type": {
+            "enum": [
+              "review_started",
+              "validation_completed",
+              "change_landed",
+              "review_disposition"
+            ]
+          }
+        },
         "required": ["event_type"]
       },
       "then": {
@@ -241,7 +250,7 @@
               "operating_skill_hash": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Content hash computed from the operating Skill Evolution package when the claim opted to record it. Omitted when that operating-package identity was not recorded; absence never means it matched the package running now."
+                "description": "Content hash computed from the operating Skill Evolution package when this lifecycle event was written. Optional only for compatibility with history written before unconditional identity recording; absence never means the package matched the one operating now."
               }
             }
           }

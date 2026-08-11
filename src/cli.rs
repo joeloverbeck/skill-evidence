@@ -203,7 +203,7 @@ pub struct EvolutionClaimArgs {
     review_id: Option<String>,
     #[arg(long, default_value = "provisional")]
     risk_tier: String,
-    /// Record the computed content hash of the operating Skill Evolution package.
+    /// Legacy accepted no-op; the operating Skill Evolution package hash is always recorded.
     #[arg(long)]
     record_operating_skill_hash: bool,
 }

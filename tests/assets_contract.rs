@@ -548,18 +548,46 @@ fn installed_event_schema_declares_operating_skill_hash_as_optional_and_open() {
         .expect("read installed event schema"),
     )
     .expect("installed event schema JSON");
-    let review_started = schema["allOf"]
+    let identity_branch = schema["allOf"]
         .as_array()
         .expect("event conditionals")
         .iter()
         .find(|branch| {
-            branch.pointer("/if/properties/event_type/const")
-                == Some(&serde_json::json!("review_started"))
+            branch.pointer("/then/properties/payload/properties/operating_skill_hash/type")
+                == Some(&serde_json::json!("string"))
         })
-        .expect("review_started payload schema");
-    let payload = review_started
+        .expect("operating identity payload schema");
+    let event_type_schema = identity_branch
+        .pointer("/if/properties/event_type")
+        .expect("operating identity event types");
+    let identity_event_types = event_type_schema["enum"].as_array().map_or_else(
+        || {
+            vec![
+                event_type_schema["const"]
+                    .as_str()
+                    .expect("identity event type"),
+            ]
+        },
+        |event_types| {
+            event_types
+                .iter()
+                .map(|event_type| event_type.as_str().expect("identity event type"))
+                .collect::<Vec<_>>()
+        },
+    );
+    assert_eq!(
+        identity_event_types,
+        vec![
+            "review_started",
+            "validation_completed",
+            "change_landed",
+            "review_disposition"
+        ],
+        "every Skill Evolution lifecycle writer must declare the computed identity"
+    );
+    let payload = identity_branch
         .pointer("/then/properties/payload")
-        .expect("review_started payload");
+        .expect("operating identity payload");
 
     assert_eq!(
         payload["properties"]["operating_skill_hash"]["type"],
@@ -572,10 +600,10 @@ fn installed_event_schema_declares_operating_skill_hash_as_optional_and_open() {
     assert!(
         !payload["required"]
             .as_array()
-            .expect("required review_started properties")
+            .expect("required identity-bearing properties")
             .iter()
             .any(|field| field == "operating_skill_hash"),
-        "absent means the operating package identity was not recorded"
+        "absent means the event predates unconditional identity recording"
     );
     assert!(
         payload.get("additionalProperties").is_none(),
@@ -583,30 +611,54 @@ fn installed_event_schema_declares_operating_skill_hash_as_optional_and_open() {
     );
 
     let validator = jsonschema::validator_for(&schema).expect("compile installed event schema");
-    let mut event = serde_json::json!({
-        "schema_version": 1,
-        "event_id": "evt_review_started",
-        "event_type": "review_started",
-        "recorded_at": "2026-01-02T03:04:05Z",
-        "operator_workflow": "skill-evolution",
-        "target": {
-            "name": "demo-skill",
-            "repo_relative_path": ".claude/skills/demo-skill",
-            "content_hash": "target-hash",
-            "repo_head": "fixture-head"
-        },
-        "top_level_session_id": "review-session",
-        "payload": { "review_id": "review-fixture" }
-    });
-    assert!(
-        validator.is_valid(&event),
-        "the historical absent shape stays valid"
-    );
-    event["payload"]["operating_skill_hash"] = serde_json::json!("operating-hash");
-    assert!(
-        validator.is_valid(&event),
-        "the additive recorded shape is valid"
-    );
+    for (event_type, event_payload) in [
+        (
+            "review_started",
+            serde_json::json!({ "review_id": "review-fixture" }),
+        ),
+        (
+            "validation_completed",
+            serde_json::json!({ "review_id": "review-fixture" }),
+        ),
+        (
+            "change_landed",
+            serde_json::json!({ "review_id": "review-fixture" }),
+        ),
+        (
+            "review_disposition",
+            serde_json::json!({
+                "review_id": "review-fixture",
+                "disposition": "monitor_for_recurrence",
+                "adjudicated_event_ids": ["evt-trigger"],
+                "note": "fixture close"
+            }),
+        ),
+    ] {
+        let mut event = serde_json::json!({
+            "schema_version": 1,
+            "event_id": format!("evt_{event_type}"),
+            "event_type": event_type,
+            "recorded_at": "2026-01-02T03:04:05Z",
+            "operator_workflow": "skill-evolution",
+            "target": {
+                "name": "demo-skill",
+                "repo_relative_path": ".claude/skills/demo-skill",
+                "content_hash": "target-hash",
+                "repo_head": "fixture-head"
+            },
+            "top_level_session_id": "review-session",
+            "payload": event_payload
+        });
+        assert!(
+            validator.is_valid(&event),
+            "the historical {event_type} shape without identity stays valid"
+        );
+        event["payload"]["operating_skill_hash"] = serde_json::json!("operating-hash");
+        assert!(
+            validator.is_valid(&event),
+            "the additive identity is valid on {event_type}"
+        );
+    }
 }
 
 #[test]

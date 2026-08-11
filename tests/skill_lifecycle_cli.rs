@@ -5,8 +5,18 @@ mod support;
 use std::{fs, path::Path, process::Command};
 
 use serde_json::Value;
-use support::{repository_root, skill_evidence};
+use support::{host, repository_root, skill_evidence};
 use tempfile::TempDir;
+
+fn expected_operating_skill_hash() -> String {
+    skill_evidence::hash_skill(
+        &repository_root(),
+        Path::new(".claude/skills/skill-evolution"),
+        &host(),
+    )
+    .expect("hash the reference host's operating Skill Evolution package")
+    .content_hash
+}
 
 fn repository_with_demo_skill() -> TempDir {
     let fixture = tempfile::tempdir().expect("temporary repository root");
@@ -1561,7 +1571,8 @@ fn skill_evolution_material_recurrence_close_reports_its_narrow_retirement_reach
             "review_id": "rev_fixture",
             "disposition": "blocked_no_valid_test",
             "adjudicated_event_ids": coverage,
-            "note": "no fresh trial can vary the binding run length"
+            "note": "no fresh trial can vary the binding run length",
+            "operating_skill_hash": expected_operating_skill_hash()
         }),
         "the receipt-only retirement reach must not change recorded history"
     );
@@ -1887,7 +1898,8 @@ fn skill_evolution_close_records_optional_validation_effort_as_asserted() {
             "adjudicated_event_ids": claim["trigger_event_ids"],
             "note": "two-run arm reproduced the condition without the failure",
             "trial_count": 2,
-            "artifacts_path": "reports/skill-evidence/demo-skill/reviews/rev_fixture/trials"
+            "artifacts_path": "reports/skill-evidence/demo-skill/reviews/rev_fixture/trials",
+            "operating_skill_hash": expected_operating_skill_hash()
         })
     );
     let projection = fs::read_to_string(
@@ -2856,10 +2868,20 @@ fn rust_appended_lifecycle_events_keep_the_javascript_byte_order() {
     // them any more — the replay ends at `review_disposition`, and the
     // comparison ends with it. The byte-order guarantee is unchanged for every
     // event type still writable, which is every type this crate emits.
-    let expected_prefix = format!(
-        "{}\n",
-        expected_text.lines().take(7).collect::<Vec<_>>().join("\n")
-    );
+    let operating_skill_hash = expected_operating_skill_hash();
+    let mut expected_lines = expected_text
+        .lines()
+        .take(7)
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    for line in &mut expected_lines[3..] {
+        assert!(line.ends_with("}}"), "lifecycle event closes payload last");
+        line.insert_str(
+            line.len() - 2,
+            &format!(",\"operating_skill_hash\":\"{operating_skill_hash}\""),
+        );
+    }
+    let expected_prefix = format!("{}\n", expected_lines.join("\n"));
     assert_eq!(
         fs::read_to_string(store.join("events.jsonl")).expect("read Rust replay stream"),
         expected_prefix
