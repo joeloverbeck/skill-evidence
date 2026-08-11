@@ -1,11 +1,24 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-09T13:12:58.22797833Z",
+  "generated_at": "2026-08-11T01:49:12.365193141Z",
   "target_content_hash": "a8bac8f11e6f71f3093da1284fcc44d0519b23de28b5ee9d31dfd6ed4588729e",
-  "qualifying_uses_on_current_hash": 1,
-  "open_incident_ids": [],
-  "candidate_clusters": [],
-  "state": "closed",
+  "qualifying_uses_on_current_hash": 2,
+  "open_incident_ids": [
+    "evt_9dcc7f9c-c5a8-4ae6-a239-8f88adb0ee59",
+    "evt_94b1348a-4286-4268-ac8a-74cedb8a0e79"
+  ],
+  "candidate_clusters": [
+    {
+      "symptom_key": "execution",
+      "open_event_ids": [
+        "evt_9dcc7f9c-c5a8-4ae6-a239-8f88adb0ee59",
+        "evt_94b1348a-4286-4268-ac8a-74cedb8a0e79"
+      ],
+      "independent_incidents": 1,
+      "max_severity": "friction"
+    }
+  ],
+  "state": "collecting",
   "authorized_workflow": null,
   "authorization_reason": null,
   "trigger_event_ids": [],
@@ -16,5 +29,5 @@
   "review_reentry_basis": null,
   "target_name": "diagnosing-bugs",
   "target_repo_relative_path": ".claude/skills/diagnosing-bugs",
-  "derivation_session_id": "019fe688-8d0a-7ce2-a472-e0fcbcde88f1"
+  "derivation_session_id": "019fed21-94e6-7222-a812-b5514066f45c"
 }

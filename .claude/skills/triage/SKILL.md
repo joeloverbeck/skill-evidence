@@ -28,16 +28,20 @@ Two **category** roles:
 - `bug` — something is broken
 - `enhancement` — new feature or improvement
 
-Five **state** roles:
+Six **state** roles:
 
 - `needs-triage` — maintainer needs to evaluate
 - `needs-info` — waiting on reporter for more information
 - `ready-for-agent` — fully specified, ready for an AFK agent
 - `ready-for-human` — needs human implementation
+- `coordination` — open parent holding sequencing; its separately AFK-ready children hold the work
 - `wontfix` — will not be actioned
 
-This repo defines no additional state roles. In particular it has no umbrella state: see
-[`../../../docs/agents/triage-labels.md`](../../../docs/agents/triage-labels.md).
+This repo held only leaf work until 2026-08-11 and deliberately had no umbrella state before then.
+`coordination` was adopted at that point; the standing condition that authorized it, and the
+dependency structure that satisfied it, are recorded in
+[`../../../docs/agents/triage-labels.md`](../../../docs/agents/triage-labels.md). A `coordination`
+parent is never AFK-grabbable and is never closed while a child is open.
 
 For a PR, the same states read against the attached code: `ready-for-agent` means a brief is attached and an agent should take the next step on the diff; `ready-for-human` means it's ready for a human to merge.
 
@@ -45,7 +49,7 @@ Every triaged issue should carry exactly one category role and one state role. I
 
 These are canonical role names — the actual label strings used in the issue tracker may differ. The mapping should have been provided to you - run `/setup-matt-pocock-skills` if not.
 
-State transitions: an unlabeled issue normally goes to `needs-triage` first; from there it moves to `needs-info`, `ready-for-agent`, `ready-for-human`, or `wontfix`. `needs-info` returns to `needs-triage` once the reporter replies. The maintainer can override at any time — flag transitions that look unusual and ask before proceeding.
+State transitions: an unlabeled issue normally goes to `needs-triage` first; from there it moves to `needs-info`, `ready-for-agent`, `ready-for-human`, `coordination`, or `wontfix`. `needs-info` returns to `needs-triage` once the reporter replies. A `coordination` parent stays put until its last child closes. The maintainer can override at any time — flag transitions that look unusual and ask before proceeding.
 
 ## Invocation
 

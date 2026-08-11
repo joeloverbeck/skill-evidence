@@ -10,6 +10,8 @@ Amended: 2026-08-09, GitHub [#16](https://github.com/joeloverbeck/skill-evidence
 
 Amended: 2026-08-10, GitHub [#23](https://github.com/joeloverbeck/skill-evidence/issues/23) — an adjudicating close can now name part of its coverage list as untestable and retire it on this decision's warrant without adjudicating it. Reach is unmoved and the treadmill reasoning below re-runs unchanged; see the consequence on untestable coverage.
 
+Amended: 2026-08-11, GitHub [#32](https://github.com/joeloverbeck/skill-evidence/issues/32) and [#35](https://github.com/joeloverbeck/skill-evidence/issues/35) — the coverage list now freezes when the review is claimed rather than when the threshold first fires, because the reach consequence below described a concurrency that never occurred. The reopening clause fired, was tested against its first real occurrence, and correction/supersession is declined a second time on a condition that bites.
+
 A Skill Evolution review that closes `blocked_no_valid_test` reached no conclusion, so it adjudicates
 nothing and its trigger evidence stays open. That close still laid a watermark, and the watermark
 deferred the very evidence that opened the gate — labelled `queued_pre_close_evidence`, as though a
@@ -233,6 +235,34 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
   preview command was considered and rejected: these existing artifacts already bound the reach,
   while a new flag beside the irreversible close would change a command surface consumers invoke by
   name and hypothetical derivation would add machinery without improving the decision.
+  **The list now freezes at the claim, and that corrects a factual claim made above.** The reach
+  consequence justified widening past the coverage list by saying the trigger list is frozen when the
+  threshold fires, "so an incident arriving *while the review runs* is never in it." Both occurrences
+  measured since say otherwise. In `joeloverbeck/playbench` the authorizing trigger sat at stream
+  index 77 and `review_started` at index 125; all 14 retired `output` incidents were recorded before
+  the review started and none during it. In this repository's `code-review` store the trigger sat at
+  index 1 and `review_started` at index 22, the same shape. The gap was never concurrency. The
+  derivation sets its fired trigger at the first event satisfying a threshold and never re-anchors, so
+  the list froze at first eligibility and then aged for as long as the gate went unclaimed — 48 events
+  in the first case. The vouch was asked to span thirteen incidents that entered the cluster before
+  the reviewer had standing to look at them, which is not a judgment a reviewer can make and not the
+  judgment this consequence described. Freezing at the claim leaves reach reason-scoped and
+  re-evaluated at the close, so the treadmill argument re-runs unchanged and the next review's bar
+  does not move; what shrinks is the span the vouch must cross, to what genuinely arrives between
+  claim and close — for both measured occurrences, nothing.
+  **It does not make a failed vouch refuse, and that is deliberate.** The residual span is small but
+  real, and its facts are still withheld from the packet, which
+  [#33](https://github.com/joeloverbeck/skill-evidence/issues/33) tracks. A refusal keyed on a
+  judgment whose inputs the protocol does not supply would either block every instrument-limited close
+  or force the reviewer to author the vouch, which is the shape *records are generated, never
+  authored* forbids. Disclosure stays the response for the residue.
+  `trigger_event_ids` on `review_started` changes meaning here, so the release carrying this moves an
+  installed and a compiled surface together and requires `skills evidence install --force` per
+  [`../releasing.md`](../releasing.md). The `Coverage list` and `Retirement reach` entries in
+  `CONTEXT.md` both name the old freeze point in so many words and move with the implementation, not
+  ahead of it. `Reach bound` does not name it and stays accurate as written, but it is read against
+  the coverage list and the two converge once the freeze moves, so it is reviewed rather than assumed
+  unchanged.
 - **A wrong vouch stays wrong: there is no correction, supersession, or unretirement event, and
   none is being built.** The reach is mechanical, but the judgment that authorizes it — that this
   instrument cannot vary the named binding constraint — is semantic, and nothing in the stream can
@@ -249,5 +279,26 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
   the one this decision has relied on since it was accepted: evidence recorded after the close
   drives the gate, and editing the target clears the hash. The residue is that a testable incident
   already on disk can stay out of the gate on the strength of a judgment that was wrong, and that
-  is accepted here rather than overlooked. What would reopen it is a close whose reach is disputed
-  *after* the vouch step has shipped and been used — every instance measured for #16 predates it.
+  is accepted here rather than overlooked.
+  **That clause fired, and the answer is the same.**
+  [#35](https://github.com/joeloverbeck/skill-evidence/issues/35) asked for a bounded,
+  source-qualified, revocation-only release. It cited `rev_278c4810-c838-415f-bcda-54de8d6457e9`, an
+  `outside_target` close in this repository, which never runs the vouch step this clause is about —
+  that step is `blocked_no_valid_test`-only. The occurrence that does satisfy the clause is
+  `joeloverbeck/playbench`'s `rev_d26b8ab8-80d3-4c57-a134-da70fd7adf89`, a `blocked_no_valid_test`
+  close that vouched for one incident, disclosed that it could not vouch for the other thirteen, and
+  retired all fourteen. Declined a second time, on three grounds. The claim-time freeze above removes
+  the mechanism that produced the disputed reach, so the machinery would be built for a defect this
+  amendment stops causing. The honest exit was measured rather than assumed: `playbench`'s `tdd` store
+  keeps nine non-retired open incidents still clustering, one of them a `material_recurrence` away
+  from re-firing, and this repository's `code-review` store reopens on a single incident recorded
+  after its disposition — retired evidence stays in `open_incident_ids` and leaves `candidate_clusters`
+  only, so the ledger never lost it. And the transition's cost is the highest this repository can pay:
+  an irreversible reader-version floor across three consumers holding append-only history no release
+  can regenerate, bought to release two residues that both still have a working door.
+  **The old reopening condition was too easy to satisfy and is replaced.** "A close whose reach is
+  disputed *after* the vouch step has shipped and been used" was met within two days of that step
+  shipping, by a review that disclosed the mismatch exactly as instructed — it fired on the procedure
+  working, not on it failing. What reopens this now is a residue with no door: a retired or
+  adjudicated incident whose gate provably cannot reopen on new evidence, rather than one that merely
+  waits for it. That is what the honest exit is standing on, so that is what should reverse this.
