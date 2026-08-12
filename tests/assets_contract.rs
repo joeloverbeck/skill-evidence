@@ -1441,6 +1441,32 @@ fn installed_skill_evolution_reference_supplies_checked_whole_field_provenance()
 }
 
 #[test]
+fn installed_skill_evolution_reference_preserves_the_complete_close_receipt_in_completion() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+    let report = reference
+        .find("### 9. Report, close, amend, complete")
+        .expect("the close step remains explicit");
+    let close = &reference[report..];
+
+    for required in [
+        "preserve the compiled close command's complete stdout payload exactly once",
+        "every line and emitted command in order without paraphrase",
+        "Cargo stderr is not part of that reporter payload",
+    ] {
+        assert!(
+            close.contains(required),
+            "installed completion must preserve `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
 fn installed_skill_evolution_reference_bars_a_verdict_conformance_only_evidence_cannot_bear() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");

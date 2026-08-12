@@ -267,6 +267,8 @@ Read `constraint_provenance` from the close receipt whenever it is present. Copy
 
 The user-facing completion is concise, links the report, states whether the live skill changed, and, when the close receipt carries `retired_from_gate_event_ids`, states that retirement reach exactly, including an empty list. When the close receipt carries `external_owners`, it states each attributed owner kind and reference. When that key is absent, add no owner clause and no empty-owner placeholder. When the receipt carries `constraint_provenance`, state that the complete source fields were recorded and name the report section carrying them. When any mechanism was marked unable to be expressed, add one clause stating that fact alongside the retirement reach.
 
+The final response must preserve the compiled close command's complete stdout payload exactly once, with every line and emitted command in order without paraphrase. Host-required framing around that intact payload and terminal-newline normalization may differ. Cargo stderr is not part of that reporter payload. On a lifecycle refusal or unsafe failure, apply the same preservation rule to the command's authoritative diagnostic on stderr.
+
 *Done when the report existed before close, the disposition event exists, the report carries the close receipt's final values, and the completion was delivered.*
 
 ## No same-review expansion
