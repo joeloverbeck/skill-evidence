@@ -2309,7 +2309,7 @@ pub fn record_use(
             )
         } else {
             format!(
-                "Duplicate receipt refused: run group {same_run_group} already recorded on the unchanged target by event {} from different top-level session {} at {}. Use --same-run-group to declare a deliberate cross-session continuation of that group; a continuation is the same qualifying use.",
+                "Duplicate receipt refused: run group {same_run_group} already recorded on the unchanged target by event {} from different top-level session {} at {}. A run recorded in an earlier top-level session cannot receive another receipt while the target is unchanged; do not record the same run again as a new use. Nothing recorded.",
                 duplicate.event_id, duplicate.top_level_session_id, duplicate.recorded_at
             )
         };

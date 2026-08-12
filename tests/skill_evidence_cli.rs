@@ -1087,11 +1087,21 @@ fn skill_evidence_explicit_cross_session_run_group_refusal_identifies_the_prior_
             .trim_end(),
     )
     .expect("prior event JSON");
+    let projection_path = fixture
+        .path()
+        .join("reports/skill-evidence/demo-skill/gate-status.json");
+    let events_before_refusal = fs::read(&events_path).expect("read event stream before refusal");
+    let projection_before_refusal =
+        fs::read(&projection_path).expect("read projection before refusal");
 
     let duplicate = explicit_record("Different task label", "session-b")
         .output()
         .expect("record cross-session continuation");
     assert_eq!(duplicate.status.code(), Some(3));
+    assert!(
+        duplicate.stdout.is_empty(),
+        "unexpected stdout: {duplicate:?}"
+    );
     let refusal = String::from_utf8_lossy(&duplicate.stderr);
     for required in [
         "Duplicate receipt refused",
@@ -1101,19 +1111,26 @@ fn skill_evidence_explicit_cross_session_run_group_refusal_identifies_the_prior_
             .as_str()
             .expect("prior recorded timestamp"),
         "different top-level session",
-        "--same-run-group",
+        "cannot receive another receipt while the target is unchanged",
+        "do not record the same run again as a new use",
+        "Nothing recorded",
     ] {
         assert!(
             refusal.contains(required),
             "missing {required:?} in {refusal}"
         );
     }
+    assert!(
+        !refusal.contains("--same-run-group"),
+        "the refusing flag must not be presented again as the remedy: {refusal}"
+    );
     assert_eq!(
-        fs::read_to_string(events_path)
-            .expect("read unchanged event stream")
-            .lines()
-            .count(),
-        1
+        fs::read(&events_path).expect("read unchanged event stream"),
+        events_before_refusal
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read unchanged projection"),
+        projection_before_refusal
     );
 }
 

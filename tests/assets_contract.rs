@@ -302,6 +302,31 @@ fn installed_capture_package_bounds_further_incidents_to_one_session() {
     );
 }
 
+/// A caller-supplied group can carry a continuation only while that group is absent from the
+/// current target hash. Once an earlier session has recorded it on the unchanged target, the
+/// operator must stop rather than mint a second qualifying use for the same run.
+#[test]
+fn installed_capture_package_bounds_cross_session_continuations_on_the_current_hash() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let package = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evidence-capture/SKILL.md"),
+    )
+    .expect("read installed capture package");
+
+    assert!(
+        package.contains(
+            "a caller-supplied run group cannot join a group the current target content hash already holds"
+        ),
+        "the package must state the machinery's current-hash limit"
+    );
+    assert!(
+        package.contains("do not record the same run again as a new use"),
+        "the package must give the safe outcome when an unchanged target already holds the group"
+    );
+}
+
 #[test]
 fn installed_skill_evolution_reference_writes_the_report_before_close_and_amends_it_after() {
     let root = tempfile::tempdir().expect("temporary repository root");

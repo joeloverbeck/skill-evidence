@@ -70,10 +70,11 @@ others. It groups incidents; it does not name a cause and is never diagnostic.
 _Avoid_: category, cause, tag, error type
 
 **Run group**:
-The one run a use record belongs to, and the unit the use denominator counts. A retry or
-continuation of the same failed task belongs to the same run group and adds no further use. A run
-that deviated in several observable ways records one incident per deviation, so a run group can
-hold several records while remaining one use.
+The one run a use record belongs to, and the unit the use denominator counts. Within one top-level
+session, a retry or continuation of the same failed task belongs to the same run group and adds no
+further use; a different top-level session cannot add another receipt for that run while the target
+content hash is unchanged. A run that deviated in several observable ways records one incident per
+deviation, so a run group can hold several records while remaining one use.
 _Avoid_: attempt, batch, session group
 
 **Evidence store**:
