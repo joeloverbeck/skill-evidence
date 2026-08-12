@@ -2,6 +2,11 @@
 
 Status: accepted (2026-08-11, GitHub [#37](https://github.com/joeloverbeck/skill-evidence/issues/37))
 
+Amended: 2026-08-12, GitHub [#46](https://github.com/joeloverbeck/skill-evidence/issues/46) — the
+reopening clause met its first real occurrence and did not fire; a post-session handoff into the
+owner's store is declined on a sharpened ground, and the census that decided it is recorded below.
+No routing decision changed.
+
 An adjudicating close that concludes `outside_target` records a positive external owner — a kind
 drawn from the shipped ownership taxonomy and a stable reference — per concluded event. That owner
 is reported: it survives in the event, in the close receipt, and in the user-facing completion,
@@ -137,3 +142,36 @@ never had.
   found absent. A count of unactioned attributions is not that evidence; it is throughput, and
   [`../principles/evidence-substrate-integrity.md`](../principles/evidence-substrate-integrity.md)
   says so.
+- **The reopening clause was tested once, on 2026-08-12, and did not fire.**
+  [#46](https://github.com/joeloverbeck/skill-evidence/issues/46) raised the first occurrence to
+  reach it. A `triage` review in `playbench` (`rev_138058a5-36cb-4a77-bfe2-640fdd546a2c`)
+  attributed an issue-body disclaimer deviation to `skill` → `.claude/skills/to-issues`, whose
+  qualifying use for that same publication run was already recorded — in a top-level session that
+  had closed before the attribution existed.
+
+  The clause asks whether the named owner's gate can re-authorize by an honest route. Across the
+  whole structured population it can. `external_owners` has existed only since
+  [#34](https://github.com/joeloverbeck/skill-evidence/issues/34), so that population is three
+  closes and eleven owner entries across the four repositories. Six of the eleven name a
+  `contract` or `environment` owner — `AGENTS.md` sections, a Codex execution environment — which
+  have no evidence store, no gate, and never will; no handoff could serve them, and none is owed.
+  The other five name a skill, and both skills are alive: `to-issues` in `playbench` stood
+  `eligible` on 18 qualifying uses, `tdd` in `what-we-bring-home` `collecting` on ten open
+  incidents.
+
+  What [#46](https://github.com/joeloverbeck/skill-evidence/issues/46) asked for instead — a route
+  into the owner's store for a deviation of a run whose session has closed — is declined, on this
+  decision's own ground made sharper. The owner store can accept another incident for a recorded
+  run only from the session that recorded it, because a caller who names a run they were not
+  observed to be in is asserting run membership, and
+  [`../principles/evidence-substrate-integrity.md`](../principles/evidence-substrate-integrity.md)
+  makes session identity load-bearing precisely so that no downstream authorization rests on a
+  caller's assertion. The observable half of that occurrence already has a home:
+  [#27](https://github.com/joeloverbeck/skill-evidence/issues/27) landed `--further-incident` on
+  2026-08-10, one day after the run in question, so a deviation of a co-run sibling noticed during
+  the session is recorded against that sibling today. What stays unrecordable is a reviewer's later
+  attribution, which is not the owner's evidence because the reviewer did not use the owner.
+
+  The same session boundary also refuses a cross-session *continuation* receipt, and there the
+  refusal advertises a remedy that cannot work. That is a defect in the refusal rather than in this
+  decision, and is [#47](https://github.com/joeloverbeck/skill-evidence/issues/47).
