@@ -1,0 +1,23 @@
+diff --git a/src/review_store.rs b/src/review_store.rs
+index 1111111..2222222 100644
+--- a/src/review_store.rs
++++ b/src/review_store.rs
+@@ -1,3 +1,19 @@
++pub struct PreparedReviewEvent(Vec<u8>);
++
++pub fn prepare_review_event(input: &str) -> Result<PreparedReviewEvent, Error> {
++    Ok(PreparedReviewEvent(validate_and_encode(input)?))
++}
++
++pub fn append_review_event(store: &mut Store, event: PreparedReviewEvent) -> Result<(), Error> {
++    store.append(&event.0)
++}
++
++pub trait FutureHook {
++    fn after_future_review(&self);
++}
++
+ pub fn record_review(store: &mut Store, input: &str) -> Result<(), Error> {
+-    store.append(&validate_and_encode(input)?)
++    append_review_event(store, prepare_review_event(input)?)
+ }

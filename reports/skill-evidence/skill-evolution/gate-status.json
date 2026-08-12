@@ -1,42 +1,35 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-11T12:55:19.641133062Z",
-  "target_content_hash": "ff7b3831896624e49ddb6812677567283d62cb3b1665b18248baf8ec9109976e",
-  "qualifying_uses_on_current_hash": 2,
+  "generated_at": "2026-08-12T03:34:34.976824419Z",
+  "target_content_hash": "abfc7930f41e6025110b591873b9f09f93f45868cd3493b894f7915a7cf17992",
+  "qualifying_uses_on_current_hash": 1,
   "open_incident_ids": [
-    "evt_25376952-bd63-4c92-a3e6-fc25fa43481a",
-    "evt_3827003f-85a6-4d5f-a91a-e448cac7bd7e"
+    "evt_ddfd4181-dc7c-4159-83f8-41ace35a30a1",
+    "evt_5cebdd66-d34d-40ba-baf6-b27a4db482bf"
   ],
   "candidate_clusters": [
     {
       "symptom_key": "state",
       "open_event_ids": [
-        "evt_25376952-bd63-4c92-a3e6-fc25fa43481a"
+        "evt_ddfd4181-dc7c-4159-83f8-41ace35a30a1",
+        "evt_5cebdd66-d34d-40ba-baf6-b27a4db482bf"
       ],
       "independent_incidents": 1,
       "max_severity": "severe_incident"
-    },
-    {
-      "symptom_key": "execution",
-      "open_event_ids": [
-        "evt_3827003f-85a6-4d5f-a91a-e448cac7bd7e"
-      ],
-      "independent_incidents": 1,
-      "max_severity": "material_failure"
     }
   ],
-  "state": "quarantined_eligible",
+  "state": "quarantined_pending_cooldown",
   "authorized_workflow": "skill-evolution",
   "authorization_reason": "severe",
   "trigger_event_ids": [
-    "evt_25376952-bd63-4c92-a3e6-fc25fa43481a"
+    "evt_ddfd4181-dc7c-4159-83f8-41ace35a30a1"
   ],
-  "threshold_session_id": "019ff078-9885-7bc0-a3a4-0a8c192575ef",
+  "threshold_session_id": "019ff3f0-fea8-7e21-827f-026cee897a5c",
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": null,
   "review_reentry_basis": "first_eligibility",
   "target_name": "skill-evolution",
   "target_repo_relative_path": ".claude/skills/skill-evolution",
-  "derivation_session_id": "019ff0b5-d605-7e91-9355-3cc9ed0fffc2"
+  "derivation_session_id": "019ff3f0-fea8-7e21-827f-026cee897a5c"
 }

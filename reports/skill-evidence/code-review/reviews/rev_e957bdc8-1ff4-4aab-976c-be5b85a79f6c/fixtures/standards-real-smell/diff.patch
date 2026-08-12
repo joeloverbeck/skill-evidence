@@ -1,0 +1,20 @@
+diff --git a/src/format.rs b/src/format.rs
+index 1111111..2222222 100644
+--- a/src/format.rs
++++ b/src/format.rs
+@@ -1,3 +1,13 @@
++pub trait FutureFormatter {
++    fn format_later(&self, value: &str) -> String;
++}
++
++pub struct FutureFormatterFactory;
++
++impl FutureFormatterFactory {
++    pub fn create() -> Option<Box<dyn FutureFormatter>> {
++        None
++    }
++}
++
+ pub fn format_now(value: &str) -> String {
+     value.trim().to_owned()
+ }
