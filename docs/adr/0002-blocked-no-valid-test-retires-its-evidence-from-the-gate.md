@@ -14,6 +14,8 @@ Amended: 2026-08-11, GitHub [#32](https://github.com/joeloverbeck/skill-evidence
 
 Amended: 2026-08-11, GitHub [#33](https://github.com/joeloverbeck/skill-evidence/issues/33) — the re-anchored coverage list reaches the reviewer with full payloads, so the vouch's missing inputs narrow to the claim-to-close span. That residue is accepted under disclosure and carries no open tracker; the reopening condition is stated where the residue is.
 
+Amended: 2026-08-12, GitHub [#45](https://github.com/joeloverbeck/skill-evidence/issues/45) — the provenance vouch now carries checked, generated whole-field citations and refuses when any instrument-limited event lacks one; the semantic reach-bound vouch remains a disclosed judgment rather than a compiled refusal.
+
 A Skill Evolution review that closes `blocked_no_valid_test` reached no conclusion, so it adjudicates
 nothing and its trigger evidence stays open. That close still laid a watermark, and the watermark
 deferred the very evidence that opened the gate — labelled `queued_pre_close_evidence`, as though a
@@ -252,10 +254,16 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
   re-evaluated at the close, so the treadmill argument re-runs unchanged and the next review's bar
   does not move; what shrinks is the span the vouch must cross, to what genuinely arrives between
   claim and close — for both measured occurrences, nothing.
-  **It does not make a failed vouch refuse, and that is deliberate.** A refusal keyed on a
-  judgment whose inputs the protocol does not supply would either block every instrument-limited close
-  or force the reviewer to author the vouch, which is the shape *records are generated, never
-  authored* forbids. Disclosure stays the response for the residue.
+  **The provenance vouch now refuses; the reach-bound vouch still does not.** Every event whose
+  retirement rests on an untestability claim must carry at least one checked citation to a complete
+  `run_condition`, `observed`, `consequence`, or `workaround_taken` field on that covered immutable
+  event. The operator supplies only the constraint label and pointer; the command copies the field,
+  records it, echoes it in the close receipt, and refuses write-free when the pointer or required
+  coverage is missing or malformed. The two grounds on which this decision declined refusal no
+  longer reach that structural provenance check: its inputs are supplied, and the operator authors
+  no recorded fact. The command still cannot decide whether the copied field entails the constraint,
+  or whether a claim-to-close arrival belongs inside the live reach bound. Those remain semantic
+  judgments, and disclosure stays the response for that residue.
   **The vouch's inputs are supplied for everything the claim freezes, and that was the point.**
   The packet's `trigger_events` is built from the projection's trigger identity list, so re-anchoring
   that list to the reason-scoped cluster hands the reviewer every frozen coverage member's full raw

@@ -263,6 +263,12 @@ pub struct EvolutionCloseArgs {
     external_owner: Vec<String>,
     #[arg(long)]
     instrument_limited: Vec<String>,
+    #[arg(
+        long,
+        num_args = 3,
+        value_names = ["CONSTRAINT_LABEL", "EVENT_ID", "FIELD"]
+    )]
+    constraint_provenance: Vec<String>,
     #[arg(long)]
     trials: Option<String>,
     #[arg(long)]
@@ -476,6 +482,7 @@ fn run_skill_evolution(
                 concluded,
                 external_owner,
                 instrument_limited,
+                constraint_provenance,
                 trials,
                 artifacts,
             } = args;
@@ -496,6 +503,23 @@ fn run_skill_evolution(
                     })
                 })
                 .collect::<Result<Vec<_>, CliError>>()?;
+            let constraint_provenance = constraint_provenance
+                .chunks_exact(3)
+                .map(|citation| {
+                    let field =
+                        crate::ConstraintProvenanceField::parse(&citation[2]).ok_or_else(|| {
+                            CliError::MissingInput(format!(
+                                "--constraint-provenance FIELD must be one of {}.",
+                                crate::ConstraintProvenanceField::roster().join("|")
+                            ))
+                        })?;
+                    Ok(crate::ConstraintProvenance {
+                        constraint_label: citation[0].clone(),
+                        event_id: citation[1].clone(),
+                        field,
+                    })
+                })
+                .collect::<Result<Vec<_>, CliError>>()?;
             let request = crate::EvolutionCloseRequest {
                 review_id: review_id.unwrap_or_default(),
                 disposition: disposition.unwrap_or_default(),
@@ -504,6 +528,7 @@ fn run_skill_evolution(
                 concluded,
                 external_owners,
                 instrument_limited,
+                constraint_provenance,
                 trials,
                 artifacts,
             };

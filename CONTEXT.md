@@ -152,15 +152,27 @@ _Avoid_: draft, patch, fix, proposal
 
 **Binding constraint**:
 The condition without which the recorded failure does not occur — load, volume, context distance,
-elapsed run length. Naming it is what decides whether any trial can test the incident at all.
+elapsed run length. Naming it is what decides whether any trial can test the incident at all. A
+constraint is **established** when a recorded field supports it, **unestablished** when the record
+does not establish it, and **refuted** for a trigger when that trigger's recorded condition places
+the failure where the proposed constraint says it should not occur. Unestablished and refuted
+constraints keep a trial slot; a field name alone establishes nothing.
 _Avoid_: root cause, precondition, trigger
 
 **Witness**:
 The observable in a finished run's own output that shows whether that run actually expressed the
 binding constraint. Fixed before any result exists; chosen afterwards, it is not evidence. An
 observable that no finished run could make read unexpressed does not show *whether*, and is not a
-witness.
+witness. Nor is an observable that a compliant run which finds nothing would omit: if that run
+would not still emit it, it is not a witness.
 _Avoid_: check, signal, indicator, assertion
+
+**Constraint provenance citation**:
+A generated whole-field copy from a covered immutable event that puts the recorded ground for a
+binding constraint in the close itself. The operator supplies a constraint label, event ID, and
+field pointer; the command supplies the field value. It proves which record was cited, not that the
+record entails the constraint.
+_Avoid_: excerpt, field class, authored note, proof
 
 **Disposition**:
 The single terminal state a review closes in. See `assets/skills/skill-evolution/` for the exact

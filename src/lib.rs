@@ -244,6 +244,56 @@ pub struct ExternalOwner {
     pub reference: String,
 }
 
+const CONSTRAINT_PROVENANCE_FIELDS: &[&str] = &[
+    "run_condition",
+    "observed",
+    "consequence",
+    "workaround_taken",
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConstraintProvenanceField {
+    RunCondition,
+    Observed,
+    Consequence,
+    WorkaroundTaken,
+}
+
+impl ConstraintProvenanceField {
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "run_condition" => Some(Self::RunCondition),
+            "observed" => Some(Self::Observed),
+            "consequence" => Some(Self::Consequence),
+            "workaround_taken" => Some(Self::WorkaroundTaken),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn roster() -> &'static [&'static str] {
+        CONSTRAINT_PROVENANCE_FIELDS
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::RunCondition => "run_condition",
+            Self::Observed => "observed",
+            Self::Consequence => "consequence",
+            Self::WorkaroundTaken => "workaround_taken",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ConstraintProvenance {
+    pub constraint_label: String,
+    pub event_id: String,
+    pub field: ConstraintProvenanceField,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvolutionCloseRequest {
     pub review_id: String,
@@ -265,6 +315,10 @@ pub struct EvolutionCloseRequest {
     /// that the accounting was *undecided* rather than *concluded* — and it asserts nothing
     /// about whether the mechanism reproduced.
     pub instrument_limited: Vec<String>,
+    /// Immutable-event fields cited as the recorded ground for binding constraints behind
+    /// instrument-limited coverage. The caller supplies only pointers; the close copies
+    /// the complete source field into the recorded disposition without asserting entailment.
+    pub constraint_provenance: Vec<ConstraintProvenance>,
     pub trials: Option<String>,
     pub artifacts: Option<String>,
 }
@@ -1302,6 +1356,15 @@ pub fn evolution_close(
             request.disposition
         )));
     }
+    if request.disposition != "blocked_no_valid_test"
+        && request.instrument_limited.is_empty()
+        && !request.constraint_provenance.is_empty()
+    {
+        return Err(refusal(
+            "--constraint-provenance is allowed only for blocked_no_valid_test or an event named --instrument-limited. Nothing done."
+                .to_owned(),
+        ));
+    }
     let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
     let target = lifecycle_target_context(root, target, &inputs.operator_skill)?;
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
@@ -1436,6 +1499,57 @@ pub fn evolution_close(
             )));
         }
     }
+    let mut resolved_constraint_provenance =
+        Vec::with_capacity(request.constraint_provenance.len());
+    for citation in &request.constraint_provenance {
+        if !coverage.contains(&citation.event_id) {
+            return Err(refusal(format!(
+                "--constraint-provenance event {} is not in this review's coverage list. Nothing done.",
+                citation.event_id
+            )));
+        }
+        if citation.constraint_label.is_empty() {
+            return Err(refusal(
+                "--constraint-provenance CONSTRAINT_LABEL must be non-empty. Nothing done."
+                    .to_owned(),
+            ));
+        }
+        let field = citation.field.as_str();
+        let field_value = events
+            .iter()
+            .find(|event| event.event_id == citation.event_id)
+            .and_then(|event| event.raw.pointer(&format!("/payload/{field}")))
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty());
+        let Some(field_value) = field_value else {
+            return Err(refusal(format!(
+                "--constraint-provenance {} {} {field} names an absent, null, or empty field. Nothing done.",
+                citation.constraint_label, citation.event_id
+            )));
+        };
+        resolved_constraint_provenance.push(serde_json::json!({
+            "constraint_label": citation.constraint_label,
+            "event_id": citation.event_id,
+            "field": field,
+            "field_value": field_value
+        }));
+    }
+    let provenance_required = if request.disposition == "blocked_no_valid_test" {
+        coverage.as_slice()
+    } else {
+        request.instrument_limited.as_slice()
+    };
+    for identity in provenance_required {
+        if !request
+            .constraint_provenance
+            .iter()
+            .any(|citation| citation.event_id == *identity)
+        {
+            return Err(refusal(format!(
+                "Instrument-limited event {identity} requires at least one --constraint-provenance <CONSTRAINT_LABEL> {identity} <FIELD>. Nothing done."
+            )));
+        }
+    }
     if EVOLUTION_ADJUDICATING_DISPOSITIONS.contains(&request.disposition.as_str()) {
         for identity in &coverage {
             match (
@@ -1513,6 +1627,9 @@ pub fn evolution_close(
         // accepted request.
         payload["instrument_limited_event_ids"] = serde_json::json!(request.instrument_limited);
     }
+    if !resolved_constraint_provenance.is_empty() {
+        payload["constraint_provenance"] = serde_json::json!(resolved_constraint_provenance);
+    }
     if !request.external_owners.is_empty() {
         payload["external_owners"] = serde_json::to_value(&request.external_owners)
             .expect("external owners always serialize");
@@ -1542,6 +1659,9 @@ pub fn evolution_close(
     if !request.external_owners.is_empty() {
         receipt["external_owners"] = serde_json::to_value(&request.external_owners)
             .expect("external owners always serialize");
+    }
+    if !resolved_constraint_provenance.is_empty() {
+        receipt["constraint_provenance"] = serde_json::json!(resolved_constraint_provenance);
     }
     // One channel reported at two scopes. A close reports what *it* moved out of the gate,
     // so both scopes read the standing set after the close, drop whatever was already
@@ -2648,6 +2768,9 @@ fn serialize_legacy_ordered_lifecycle_event(event: &Value) -> Result<Vec<u8>, Er
                     encoded_json(instrument_limited),
                 ));
             }
+            if let Some(constraint_provenance) = payload.get("constraint_provenance") {
+                parts.push(("constraint_provenance", encoded_json(constraint_provenance)));
+            }
             if let Some(external_owners) = payload.get("external_owners") {
                 parts.push(("external_owners", encoded_json(external_owners)));
             }
@@ -2940,6 +3063,18 @@ fn is_valid_external_owner_entry(owner: &Value) -> bool {
         && non_empty_string(owner.get("reference")).is_some()
 }
 
+fn is_valid_constraint_provenance_entry(citation: &Value) -> bool {
+    citation.as_object().is_some_and(|entry| {
+        ["constraint_label", "event_id", "field", "field_value"]
+            .iter()
+            .all(|field| entry.contains_key(*field))
+    }) && non_empty_string(citation.get("constraint_label")).is_some()
+        && non_empty_string(citation.get("event_id")).is_some()
+        && non_empty_string(citation.get("field"))
+            .is_some_and(|field| CONSTRAINT_PROVENANCE_FIELDS.contains(&field))
+        && non_empty_string(citation.get("field_value")).is_some()
+}
+
 fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
     let mut errors = Vec::new();
     let Some(event) = event.as_object() else {
@@ -3165,6 +3300,19 @@ fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
                 "instrument_limited_event_ids must be a non-empty array of event ids when present"
                     .to_owned(),
             );
+        }
+        if payload.get("constraint_provenance").is_some_and(|value| {
+            value.as_array().is_none_or(|citations| {
+                citations.is_empty()
+                    || citations
+                        .iter()
+                        .any(|citation| !is_valid_constraint_provenance_entry(citation))
+            })
+        }) {
+            errors.push(format!(
+                "constraint_provenance must be a non-empty array of citations containing non-empty constraint_label, event_id, field ({}), and field_value when present",
+                CONSTRAINT_PROVENANCE_FIELDS.join("|")
+            ));
         }
         if payload.get("external_owners").is_some_and(|value| {
             value.as_array().is_none_or(|owners| {

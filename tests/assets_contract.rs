@@ -525,6 +525,64 @@ fn installed_skill_evolution_reference_sources_each_binding_constraint_in_step_f
 }
 
 #[test]
+fn installed_skill_evolution_reference_tests_witnesses_against_a_clean_compliant_run() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    for required in [
+        "would a compliant run that finds nothing still emit it?",
+        "If no, it is not a witness",
+        "before any executor runs",
+    ] {
+        assert!(
+            plan.contains(required),
+            "installed step 4 must preserve `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
+fn installed_skill_evolution_reference_keeps_refuted_constraints_in_trial_per_trigger() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    for required in [
+        "placing the failure at first use refutes an accumulation, volume, or late-run constraint for that trigger",
+        "That trigger keeps its trial slot regardless of how the mechanism grouped it",
+        "re-examine the grouping before any unable-to-be-expressed marking",
+    ] {
+        assert!(
+            plan.contains(required),
+            "installed step 4 must preserve `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
 fn installed_skill_evolution_reference_keeps_unestablished_constraints_in_trial() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
@@ -683,6 +741,34 @@ fn installed_skill_evolution_reference_separates_raw_tasks_from_executor_logisti
 }
 
 #[test]
+fn installed_skill_evolution_reference_discloses_evaluable_failure_readings_in_step_six() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+    let validation = reference
+        .find("### 6. Run blind comparative validation")
+        .expect("the blind-validation step remains explicit");
+    let acceptance = reference
+        .find("### 7. Apply the acceptance gate")
+        .expect("the acceptance step remains explicit");
+    let step_six = &reference[validation..acceptance];
+
+    for required in [
+        "the frozen failure reading remains evaluable on the returned artifact",
+        "state what that failure reading read in the review report",
+    ] {
+        assert!(
+            step_six.contains(required),
+            "installed step 6 must preserve `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
 fn installed_event_schema_declares_close_validation_effort_as_optional() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
@@ -796,6 +882,65 @@ fn installed_event_schema_keeps_untestable_coverage_optional_and_open() {
     assert!(
         payload.get("additionalProperties").is_none(),
         "a consumer still on a stale installed schema must keep validating streams that carry this key"
+    );
+}
+
+#[test]
+fn installed_event_schema_keeps_constraint_provenance_optional_and_open() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let schema: serde_json::Value = serde_json::from_slice(
+        &fs::read(
+            root.path()
+                .join("schemas/skill-evidence/event.v1.schema.json"),
+        )
+        .expect("read installed event schema"),
+    )
+    .expect("installed event schema JSON");
+    let payload = schema
+        .pointer("/allOf/1/then/properties/payload")
+        .expect("review_disposition payload schema");
+    let provenance = &payload["properties"]["constraint_provenance"];
+
+    assert_eq!(provenance["type"], "array");
+    assert_eq!(provenance["minItems"], 1);
+    assert_eq!(
+        provenance["items"]["required"],
+        serde_json::json!(["constraint_label", "event_id", "field", "field_value"])
+    );
+    assert_eq!(
+        provenance["items"]["properties"]["field"]["enum"],
+        serde_json::json!(skill_evidence::ConstraintProvenanceField::roster())
+    );
+    for field in ["constraint_label", "event_id", "field_value"] {
+        assert_eq!(provenance["items"]["properties"][field]["type"], "string");
+        assert_eq!(provenance["items"]["properties"][field]["minLength"], 1);
+    }
+    assert!(
+        provenance["description"]
+            .as_str()
+            .expect("provenance absent-meaning description")
+            .contains("Omitted means no checked constraint provenance was recorded"),
+        "the optional key must define what every historical absence means"
+    );
+    assert!(
+        provenance["description"]
+            .as_str()
+            .expect("provenance absent-meaning description")
+            .contains("does not negate an instrument-limited claim"),
+        "historical blocked closes must keep their instrument-limited meaning"
+    );
+    assert!(
+        !payload["required"]
+            .as_array()
+            .expect("required review_disposition properties")
+            .iter()
+            .any(|field| field == "constraint_provenance"),
+        "historical closes omit constraint provenance and remain valid"
+    );
+    assert!(
+        payload.get("additionalProperties").is_none(),
+        "a stale installed schema must keep accepting the optional payload key"
     );
 }
 
@@ -1261,6 +1406,36 @@ fn installed_skill_evolution_reference_makes_every_close_route_explicit_and_insp
         assert!(
             reference.contains(required),
             "installed close workflow must preserve `{required}`: {reference}"
+        );
+    }
+}
+
+#[test]
+fn installed_skill_evolution_reference_supplies_checked_whole_field_provenance() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+    let report = reference
+        .find("### 9. Report, close, amend, complete")
+        .expect("the close step remains explicit");
+    let close = &reference[report..];
+
+    for required in [
+        "`--constraint-provenance <constraint-label> <event-id> <field>`",
+        "`run_condition`, `observed`, `consequence`, or `workaround_taken`",
+        "every event named `--instrument-limited`",
+        "every event in the coverage list for `blocked_no_valid_test`",
+        "copies the complete field verbatim into the disposition event and close receipt",
+        "refuses before writing when a pointer is missing, outside coverage, or names an absent, null, or empty field",
+        "- Constraint provenance copied:",
+    ] {
+        assert!(
+            close.contains(required),
+            "installed close step must preserve `{required}`: reference={reference}"
         );
     }
 }

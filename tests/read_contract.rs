@@ -157,3 +157,52 @@ fn external_owner_entries_reject_undeclared_fields() {
         stream.integrity_errors
     );
 }
+
+#[test]
+fn present_constraint_provenance_requires_complete_non_empty_generated_citations() {
+    let root = tempfile::tempdir().expect("temporary repository");
+    let events_path = root.path().join("events.jsonl");
+    let valid = json!({
+        "schema_version": 1,
+        "event_id": "evt_valid_constraint_provenance",
+        "event_type": "review_disposition",
+        "recorded_at": "2026-07-25T11:59:59.000Z",
+        "operator_workflow": "skill-evolution",
+        "target": {
+            "name": "game-evidence",
+            "repo_relative_path": ".claude/skills/game-evidence",
+            "content_hash": "fixture-hash",
+            "repo_head": "fixture-head"
+        },
+        "top_level_session_id": "fixture-session",
+        "payload": {
+            "review_id": "rev_read_contract",
+            "disposition": "blocked_no_valid_test",
+            "adjudicated_event_ids": ["evt_incident"],
+            "constraint_provenance": [{
+                "constraint_label": "M1",
+                "event_id": "evt_incident",
+                "field": "run_condition",
+                "field_value": "not a late-run drift"
+            }],
+            "note": "the complete source field is copied"
+        }
+    });
+    let mut malformed = valid.clone();
+    malformed["event_id"] = json!("evt_malformed_constraint_provenance");
+    malformed["payload"]["constraint_provenance"][0]["field_value"] = json!("");
+    fs::write(&events_path, format!("{valid}\n{malformed}\n"))
+        .expect("write constraint-provenance events");
+
+    let stream = skill_evidence::read_validated_event_stream(&events_path)
+        .expect("read public validated event stream");
+
+    assert_eq!(stream.events, [valid]);
+    assert_eq!(stream.integrity_errors.len(), 1);
+    assert!(
+        stream.integrity_errors[0].contains("constraint_provenance")
+            && stream.integrity_errors[0].contains("non-empty"),
+        "integrity error must explain the malformed generated citation: {:?}",
+        stream.integrity_errors
+    );
+}

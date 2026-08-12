@@ -143,6 +143,17 @@ fn record_clean_use(root: &Path, label: &str, session: &str) {
 }
 
 fn record_outcome(root: &Path, label: &str, session: &str, symptom: &str, outcome: &str) -> String {
+    record_outcome_with_run_condition(root, label, session, symptom, outcome, "fixture incident")
+}
+
+fn record_outcome_with_run_condition(
+    root: &Path,
+    label: &str,
+    session: &str,
+    symptom: &str,
+    outcome: &str,
+    run_condition: &str,
+) -> String {
     let output = skill_evidence()
         .args(["skills", "evidence", "record", "--root"])
         .arg(root)
@@ -162,7 +173,7 @@ fn record_outcome(root: &Path, label: &str, session: &str, symptom: &str, outcom
             "--consequence",
             "consequence",
             "--run-condition",
-            "fixture incident",
+            run_condition,
             "--evidence-ref",
             "logs/fixture.txt",
             "--session-id",
@@ -179,6 +190,36 @@ fn record_outcome(root: &Path, label: &str, session: &str, symptom: &str, outcom
         .as_str()
         .expect("record receipt event id")
         .to_owned()
+}
+
+fn replace_recorded_payload_field(
+    root: &Path,
+    event_id: &str,
+    field: &str,
+    replacement: Option<Value>,
+) {
+    let stream_path = root.join("reports/skill-evidence/demo-skill/events.jsonl");
+    let stream = fs::read_to_string(&stream_path).expect("read event stream for fixture edit");
+    let mut found = false;
+    let mut rewritten = String::new();
+    for line in stream.lines() {
+        let mut event: Value = serde_json::from_str(line).expect("event JSON");
+        if event["event_id"] == event_id {
+            found = true;
+            let payload = event["payload"]
+                .as_object_mut()
+                .expect("event payload object");
+            if let Some(value) = replacement.clone() {
+                payload.insert(field.to_owned(), value);
+            } else {
+                payload.remove(field);
+            }
+        }
+        rewritten.push_str(&serde_json::to_string(&event).expect("serialize edited fixture event"));
+        rewritten.push('\n');
+    }
+    assert!(found, "fixture event {event_id} must exist");
+    fs::write(stream_path, rewritten).expect("rewrite event stream fixture");
 }
 
 fn claim_evolution(root: &Path) -> Value {
@@ -261,6 +302,22 @@ fn add_concluded_coverage_routes(
         if !undecidable.contains(&identity.as_str()) {
             command.args(["--concluded", &identity]);
         }
+    }
+}
+
+fn add_constraint_provenance_for_coverage(
+    command: &mut Command,
+    root: &Path,
+    review_id: &str,
+    field: &str,
+) {
+    for (index, identity) in review_coverage(root, review_id).into_iter().enumerate() {
+        command.args([
+            "--constraint-provenance",
+            &format!("M{}", index + 1),
+            &identity,
+            field,
+        ]);
     }
 }
 
@@ -361,7 +418,14 @@ fn run_evolution_close(
     disposition: &str,
     note: Option<&str>,
 ) -> std::process::Output {
-    run_evolution_close_for_review(root, event_id, "rev_fixture", disposition, note)
+    run_evolution_close_for_review_with_provenance(
+        root,
+        event_id,
+        "rev_fixture",
+        disposition,
+        note,
+        true,
+    )
 }
 
 fn run_evolution_close_for_review(
@@ -370,6 +434,40 @@ fn run_evolution_close_for_review(
     review_id: &str,
     disposition: &str,
     note: Option<&str>,
+) -> std::process::Output {
+    run_evolution_close_for_review_with_provenance(
+        root,
+        event_id,
+        review_id,
+        disposition,
+        note,
+        true,
+    )
+}
+
+fn run_evolution_close_without_provenance(
+    root: &Path,
+    event_id: &str,
+    disposition: &str,
+    note: Option<&str>,
+) -> std::process::Output {
+    run_evolution_close_for_review_with_provenance(
+        root,
+        event_id,
+        "rev_fixture",
+        disposition,
+        note,
+        false,
+    )
+}
+
+fn run_evolution_close_for_review_with_provenance(
+    root: &Path,
+    event_id: &str,
+    review_id: &str,
+    disposition: &str,
+    note: Option<&str>,
+    include_constraint_provenance: bool,
 ) -> std::process::Output {
     let mut command = skill_evidence();
     command
@@ -401,6 +499,9 @@ fn run_evolution_close_for_review(
     .contains(&disposition)
     {
         add_concluded_coverage_routes(&mut command, root, review_id, &[]);
+    }
+    if include_constraint_provenance && disposition == "blocked_no_valid_test" {
+        add_constraint_provenance_for_coverage(&mut command, root, review_id, "run_condition");
     }
     lifecycle_clock(
         &mut command,
@@ -1855,6 +1956,20 @@ fn skill_evolution_material_recurrence_close_reports_its_narrow_retirement_reach
     let receipt: Value = serde_json::from_slice(&close.stdout).expect("close receipt JSON");
     let coverage = vec![material_one.clone(), material_two.clone()];
     let reach = vec![material_one, material_two];
+    let constraint_provenance = serde_json::json!([
+        {
+            "constraint_label": "M1",
+            "event_id": coverage[0],
+            "field": "run_condition",
+            "field_value": "fixture incident"
+        },
+        {
+            "constraint_label": "M2",
+            "event_id": coverage[1],
+            "field": "run_condition",
+            "field_value": "fixture incident"
+        }
+    ]);
     assert_eq!(
         receipt["adjudicated_event_ids"],
         serde_json::to_value(&coverage).expect("coverage JSON")
@@ -1890,6 +2005,7 @@ fn skill_evolution_material_recurrence_close_reports_its_narrow_retirement_reach
             "review_id": "rev_fixture",
             "disposition": "blocked_no_valid_test",
             "adjudicated_event_ids": coverage,
+            "constraint_provenance": constraint_provenance,
             "note": "no fresh trial can vary the binding run length",
             "operating_skill_hash": expected_operating_skill_hash(),
             "operating_package_matches_shipped": true
@@ -2068,6 +2184,10 @@ fn naming_already_retired_coverage_adds_nothing_to_this_closes_reach() {
             &already_retired,
             "--instrument-limited",
             &already_retired,
+            "--constraint-provenance",
+            "M1",
+            &already_retired,
+            "run_condition",
         ]);
     add_concluded_coverage_routes(&mut command, fixture.path(), "rev_second", &[]);
     lifecycle_clock(&mut command, "lock_second_close");
@@ -2372,6 +2492,10 @@ fn skill_evolution_close_records_coverage_its_instrument_could_not_test() {
             "two mechanisms did not reproduce; the third could not be expressed",
             "--instrument-limited",
             &untestable,
+            "--constraint-provenance",
+            "M1",
+            &untestable,
+            "run_condition",
         ]);
     add_concluded_coverage_routes(&mut command, fixture.path(), "rev_fixture", &[&untestable]);
     lifecycle_clock(&mut command, "lock_evolution_close");
@@ -2420,6 +2544,590 @@ fn skill_evolution_close_records_coverage_its_instrument_could_not_test() {
     );
     assert_eq!(projection["candidate_clusters"], serde_json::json!([]));
     assert_event_stream_matches_the_published_schema(fixture.path());
+}
+
+#[test]
+fn instrument_limited_close_refuses_missing_constraint_provenance_write_free() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let untestable = claim["trigger_event_ids"][0]
+        .as_str()
+        .expect("trigger event id")
+        .to_owned();
+    let store = fixture.path().join("reports/skill-evidence/demo-skill");
+    let stream_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("read gate projection before refusal");
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_close_without_constraint_provenance",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "monitor_for_recurrence",
+            "--note",
+            "one mechanism could not be expressed",
+            "--instrument-limited",
+            &untestable,
+        ]);
+    add_concluded_coverage_routes(&mut command, fixture.path(), "rev_fixture", &[&untestable]);
+    lifecycle_clock(&mut command, "lock_close_without_constraint_provenance");
+
+    let output = command.output().expect("close without provenance");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("UTF-8 refusal"),
+        format!(
+            "Instrument-limited event {untestable} requires at least one --constraint-provenance <CONSTRAINT_LABEL> {untestable} <FIELD>. Nothing done.\n"
+        )
+    );
+    assert_eq!(
+        fs::read(&stream_path).expect("read event stream after refusal"),
+        stream_before,
+        "a missing provenance citation must append no event"
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before,
+        "a missing provenance citation must not rewrite the projection"
+    );
+}
+
+#[test]
+fn blocked_no_valid_test_refuses_uncited_coverage_write_free() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let first_trigger = claim["trigger_event_ids"][0]
+        .as_str()
+        .expect("trigger event id")
+        .to_owned();
+    let store = fixture.path().join("reports/skill-evidence/demo-skill");
+    let stream_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("read gate projection before refusal");
+
+    let output = run_evolution_close_without_provenance(
+        fixture.path(),
+        "evt_blocked_without_constraint_provenance",
+        "blocked_no_valid_test",
+        Some("the instrument cannot express the binding constraint"),
+    );
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("UTF-8 refusal"),
+        format!(
+            "Instrument-limited event {first_trigger} requires at least one --constraint-provenance <CONSTRAINT_LABEL> {first_trigger} <FIELD>. Nothing done.\n"
+        )
+    );
+    assert_eq!(
+        fs::read(&stream_path).expect("read event stream after refusal"),
+        stream_before
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before
+    );
+}
+
+#[test]
+fn constraint_provenance_refuses_an_event_outside_coverage_write_free() {
+    let fixture = repository_with_demo_skill();
+    claim_evolution(fixture.path());
+    let store = fixture.path().join("reports/skill-evidence/demo-skill");
+    let stream_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("read gate projection before refusal");
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_close_with_out_of_coverage_provenance",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "blocked_no_valid_test",
+            "--note",
+            "the instrument cannot express the binding constraints",
+        ]);
+    add_constraint_provenance_for_coverage(
+        &mut command,
+        fixture.path(),
+        "rev_fixture",
+        "run_condition",
+    );
+    command.args([
+        "--constraint-provenance",
+        "outside",
+        "evt_evolution_claim",
+        "run_condition",
+    ]);
+    lifecycle_clock(&mut command, "lock_close_with_out_of_coverage_provenance");
+
+    let output = command.output().expect("close with outside provenance");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("UTF-8 refusal"),
+        "--constraint-provenance event evt_evolution_claim is not in this review's coverage list. Nothing done.\n"
+    );
+    assert_eq!(
+        fs::read(&stream_path).expect("read event stream after refusal"),
+        stream_before
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before
+    );
+}
+
+#[test]
+fn constraint_provenance_refuses_a_null_field_write_free() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let null_field_event = claim["trigger_event_ids"][0]
+        .as_str()
+        .expect("trigger event id")
+        .to_owned();
+    let store = fixture.path().join("reports/skill-evidence/demo-skill");
+    let stream_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("read gate projection before refusal");
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_close_with_null_constraint_field",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "blocked_no_valid_test",
+            "--note",
+            "the instrument cannot express the binding constraints",
+        ]);
+    for (index, identity) in review_coverage(fixture.path(), "rev_fixture")
+        .into_iter()
+        .enumerate()
+    {
+        command.args([
+            "--constraint-provenance",
+            &format!("M{}", index + 1),
+            &identity,
+            if identity == null_field_event {
+                "workaround_taken"
+            } else {
+                "run_condition"
+            },
+        ]);
+    }
+    lifecycle_clock(&mut command, "lock_close_with_null_constraint_field");
+
+    let output = command.output().expect("close with null field");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("UTF-8 refusal"),
+        format!(
+            "--constraint-provenance M1 {null_field_event} workaround_taken names an absent, null, or empty field. Nothing done.\n"
+        )
+    );
+    assert_eq!(
+        fs::read(&stream_path).expect("read event stream after refusal"),
+        stream_before
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before
+    );
+}
+
+#[test]
+fn constraint_provenance_refuses_absent_and_empty_fields_write_free() {
+    {
+        let fixture = repository_with_demo_skill();
+        let claim = claim_evolution(fixture.path());
+        let malformed_event = claim["trigger_event_ids"][0]
+            .as_str()
+            .expect("trigger event id")
+            .to_owned();
+        replace_recorded_payload_field(fixture.path(), &malformed_event, "run_condition", None);
+        let store = fixture.path().join("reports/skill-evidence/demo-skill");
+        let stream_path = store.join("events.jsonl");
+        let projection_path = store.join("gate-status.json");
+        let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+        let projection_before =
+            fs::read(&projection_path).expect("read gate projection before refusal");
+        let mut command = skill_evidence();
+        command
+            .args(["skills", "evolution", "close", "--root"])
+            .arg(fixture.path())
+            .args([
+                "--target",
+                ".claude/skills/demo-skill",
+                "--event-id",
+                "evt_close_with_absent_constraint_field",
+                "--repository-head",
+                "fixture-head",
+                "--review-id",
+                "rev_fixture",
+                "--disposition",
+                "blocked_no_valid_test",
+                "--note",
+                "the instrument cannot express the binding constraints",
+            ]);
+        for (index, identity) in review_coverage(fixture.path(), "rev_fixture")
+            .into_iter()
+            .enumerate()
+        {
+            command.args([
+                "--constraint-provenance",
+                &format!("M{}", index + 1),
+                &identity,
+                "run_condition",
+            ]);
+        }
+        lifecycle_clock(&mut command, "lock_close_with_absent_constraint_field");
+
+        let output = command.output().expect("close with malformed field");
+
+        assert_eq!(output.status.code(), Some(3));
+        assert!(output.stdout.is_empty());
+        assert_eq!(
+            String::from_utf8(output.stderr).expect("UTF-8 refusal"),
+            format!(
+                "--constraint-provenance M1 {malformed_event} run_condition names an absent, null, or empty field. Nothing done.\n"
+            )
+        );
+        assert_eq!(
+            fs::read(&stream_path).expect("read event stream after refusal"),
+            stream_before
+        );
+        assert_eq!(
+            fs::read(&projection_path).expect("read gate projection after refusal"),
+            projection_before
+        );
+    }
+
+    {
+        let fixture = repository_with_demo_skill();
+        let claim = claim_evolution(fixture.path());
+        let triggers = claim["trigger_event_ids"]
+            .as_array()
+            .expect("trigger event ids")
+            .iter()
+            .map(|identity| identity.as_str().expect("trigger event id"))
+            .collect::<Vec<_>>();
+        replace_recorded_payload_field(
+            fixture.path(),
+            "evt_evolution_claim",
+            "run_condition",
+            Some(serde_json::json!("")),
+        );
+        let store = fixture.path().join("reports/skill-evidence/demo-skill");
+        let stream_path = store.join("events.jsonl");
+        let projection_path = store.join("gate-status.json");
+        let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+        let projection_before =
+            fs::read(&projection_path).expect("read gate projection before refusal");
+        let mut command = skill_evidence();
+        command
+            .args(["skills", "evolution", "close", "--root"])
+            .arg(fixture.path())
+            .args([
+                "--target",
+                ".claude/skills/demo-skill",
+                "--event-id",
+                "evt_close_with_empty_constraint_field",
+                "--repository-head",
+                "fixture-head",
+                "--review-id",
+                "rev_fixture",
+                "--disposition",
+                "monitor_for_recurrence",
+                "--note",
+                "the claim event carries no provenance value",
+                "--adjudicate",
+                "evt_evolution_claim",
+                "--instrument-limited",
+                "evt_evolution_claim",
+                "--constraint-provenance",
+                "M1",
+                "evt_evolution_claim",
+                "run_condition",
+            ]);
+        add_concluded_coverage_routes(&mut command, fixture.path(), "rev_fixture", &triggers);
+        lifecycle_clock(&mut command, "lock_close_with_empty_constraint_field");
+
+        let output = command.output().expect("close with empty field");
+
+        assert_eq!(output.status.code(), Some(3));
+        assert!(output.stdout.is_empty());
+        assert_eq!(
+            String::from_utf8(output.stderr).expect("UTF-8 refusal"),
+            "--constraint-provenance M1 evt_evolution_claim run_condition names an absent, null, or empty field. Nothing done.\n"
+        );
+        assert_eq!(
+            fs::read(&stream_path).expect("read event stream after refusal"),
+            stream_before
+        );
+        assert_eq!(
+            fs::read(&projection_path).expect("read gate projection after refusal"),
+            projection_before
+        );
+    }
+}
+
+#[test]
+fn blocked_close_records_complete_constraint_provenance_in_event_and_receipt() {
+    let fixture = repository_with_demo_skill();
+    let refuting_text = "Twelve two-axis passes over a 14-file change; the reporting contract was unmet from the first pass and every pass after, so not a late-run drift";
+    let first = record_outcome_with_run_condition(
+        fixture.path(),
+        "review pass one",
+        "session-a",
+        "state",
+        "friction",
+        refuting_text,
+    );
+    let second = record_outcome_with_run_condition(
+        fixture.path(),
+        "review pass two",
+        "session-b",
+        "state",
+        "friction",
+        "The omission held from the first pass through the last",
+    );
+    let third = record_outcome_with_run_condition(
+        fixture.path(),
+        "review pass three",
+        "session-c",
+        "state",
+        "friction",
+        "the prose form was set at the first pass and repeated unchanged to the ninth",
+    );
+    let claim = claim_existing_evolution(fixture.path());
+    assert_eq!(
+        claim["trigger_event_ids"],
+        serde_json::json!([first, second, third])
+    );
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_close_with_constraint_provenance",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "blocked_no_valid_test",
+            "--note",
+            "the instrument cannot express the claimed accumulation constraint",
+        ]);
+    add_constraint_provenance_for_coverage(
+        &mut command,
+        fixture.path(),
+        "rev_fixture",
+        "run_condition",
+    );
+    lifecycle_clock(&mut command, "lock_close_with_constraint_provenance");
+
+    let output = command.output().expect("close with provenance");
+
+    assert!(
+        output.status.success(),
+        "close failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let receipt: Value = serde_json::from_slice(&output.stdout).expect("close receipt JSON");
+    let expected = serde_json::json!([
+        {
+            "constraint_label": "M1",
+            "event_id": first,
+            "field": "run_condition",
+            "field_value": refuting_text
+        },
+        {
+            "constraint_label": "M2",
+            "event_id": second,
+            "field": "run_condition",
+            "field_value": "The omission held from the first pass through the last"
+        },
+        {
+            "constraint_label": "M3",
+            "event_id": third,
+            "field": "run_condition",
+            "field_value": "the prose form was set at the first pass and repeated unchanged to the ninth"
+        }
+    ]);
+    assert_eq!(receipt["constraint_provenance"], expected);
+    assert!(
+        receipt["constraint_provenance"][0]["field_value"]
+            .as_str()
+            .expect("copied field text")
+            .contains("so not a late-run drift")
+    );
+    let stream = fs::read_to_string(
+        fixture
+            .path()
+            .join("reports/skill-evidence/demo-skill/events.jsonl"),
+    )
+    .expect("read event stream");
+    let disposition: Value = stream
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("event JSON"))
+        .find(|event| event["event_id"] == "evt_close_with_constraint_provenance")
+        .expect("review_disposition event");
+    assert_eq!(disposition["payload"]["constraint_provenance"], expected);
+    assert_event_stream_matches_the_published_schema(fixture.path());
+}
+
+#[test]
+fn constraint_provenance_refuses_a_close_without_an_instrument_limited_claim_write_free() {
+    let fixture = repository_with_demo_skill();
+    claim_evolution(fixture.path());
+    let store = fixture.path().join("reports/skill-evidence/demo-skill");
+    let stream_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("read gate projection before refusal");
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_superseded_with_constraint_provenance",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "superseded_by_target_version",
+            "--note",
+            "the target moved",
+        ]);
+    add_constraint_provenance_for_coverage(
+        &mut command,
+        fixture.path(),
+        "rev_fixture",
+        "run_condition",
+    );
+    lifecycle_clock(&mut command, "lock_superseded_with_constraint_provenance");
+
+    let output = command
+        .output()
+        .expect("close superseded review with provenance");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("UTF-8 refusal"),
+        "--constraint-provenance is allowed only for blocked_no_valid_test or an event named --instrument-limited. Nothing done.\n"
+    );
+    assert_eq!(
+        fs::read(&stream_path).expect("read event stream after refusal"),
+        stream_before
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before
+    );
+}
+
+#[test]
+fn constraint_provenance_refuses_an_unknown_field_write_free() {
+    let fixture = repository_with_demo_skill();
+    let claim = claim_evolution(fixture.path());
+    let trigger = claim["trigger_event_ids"][0]
+        .as_str()
+        .expect("trigger event id");
+    let store = fixture.path().join("reports/skill-evidence/demo-skill");
+    let stream_path = store.join("events.jsonl");
+    let projection_path = store.join("gate-status.json");
+    let stream_before = fs::read(&stream_path).expect("read event stream before refusal");
+    let projection_before =
+        fs::read(&projection_path).expect("read gate projection before refusal");
+    let mut command = skill_evidence();
+    command
+        .args(["skills", "evolution", "close", "--root"])
+        .arg(fixture.path())
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--event-id",
+            "evt_close_with_unknown_constraint_field",
+            "--repository-head",
+            "fixture-head",
+            "--review-id",
+            "rev_fixture",
+            "--disposition",
+            "blocked_no_valid_test",
+            "--note",
+            "the citation field is outside the closed roster",
+            "--constraint-provenance",
+            "M1",
+            trigger,
+            "expected",
+        ]);
+    lifecycle_clock(&mut command, "lock_close_with_unknown_constraint_field");
+
+    let output = command.output().expect("close with unknown field");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("UTF-8 refusal"),
+        "--constraint-provenance FIELD must be one of run_condition|observed|consequence|workaround_taken.\n"
+    );
+    assert_eq!(
+        fs::read(&stream_path).expect("read event stream after refusal"),
+        stream_before
+    );
+    assert_eq!(
+        fs::read(&projection_path).expect("read gate projection after refusal"),
+        projection_before
+    );
 }
 
 #[test]
@@ -2524,6 +3232,10 @@ fn outside_target_close_reports_recorded_owners_and_other_closes_omit_them() {
             &concluded,
             "--instrument-limited",
             &undecidable,
+            "--constraint-provenance",
+            "M2",
+            &undecidable,
+            "run_condition",
             "--external-owner",
             &concluded,
             "skill",
@@ -3009,6 +3721,14 @@ fn outside_target_close_refuses_an_owner_not_bound_to_a_concluded_event_write_fr
             undecidable,
             "--instrument-limited",
             triggers[2].as_str().expect("second undecidable event id"),
+            "--constraint-provenance",
+            "M2",
+            undecidable,
+            "run_condition",
+            "--constraint-provenance",
+            "M3",
+            triggers[2].as_str().expect("second undecidable event id"),
+            "run_condition",
             "--external-owner",
             concluded,
             "skill",
@@ -3270,7 +3990,14 @@ fn close_naming_untestable_coverage(
             "note",
         ]);
     for identity in named {
-        command.args(["--instrument-limited", identity]);
+        command.args([
+            "--instrument-limited",
+            identity,
+            "--constraint-provenance",
+            "binding-constraint",
+            identity,
+            "run_condition",
+        ]);
     }
     if [
         "resolved_by_change",
@@ -3462,6 +4189,10 @@ fn an_adjudicating_close_reports_the_coverage_it_retired_as_untestable() {
             "one mechanism's binding constraint was inexpressible in a fresh session",
             "--instrument-limited",
             &untestable,
+            "--constraint-provenance",
+            "M1",
+            &untestable,
+            "run_condition",
         ]);
     add_concluded_coverage_routes(&mut command, fixture.path(), "rev_fixture", &[&untestable]);
     lifecycle_clock(&mut command, "lock_evolution_close");
