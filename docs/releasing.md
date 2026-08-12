@@ -76,6 +76,29 @@ CI runs the last two on every push, diffing the file list against
 package, a new schema — that file is what you update; it carries no comments because it is
 compared byte-for-byte against `cargo package --list` output.
 
+### Forward-test changed skill packages in both agent hosts
+
+When the bytes of a live installed package change, exercise the installed package in one fresh
+Codex session and one fresh Claude session before release. Give each session only the ordinary
+user invocation and the installed package; do not supply the diagnosis, expected response, or the
+other host's transcript. Retain, separately for each host:
+
+1. the exact compiled command the package ran, including fixed clock or identity inputs;
+2. the command's stdout, stderr, and exit status; and
+3. the agent's final response.
+
+Validate the compiled output and the final response as distinct surfaces. On success, require the
+reporter's complete stdout payload to appear once in the final response, with every line and
+emitted command preserved in order and without paraphrase. Host-required framing around that
+intact payload and terminal-newline normalization are presentation and may differ. Cargo stderr is
+not reporter output. On a lifecycle refusal or unsafe failure, apply the same preservation rule to
+the command's authoritative diagnostic on stderr. A Cargo failure before the binary starts, a
+missing transcript, or a run through only one host is not a pass.
+
+This is a release acceptance seam, not a CI snapshot: it tests the agent behavior consumers
+actually receive while keeping Cargo's deterministic reporter bytes under the ordinary Rust
+suite. The package change is ready for release only when both host runs satisfy the same predicate.
+
 ## 4. Publish and tag
 
 ```console

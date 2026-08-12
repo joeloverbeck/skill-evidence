@@ -693,6 +693,41 @@ fn installed_status_package_does_not_tie_retirement_to_one_disposition() {
 }
 
 #[test]
+fn installed_status_package_treats_reporter_stdout_as_the_portable_payload() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let package = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution-status/SKILL.md"),
+    )
+    .expect("read installed skill-evolution-status package");
+    let prose = package.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    for required in [
+        "cargo run --locked --quiet -p demo-cli -- skills evolution-status",
+        "The authoritative census payload is the compiled reporter's stdout",
+        "Cargo diagnostics on stderr are not part of the census",
+        "without omission, duplication, reordering, or paraphrase",
+        "Host-required framing around that intact payload and normalization of its terminal newline are permitted",
+        "Cargo may write only its ordinary build and cache artifacts",
+    ] {
+        assert!(
+            prose.contains(required),
+            "installed status package must preserve `{required}`: package={package}"
+        );
+    }
+
+    assert!(
+        !package.contains("Relay the compiled command output verbatim."),
+        "byte equality with an agent's whole response is not a portable output contract"
+    );
+    assert!(
+        !package.contains("_Done when the exact census"),
+        "completion must be judged on the intact reporter payload rather than host framing"
+    );
+}
+
+#[test]
 fn installed_event_schema_keeps_untestable_coverage_optional_and_open() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
