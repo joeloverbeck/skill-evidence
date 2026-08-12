@@ -1,12 +1,14 @@
 # The evolution gate gets no new instrument for conformance-only evidence
 
-Status: accepted (2026-08-08, GitHub [#2](https://github.com/joeloverbeck/skill-evidence/issues/2))
+Status: accepted (2026-08-08, GitHub [#2](https://github.com/joeloverbeck/skill-evidence/issues/2)); superseded in part 2026-08-12 by [ADR 0008](0008-a-long-course-trial-expresses-an-accumulated-context-constraint.md) (GitHub [#48](https://github.com/joeloverbeck/skill-evidence/issues/48)) for constraints of accumulated context, volume, and run length
 
 Amended: 2026-08-09, GitHub [#16](https://github.com/joeloverbeck/skill-evidence/issues/16) — retirement consequences now defer to ADR 0002's reason-scoped reach rather than describing every instrument-limited close as whole-cluster retirement. No instrument decision changed.
 
 Amended: 2026-08-10, GitHub [#24](https://github.com/joeloverbeck/skill-evidence/issues/24) — this decision's routing now has a home in the text that executes it: the installed review reads each trigger's evidence class and bars the verdict per trigger rather than relying on the whole cluster being untestable. No instrument decision changed, and no classifier was built.
 
 Amended: 2026-08-10, GitHub [#28](https://github.com/joeloverbeck/skill-evidence/issues/28) — the declined routing option was re-raised with fresh evidence and re-declined; see *Considered options* below. The disclosure gap the re-raise did establish was never this decision's to decline, and is [#30](https://github.com/joeloverbeck/skill-evidence/issues/30). No instrument decision changed.
+
+Superseded in part: 2026-08-12, GitHub [#48](https://github.com/joeloverbeck/skill-evidence/issues/48) — [ADR 0008](0008-a-long-course-trial-expresses-an-accumulated-context-constraint.md) supersedes the instrument decision for constraints of accumulated context, volume, and run length, which now take a long-course reproduction trial. The reopening condition below fired on both disjuncts — one qualifying consumer close, and an instrument proposal — and option (b)'s wall turned out to rest on a text conflating a *fresh* executor with a *short-context* one. This decision's ruling that an outcome acceptance gate decides nothing about a conformance-only trigger stands unchanged and is not reopened. Its rejection of option (b) does not: that rejection rested solely on the wall, so ADR 0008 records (b) as open rather than declined, without re-deciding it.
 
 Skill Evidence Capture's ladder is disjunctive. Two of the four things that reach `material_failure`
 are outcome claims — *"material rework required"*, *"wrong work caught before consequential
@@ -133,6 +135,13 @@ name accumulated volume or elapsed run length — five to seven review passes, 1
 none *"neither support nor weaken this."* A trial executor starts fresh and short-context, so it
 cannot express that constraint whatever it then measures. This is the same wall step 4 of
 `authorized-review.md` already tells a reviewer to check for.
+**That wall was this option's only recorded ground, and it has since come down.**
+[ADR 0008](0008-a-long-course-trial-expresses-an-accumulated-context-constraint.md) found the
+sentence above conflates a *fresh* executor with a *short* one, so for an accumulated-context,
+volume, or run-length constraint the ground quoted here no longer holds. That does not revive (b):
+giving conformance evidence its own acceptance test is a larger change than lengthening a
+reproduction trial, and ADR 0008 declines to re-decide it. This option now stands **open rather than
+declined**, with no tracker carrying it and no dependent work resting on it.
 
 **(c) Give the no-conclusion close its own disposition.** Necessary, insufficient, and already
 adopted — in ADR 0002, as part of a larger decision rather than instead of it. It made the
@@ -174,7 +183,15 @@ review reaching this exit on one target: `triage`'s durability-drift-at-volume m
 unable to be expressed by review `1a00f33c-19d3-4e28-ba1e-d17d8e61f205` after its predecessor
 `fce6031a-a8f1-44b9-93cc-5c27488a51d3` ran a fresh short-context reproduction whose current arm
 passed. That is the cost this decision accepted, observed once more — not a new kind of thing, and
-below the bar the last consequence sets. Two of the three routes the issue proposed are now
+below the bar the last consequence sets.
+**Both halves of that occurrence are superseded, and the re-decline still stands.**
+[ADR 0008](0008-a-long-course-trial-expresses-an-accumulated-context-constraint.md) sends a volume
+constraint to a long-course reproduction trial, and stops a predecessor's short-context pass from
+binding a successor's judgment — so `1a00f33c`'s exit would not be reached the same way today. That
+does not disturb the re-decline, because #28 asked for routing to method-gap research, and this
+decision declined that on entirely separate grounds: the parking ADR 0002 had already fixed, and the
+owner's refusal of the *lands somewhere* half. ADR 0008 touches neither, and routes nothing.
+Two of the three routes the issue proposed are now
 foreclosed rather than merely declined: shipping the commission package was rejected by
 [ADR 0004](0004-method-gap-research-status-severs-its-commission-dependency.md) and is now barred
 outright by [`../principles/consumer-contract.md`](../principles/consumer-contract.md)
@@ -265,3 +282,19 @@ decision never declined *saying so*, only *routing* it, and the disclosure is
   extraction, and `what-we-bring-home` contributed 8 events and no material failures, too young to
   inform anything. This ADR sets no bar on what evidence a later proposal must clear; it records
   that today's did not warrant an instrument.
+  **Both disjuncts fired, the first on exactly one close.**
+  `what-we-bring-home`'s `rev_eb6dccae-387e-44d8-b56a-46cee85217d3` matches every term of the first:
+  a consumer store, after this decision, on `grilling` — assurance-producing — with two triggers its
+  report records as outcome-graded and an undecidable ground of *"reproduction instrument for all
+  seven triggers."* It is the only post-ADR consumer close matching **both** halves. One other,
+  `playbench`'s `rev_6a875d58-0bcd-4813-b037-d2c4e2040843`, records an outcome-graded trigger but is
+  on `codebase-design`, which is not among the four assurance-producing skills; every remaining
+  post-ADR consumer close whose report records classes records conformance-only triggers. So the
+  clause is met once rather than by a population.
+  [#48](https://github.com/joeloverbeck/skill-evidence/issues/48) supplied that record and
+  [`../../reports/skill-evolution-independent-instrument-research-report.md`](../../reports/skill-evolution-independent-instrument-research-report.md)
+  supplied an instrument proposal;
+  [ADR 0008](0008-a-long-course-trial-expresses-an-accumulated-context-constraint.md) records what
+  they were decided to mean and takes the accumulated-context half. One correction belongs here
+  rather than there: `what-we-bring-home` is no longer too young to inform anything, and now carries
+  six of the fifteen instrument-limited closes.
