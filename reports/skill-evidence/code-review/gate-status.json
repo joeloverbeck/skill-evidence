@@ -1,37 +1,42 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-12T08:30:20.674675267Z",
+  "generated_at": "2026-08-12T11:57:27.213852846Z",
   "target_content_hash": "58ee690ec479d13e9ff51567f4e57087f319ac7a1aca6511d61c8628f5e43fa6",
-  "qualifying_uses_on_current_hash": 28,
+  "qualifying_uses_on_current_hash": 29,
   "open_incident_ids": [
     "evt_7814cfa8-ad78-4511-b202-f78ad96902d3",
     "evt_c5666704-0654-4a6f-9626-2deb557e1302",
     "evt_d629f005-ff0e-4bda-8136-9f82d13c3c04",
     "evt_79fba326-61ff-4ace-adbf-7091c4527429",
-    "evt_3ea9e7a9-f39c-4c9b-8dff-5dbeab0860f9"
+    "evt_3ea9e7a9-f39c-4c9b-8dff-5dbeab0860f9",
+    "evt_bed10d6c-155b-4b55-b087-973ab25b89d9"
   ],
   "candidate_clusters": [
     {
       "symptom_key": "execution",
       "open_event_ids": [
-        "evt_79fba326-61ff-4ace-adbf-7091c4527429"
+        "evt_79fba326-61ff-4ace-adbf-7091c4527429",
+        "evt_bed10d6c-155b-4b55-b087-973ab25b89d9"
       ],
-      "independent_incidents": 1,
+      "independent_incidents": 2,
       "max_severity": "material_failure"
     }
   ],
-  "state": "collecting",
-  "authorized_workflow": null,
-  "authorization_reason": null,
-  "trigger_event_ids": [],
-  "threshold_session_id": null,
+  "state": "eligible_pending_cooldown",
+  "authorized_workflow": "skill-evolution",
+  "authorization_reason": "ten_use_unresolved",
+  "trigger_event_ids": [
+    "evt_79fba326-61ff-4ace-adbf-7091c4527429",
+    "evt_bed10d6c-155b-4b55-b087-973ab25b89d9"
+  ],
+  "threshold_session_id": "019ff51d-0ff3-7aa2-b36d-881035a0bd51",
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": "rev_e957bdc8-1ff4-4aab-976c-be5b85a79f6c",
-  "review_reentry_basis": "queued_pre_close_evidence",
+  "review_reentry_basis": "post_review_incident",
   "target_name": "code-review",
   "target_repo_relative_path": ".claude/skills/code-review",
-  "derivation_session_id": "019ff4ad-d343-7fb1-a948-8e666febacf1",
+  "derivation_session_id": "019ff51d-0ff3-7aa2-b36d-881035a0bd51",
   "instrument_limited_incident_ids": [
     "evt_7814cfa8-ad78-4511-b202-f78ad96902d3",
     "evt_c5666704-0654-4a6f-9626-2deb557e1302",

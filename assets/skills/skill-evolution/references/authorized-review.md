@@ -78,6 +78,10 @@ For each distinct mechanism, name its binding constraint — the condition witho
 
 For each testable constraint, name its **witness**: an observable the raw task naturally produces in a finished run's output or artifacts that shows whether the run expressed the constraint, plus the observation that reads unexpressed. For each proposed witness, ask: **would a compliant run that finds nothing still emit it?** If no, it is not a witness; mark the mechanism unable to be expressed in the frozen plan before any executor runs. The harness must not compel the executor to emit it. An observable that cannot read unexpressed is not a witness; mark its mechanism unable to be expressed. Anything already produced by the run can qualify; require no new instrument. Fix every reading before outcomes exist, because one chosen after a result is not evidence.
 
+Before freezing any runnable reproduction trial, reconcile the complete mechanism with its reproduction oracle. Break each candidate mechanism into named observable clauses, including its triggering condition and every behavior the mechanism says is wrong. For every clause, freeze the natural output or artifact observation that reads it true and the observation that reads it false. Freeze the recurrence rule that combines those clauses, including whether all or only named alternatives must hold. A constraint witness establishes that the run exercised the condition; it does not by itself establish every failure clause.
+
+Reconcile in both directions: every mechanism clause maps to at least one frozen reading in the witness, failure reading, pass/fail rubric, or deterministic checks, and every reproduction criterion maps back to a mechanism clause or protected behavior. Both unmatched lists must be empty before a runnable trial is frozen. If a clause has no natural reading, repair the plan or narrow an overstated mechanism before running; if no behavior-neutral trial can read it, mark the mechanism unable to be expressed. Never let a rubric that measures only part of the declared mechanism stand as its reproduction oracle. Save the clause map, recurrence rule, and both empty unmatched lists with the frozen plan.
+
 A same-hash predecessor that already ran trials constrains this judgment: if it reports the current arm passing on a mechanism shape these incidents repeat, that is evidence the wording is followed when freshly read, and the constraint is the run condition rather than the text. Do not re-derive it by rerunning equivalent trials.
 
 For each binding constraint, identify what in the evidence packet establishes it: a recorded `run_condition`, `observed`, `consequence`, or `workaround_taken`, or a same-target predecessor's ruling. When nothing in the packet establishes a constraint, record it as unestablished rather than asserting it. An effect recorded as undetermined establishes nothing about that effect and does not establish its opposite. Only a constraint the evidence packet establishes can support an **unable to be expressed** marking. An unestablished constraint keeps its trial slot and proceeds to an ordinary reproduction trial. A recorded field placing the failure at first use refutes an accumulation, volume, or late-run constraint for that trigger. That trigger keeps its trial slot regardless of how the mechanism grouped it. When grouped triggers' recorded conditions disagree about the constraint, re-examine the grouping before any unable-to-be-expressed marking. When recorded run conditions agree that failures arrived at volume, late in a long run, or only intermittently, say so here and treat a fresh short-context single-run trial as unable to express that.
@@ -106,9 +110,11 @@ The current arm is the union of the reproduction trials; if their results disagr
 
 Run each runnable reproduction on the unchanged current skill before building anything, under step 6's rules. Read its **first** witness before spending another. Unexpressed → mark that mechanism unable to be expressed and stop only its trial, with no re-cut prompt or fixture. Expressed → finish its planned current-arm runs.
 
+Classify recurrence from the frozen recurrence rule, not from the broader trial verdict. A retained artifact that satisfies that rule reproduced the mechanism even when the trial otherwise passed; a protected-behavior or comparison result cannot erase the frozen failure reading.
+
 Classify each mechanism separately, including run 1: failure recurred → reproduced; witnesses expressed on every run without failure → not reproduced with witnesses expressed; any unexpressed witness → unable to be expressed. Build the candidate only for reproduced mechanisms and carry all three mappings into the report. This per-mechanism routing does not create per-trigger dispositions; the review still closes once, and step 9 carries each mechanism's reading into that one close.
 
-If none reproduced, build no candidate. Choose `blocked_no_valid_test` only when the review has concluded about no covered trigger and no trial could express any mechanism. Otherwise keep the disposition for a conclusion already reached, or carry `monitor_for_recurrence`, and route every unable-to-be-expressed mechanism's triggers undecidable at step 9 — a disposition whose reach is the authorization reason's whole cluster must not stand in for a mixed review or one that did express something. Name every mechanism's reading in the note, then go to step 9.
+If none reproduced, build no candidate. Choose `blocked_no_valid_test` only when the review has concluded about no covered trigger and no trial could express any mechanism. Otherwise keep the disposition for a conclusion already reached, or carry `monitor_for_recurrence`, and route every unable-to-be-expressed mechanism's triggers undecidable at step 9 — a disposition whose reach is the authorization reason's whole cluster must not stand in for a mixed review or one that did express something. A mixed no-candidate review terminates as `mixed_no_candidate` with disposition `monitor_for_recurrence` when at least one mechanism was not reproduced with witnesses expressed and at least one was unable to be expressed. Do not label the whole review `not_reproducible`; that outcome remains step 3's conclusion that the packet supports no mechanism the target could own. Name every mechanism's reading in the note, then go to step 9.
 
 Copy the live target to `reviews/<review-id>/candidate/` (outside skill discovery) and modify only that copy; the live target stays untouched until every trial passes. Design rules:
 
@@ -220,6 +226,9 @@ Before any close, write the review report at `reviews/<review-id>.md`, with unre
 ## Frozen validation plan
 - Risk tier:
 - Paired trials:
+- Mechanism clause → observable reading:
+- Recurrence rule:
+- Unmatched mechanism clauses / reproduction criteria:
 - Deterministic checks:
 
 ## Results
@@ -239,6 +248,7 @@ Before any close, write the review report at `reviews/<review-id>.md`, with unre
 ## Landing
 - Landed: yes/no
 - Target after hash or unchanged hash:
+- Terminal outcome:
 - Final disposition:
 - Coverage named untestable:
 - Constraint provenance copied:
@@ -277,4 +287,4 @@ Unrelated imperfections noticed during an authorized review are not in scope: do
 
 ## Terminal outcomes
 
-Every invocation ends in exactly one state. `refused_closed_gate`, `refused_cooldown_or_same_session`, and `refused_self_target` end in `SKILL.md` step 2 with no event and no report. Claimed reviews end as `superseded_by_target_version`, `insufficient_independence`, `outside_target`, `not_reproducible`, `blocked_no_valid_test`, `candidate_rejected_validation`, `resolved_no_change`, or — the only outcome that modifies the live target — `resolved_by_validated_change` (disposition `resolved_by_change`). Name the terminal outcome in the completion.
+Every invocation ends in exactly one state. `refused_closed_gate`, `refused_cooldown_or_same_session`, and `refused_self_target` end in `SKILL.md` step 2 with no event and no report. Claimed reviews end as `superseded_by_target_version`, `insufficient_independence`, `outside_target`, `not_reproducible`, `blocked_no_valid_test`, `candidate_rejected_validation`, `resolved_no_change`, `mixed_no_candidate` when `monitor_for_recurrence` closes a review in which no mechanism reproduced, at least one was not reproduced with witnesses expressed, and at least one was unable to be expressed, or — the only outcome that modifies the live target — `resolved_by_validated_change` (disposition `resolved_by_change`). Name the terminal outcome in the report and completion.

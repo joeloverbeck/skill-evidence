@@ -464,6 +464,56 @@ fn installed_skill_evolution_reference_requires_per_mechanism_trials() {
 }
 
 #[test]
+fn installed_skill_evolution_reconciles_every_mechanism_clause_with_its_reproduction_oracle() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let validation = reference
+        .find("### 6. Run blind comparative validation")
+        .expect("the candidate-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+    let reproduction = &reference[current_arm..validation];
+
+    for required in [
+        "Break each candidate mechanism into named observable clauses",
+        "including its triggering condition and every behavior the mechanism says is wrong",
+        "Freeze the recurrence rule that combines those clauses",
+        "every mechanism clause maps to at least one frozen reading",
+        "every reproduction criterion maps back to a mechanism clause or protected behavior",
+        "Both unmatched lists must be empty before a runnable trial is frozen",
+    ] {
+        assert!(
+            plan.contains(required),
+            "the frozen plan must preserve `{required}`: reference={reference}"
+        );
+    }
+    assert!(
+        reproduction.contains(
+            "Classify recurrence from the frozen recurrence rule, not from the broader trial verdict"
+        ) && reproduction.contains(
+            "A retained artifact that satisfies that rule reproduced the mechanism even when the trial otherwise passed"
+        ),
+        "a broad outcome rubric must not erase a mechanism failure present in the retained artifact: reference={reference}"
+    );
+    assert!(
+        reference.contains("- Mechanism clause → observable reading:")
+            && reference.contains("- Unmatched mechanism clauses / reproduction criteria:"),
+        "the durable report must retain the reconciliation that made the reproduction oracle complete: reference={reference}"
+    );
+}
+
+#[test]
 fn installed_skill_evolution_reference_reserves_blocked_for_the_whole_review() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
@@ -1554,6 +1604,51 @@ fn installed_skill_evolution_reference_keeps_its_no_candidate_route_consistent_w
             "Otherwise keep the disposition for a conclusion already reached, or carry `monitor_for_recurrence`, and route every unable-to-be-expressed mechanism's triggers undecidable at step 9"
         ),
         "a review with one concluded trigger and one unexpressible mechanism must retain its conclusion instead of falling onto the whole-cluster disposition"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reports_a_mixed_no_candidate_close_truthfully() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let package = fs::read_to_string(root.path().join(".claude/skills/skill-evolution/SKILL.md"))
+        .expect("read installed Skill Evolution package");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    assert!(
+        reference.contains(
+            "A mixed no-candidate review terminates as `mixed_no_candidate` with disposition `monitor_for_recurrence`"
+        ),
+        "the no-candidate branch must name the mixed result instead of borrowing the narrower ownership conclusion: reference={reference}"
+    );
+    assert!(
+        reference.contains("Do not label the whole review `not_reproducible`"),
+        "the mixed route must explicitly reject the previous false terminal label: reference={reference}"
+    );
+    assert!(
+        reference.contains(
+            "`mixed_no_candidate` when `monitor_for_recurrence` closes a review in which no mechanism reproduced, at least one was not reproduced with witnesses expressed, and at least one was unable to be expressed"
+        ),
+        "the terminal roster must define the mixed label by its per-mechanism readings: reference={reference}"
+    );
+    assert!(
+        reference.contains("- Terminal outcome:"),
+        "the durable report must keep the human-facing terminal label distinct from the close disposition: reference={reference}"
+    );
+    assert!(
+        !package.contains(
+            "exactly one terminal outcome was reached and recorded through the compiled command"
+        ),
+        "the compiled event records a close disposition, not the report's human-facing terminal label: package={package}"
+    );
+    assert!(
+        package.contains("exactly one close disposition was recorded through the compiled command")
+            && package.contains("the review report names its truthful terminal outcome"),
+        "the installed entrypoint must distinguish the persisted disposition from the reported terminal label: package={package}"
     );
 }
 
