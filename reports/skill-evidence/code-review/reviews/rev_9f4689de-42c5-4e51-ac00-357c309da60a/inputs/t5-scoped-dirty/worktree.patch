@@ -1,0 +1,14 @@
+diff --git a/notes/sentinel.txt b/notes/sentinel.txt
+index 2fa992c..efc0f85 100644
+--- a/notes/sentinel.txt
++++ b/notes/sentinel.txt
+@@ -1 +1 @@
+-keep
++unrelated
+diff --git a/src/authorized.txt b/src/authorized.txt
+index d00491f..00750ed 100644
+--- a/src/authorized.txt
++++ b/src/authorized.txt
+@@ -1 +1 @@
+-1
++3

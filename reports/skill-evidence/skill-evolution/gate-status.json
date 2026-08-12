@@ -1,35 +1,44 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-12T04:46:25.81745643Z",
-  "target_content_hash": "abfc7930f41e6025110b591873b9f09f93f45868cd3493b894f7915a7cf17992",
+  "generated_at": "2026-08-12T17:26:45.602251134Z",
+  "target_content_hash": "18adb23ddaa424664f5fdc398103669c781c8bd1ac50b0ccd5501eca38aad376",
   "qualifying_uses_on_current_hash": 2,
   "open_incident_ids": [
-    "evt_ddfd4181-dc7c-4159-83f8-41ace35a30a1",
-    "evt_5cebdd66-d34d-40ba-baf6-b27a4db482bf"
+    "evt_7216ef85-73c8-40d7-8bbd-7868f99f432d",
+    "evt_ef6a6237-5116-4d75-a8ec-e980d782fd41",
+    "evt_f2296db5-26e4-41ca-a157-60821b04d8ca"
   ],
   "candidate_clusters": [
     {
-      "symptom_key": "state",
+      "symptom_key": "execution",
       "open_event_ids": [
-        "evt_ddfd4181-dc7c-4159-83f8-41ace35a30a1",
-        "evt_5cebdd66-d34d-40ba-baf6-b27a4db482bf"
+        "evt_7216ef85-73c8-40d7-8bbd-7868f99f432d"
+      ],
+      "independent_incidents": 1,
+      "max_severity": "friction"
+    },
+    {
+      "symptom_key": "output",
+      "open_event_ids": [
+        "evt_ef6a6237-5116-4d75-a8ec-e980d782fd41",
+        "evt_f2296db5-26e4-41ca-a157-60821b04d8ca"
       ],
       "independent_incidents": 1,
       "max_severity": "severe_incident"
     }
   ],
-  "state": "quarantined_eligible",
+  "state": "quarantined_pending_cooldown",
   "authorized_workflow": "skill-evolution",
   "authorization_reason": "severe",
   "trigger_event_ids": [
-    "evt_ddfd4181-dc7c-4159-83f8-41ace35a30a1"
+    "evt_ef6a6237-5116-4d75-a8ec-e980d782fd41"
   ],
-  "threshold_session_id": "019ff3f0-fea8-7e21-827f-026cee897a5c",
+  "threshold_session_id": "019ff6c2-5547-7eb0-beab-0bc56a4db17b",
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": null,
   "review_reentry_basis": "first_eligibility",
   "target_name": "skill-evolution",
   "target_repo_relative_path": ".claude/skills/skill-evolution",
-  "derivation_session_id": "019ff3ee-ca53-7303-9b81-a14eb45255fd"
+  "derivation_session_id": "019ff6c2-5547-7eb0-beab-0bc56a4db17b"
 }

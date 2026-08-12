@@ -1,0 +1,10 @@
+diff --git a/greet.sh b/greet.sh
+index c72f88e..fce985a 100644
+--- a/greet.sh
++++ b/greet.sh
+@@ -1 +1,5 @@
+ #!/bin/sh
++
++x() {
++  printf 'hello\\n'
++}

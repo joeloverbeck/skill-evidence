@@ -1,0 +1,35 @@
+diff --git a/src/five.txt b/src/five.txt
+index d00491f..00750ed 100644
+--- a/src/five.txt
++++ b/src/five.txt
+@@ -1 +1 @@
+-1
++3
+diff --git a/src/four.txt b/src/four.txt
+index d00491f..0cfbf08 100644
+--- a/src/four.txt
++++ b/src/four.txt
+@@ -1 +1 @@
+-1
++2
+diff --git a/src/one.txt b/src/one.txt
+index d00491f..0cfbf08 100644
+--- a/src/one.txt
++++ b/src/one.txt
+@@ -1 +1 @@
+-1
++2
+diff --git a/src/three.txt b/src/three.txt
+index d00491f..0cfbf08 100644
+--- a/src/three.txt
++++ b/src/three.txt
+@@ -1 +1 @@
+-1
++2
+diff --git a/src/two.txt b/src/two.txt
+index d00491f..0cfbf08 100644
+--- a/src/two.txt
++++ b/src/two.txt
+@@ -1 +1 @@
+-1
++2

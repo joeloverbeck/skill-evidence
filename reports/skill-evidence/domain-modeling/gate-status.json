@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-12T15:51:38.278231876Z",
+  "generated_at": "2026-08-12T16:23:22.745Z",
   "target_content_hash": "97f7208528885b6bf219d45525f5e086b45291c8b1f66090915d6e8bd6709dc8",
   "qualifying_uses_on_current_hash": 11,
   "open_incident_ids": [
@@ -19,12 +19,10 @@
     {
       "symptom_key": "output",
       "open_event_ids": [
-        "evt_4833594e-7e25-4a2f-a94a-278e6e3b9e86",
-        "evt_94dcf11b-22ca-4d83-afd5-32b877b83799",
-        "evt_c587abf2-e777-47c5-9715-075a92b9ce88"
+        "evt_4833594e-7e25-4a2f-a94a-278e6e3b9e86"
       ],
-      "independent_incidents": 3,
-      "max_severity": "material_failure"
+      "independent_incidents": 1,
+      "max_severity": "friction"
     },
     {
       "symptom_key": "execution",
@@ -37,25 +35,24 @@
       "max_severity": "material_failure"
     }
   ],
-  "state": "eligible",
-  "authorized_workflow": "skill-evolution",
-  "authorization_reason": "material_recurrence:output",
-  "trigger_event_ids": [
-    "evt_94dcf11b-22ca-4d83-afd5-32b877b83799",
-    "evt_c587abf2-e777-47c5-9715-075a92b9ce88"
-  ],
-  "threshold_session_id": "20756fb1-c768-4e26-ba38-df968e399320",
+  "state": "collecting",
+  "authorized_workflow": null,
+  "authorization_reason": null,
+  "trigger_event_ids": [],
+  "threshold_session_id": null,
   "not_before": null,
   "active_review_id": null,
-  "last_completed_review_id": "5d1d35bb-95d9-4316-a36f-3c13559250ff",
-  "review_reentry_basis": "post_review_incident",
+  "last_completed_review_id": "8f1a4f65-fc16-4cac-90aa-cc223195ad01",
+  "review_reentry_basis": "queued_behind_instrument_limited_review",
   "target_name": "domain-modeling",
   "target_repo_relative_path": ".claude/skills/domain-modeling",
-  "derivation_session_id": "bd16d06e-9797-4e48-967d-7d4bdbec019d",
+  "derivation_session_id": "019ff6c4-14b4-7b42-ba51-42a570018e84",
   "instrument_limited_incident_ids": [
     "evt_2aabfe78-d93c-48c4-b54e-346b838bfb83",
     "evt_92d00622-339f-4004-86c9-60fbeb50d218",
     "evt_cade3ab8-7454-490e-9e60-9ed1e974d9d9",
-    "evt_599a36b0-d0c4-408d-9ef3-30a806c8ca86"
+    "evt_599a36b0-d0c4-408d-9ef3-30a806c8ca86",
+    "evt_94dcf11b-22ca-4d83-afd5-32b877b83799",
+    "evt_c587abf2-e777-47c5-9715-075a92b9ce88"
   ]
 }
