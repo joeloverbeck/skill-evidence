@@ -111,6 +111,44 @@ fn snapshot_tree(root: &std::path::Path) -> BTreeMap<String, Vec<u8>> {
     snapshot
 }
 
+#[test]
+fn installed_live_packages_do_not_point_to_nonexistent_archive_paths() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+
+    let capture = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evidence-capture/SKILL.md"),
+    )
+    .expect("read installed capture package");
+    assert!(
+        capture.contains(
+            "No report file is produced for ordinary capture; markdown reports belong to evolution runs."
+        ),
+        "removing the maintainer-only pointer must retain the capture package's reporting guidance"
+    );
+
+    let mut offenders = Vec::new();
+    for package in ["skill-evidence-capture", "skill-evolution"] {
+        let installed = fs::read_to_string(
+            root.path()
+                .join(".claude/skills")
+                .join(package)
+                .join("SKILL.md"),
+        )
+        .expect("read installed live package");
+        if installed.contains("archive/") {
+            offenders.push(package);
+        }
+    }
+
+    assert_eq!(
+        offenders,
+        Vec::<&str>::new(),
+        "live installed packages must not point to archive paths that do not exist in the authoring repository"
+    );
+}
+
 /// Capture is where a run's deviations become addressable evidence or stop being
 /// addressable at all. A recorder told to fix exactly one outcome and one symptom key, with
 /// nothing said about a run that deviated several ways, compresses them into one record and
