@@ -181,6 +181,32 @@ witness. Nor is an observable that a compliant run which finds nothing would omi
 would not still emit it, it is not a witness.
 _Avoid_: check, signal, indicator, assertion
 
+**Artifact identity relation**:
+The rule one frozen reading uses to decide whether two artifacts count as the same. Fixed before
+outcomes exist, like a witness and for the same reason, so a comparison the plan did not freeze at
+all cannot carry an adverse claim at the acceptance gate. See
+`assets/skills/skill-evolution/` for the admissible relations and what naming one costs — this
+glossary names the concept, not the roster, so the two cannot drift — and
+[`docs/adr/0009-the-acceptance-gate-spends-only-arm-discriminating-evidence.md`](docs/adr/0009-the-acceptance-gate-spends-only-arm-discriminating-evidence.md).
+_Avoid_: normalization, hash comparison, byte equality
+
+**Frozen-input fault**:
+A frozen trial input whose own bytes refute a factual premise the frozen plan asserted about it,
+found only once both arms have returned the same reading. It is a defect in the plan, established by
+reading the retained artifact rather than by re-running or re-cutting it, and it voids the criterion
+that rested on the premise — never the trial's other readings, and never as a limit of the
+instrument.
+_Avoid_: bad fixture, broken trial, invalid run
+
+**Material candidate regression**:
+An observation that bars a candidate at the acceptance gate. Establishing one takes four things the
+retained artifacts must show — see `assets/skills/skill-evolution/` for the exact standard — and a
+defect in a capability the current arm never produced is not such a regression, because there is
+nothing for it to regress from; it is graded against mechanism resolution and growth instead, where
+it can still reject the candidate. An observation short of the standard is recorded and decides
+nothing on its own.
+_Avoid_: breakage, side effect, post-hoc finding, instability
+
 **Constraint provenance citation**:
 A generated whole-field copy from a covered immutable event that puts the recorded ground for a
 binding constraint in the close itself. The operator supplies a constraint label, event ID, and

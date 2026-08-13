@@ -1000,6 +1000,217 @@ fn installed_skill_evolution_reference_discloses_evaluable_failure_readings_in_s
 }
 
 #[test]
+fn installed_skill_evolution_reference_freezes_artifact_identity_before_outcomes() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    for required in [
+        "Freeze the **artifact identity relation** each such reading uses: exact bytes, or one named deterministic canonicalization, with the exact command that computes it and the difference it is allowed to absorb.",
+        "Exact bytes is the default and needs no argument: a frozen reading that compares artifacts without naming a relation is governed by exact bytes.",
+        "A comparison the plan did not freeze at all cannot carry an adverse claim at step 7, where it is recorded and decides nothing by itself. No relation may be chosen, widened, or narrowed once results exist.",
+    ] {
+        assert!(
+            plan.contains(required),
+            "step 4 must fix artifact sameness before any outcome exists: missing `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
+fn installed_skill_evolution_reference_compares_under_the_frozen_relation_in_step_six() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let validation = reference
+        .find("### 6. Run blind comparative validation")
+        .expect("the blind-validation step remains explicit");
+    let acceptance = reference
+        .find("### 7. Apply the acceptance gate")
+        .expect("the acceptance step remains explicit");
+    let step_six = &reference[validation..acceptance];
+
+    assert!(
+        step_six.contains(
+            "Compare artifacts only under the artifact identity relation step 4 froze for that reading, and retain both sides of every comparison, so a claim made at step 7 rests on what is on disk rather than on what a run reported."
+        ),
+        "the run step must apply the frozen relation and retain what a step-7 claim will have to be established from: reference={reference}"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_voids_a_symmetric_frozen_input_fault() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let acceptance = reference
+        .find("### 7. Apply the acceptance gate")
+        .expect("the acceptance step remains explicit");
+    let record = reference
+        .find("### 8. Record, land, verify")
+        .expect("the landing step remains explicit");
+    let gate = &reference[acceptance..record];
+
+    for required in [
+        "that is a **frozen-input fault** in the plan rather than a result about either arm",
+        "Establish it by reading the retained artifact and quoting the refuting bytes, never by re-running and never by re-cutting the fixture",
+        "The refuted criterion is void for this gate, because a criterion both arms fail on a premise the input itself refutes discriminates nothing between them.",
+        "A symmetric reading with no such fault established is not void: on a protected-behavior or regression criterion it is noninferior, which the gate already accounts for, and on a reproduction case it means the candidate resolved nothing, which the gate's first term already refuses.",
+        "Voiding takes the refuting bytes and never a shared result alone.",
+        "Record the fault, the refuting bytes, and the voided criterion in the review report.",
+        "A void criterion is a defect in the plan and never a limit of the instrument, so it supports no unable-to-be-expressed marking, no `--instrument-limited` naming, and no `blocked_no_valid_test`.",
+    ] {
+        assert!(
+            gate.contains(required),
+            "a symmetric input fault must not be spent against the candidate: missing `{required}`: reference={reference}"
+        );
+    }
+    assert!(
+        gate.contains(
+            "Voiding reaches every criterion this gate reads by comparing the arms, the reproduction reading included: the bars stated absolutely above — safety, scope, and ownership invariants, and the deterministic checks the candidate must pass before landing — are not satisfied by the current skill failing them too."
+        ),
+        "voiding must reach the reproduction reading and must not reach the bars this gate states absolutely: reference={reference}"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_attributes_every_material_regression_claim() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let acceptance = reference
+        .find("### 7. Apply the acceptance gate")
+        .expect("the acceptance step remains explicit");
+    let record = reference
+        .find("### 8. Record, land, verify")
+        .expect("the landing step remains explicit");
+    let gate = &reference[acceptance..record];
+
+    assert!(
+        gate.contains(
+            "Whatever reading it comes from, calling an observation a **material candidate regression** requires all four of the following, each established from the retained artifacts."
+        ),
+        "the standard must bind every material-regression claim, so that a frozen criterion both arms fail is not exempt from arm-discrimination: reference={reference}"
+    );
+    assert!(
+        gate.contains(
+            "The bar stays open to an observation no frozen criterion covers, because a severe regression nobody anticipated is what it exists to catch; being frozen is not itself one of the four and does not stand in for them."
+        ),
+        "the open regression bar must survive the attribution standard rather than be closed by it: reference={reference}"
+    );
+    for required in [
+        "**arm-discriminating** — present on the candidate arm and absent from the current arm under the same frozen input;",
+        "**not variance** — not produced by the frozen input's own bytes, by the harness or executor logistics, or by a difference the reading's frozen artifact identity relation absorbs; where the comparison was never frozen at all, this part is unmet, because sameness settled after the fact is not evidence;",
+        "**attributable** — the candidate's text produces it, named as the clause it adds, the clause it removes, or the exact difference from the current skill responsible where no single clause is;",
+        "**baselined** — the current arm produced a comparable behavior for it to regress from.",
+    ] {
+        assert!(
+            gate.contains(required),
+            "a material candidate regression must be established on all four parts: missing `{required}`: reference={reference}"
+        );
+    }
+    assert!(
+        gate.contains(
+            "A severe regression is established the same way: the four parts settle whether the candidate caused it, never how bad it is."
+        ),
+        "the gate bars material or severe regression, so calling one severe must not route around the four parts: reference={reference}"
+    );
+    assert!(
+        gate.contains(
+            "Where the candidate supplies a capability the current arm never had, the fourth fails by construction and the observation is not a regression."
+        ) && gate.contains(
+            "a defect read there can still reject the candidate"
+        ),
+        "a novel-capability defect must be regraded rather than dropped: reference={reference}"
+    );
+    assert!(
+        gate.contains(
+            "An observation failing any of the four is recorded in the review report with which part it failed, and cannot by itself reject the candidate."
+        ),
+        "an unattributed observation must be recorded and must not decide the gate on its own: reference={reference}"
+    );
+    assert!(
+        gate.contains(
+            "This narrows the open bar in one place, deliberately. An unanticipated regression that turns on two artifacts being the same cannot be established by the review that first notices it, because the relation deciding sameness would have to be chosen after the result it decides."
+        ),
+        "the reference an agent actually reads must disclose the one narrowing, rather than leaving it to the decision record: reference={reference}"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_reports_gate_attribution_in_its_own_section() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    // `## Unable to be expressed` is named in step 9's prose before the template repeats it, so the
+    // anchors chain forward from the previous one rather than each searching from the start.
+    let template_plan = reference
+        .find("## Frozen validation plan")
+        .expect("the report template keeps its frozen-plan section");
+    let template_results = reference[template_plan..]
+        .find("## Results")
+        .map(|offset| template_plan + offset)
+        .expect("the report template keeps its results section");
+    let template_unable = reference[template_results..]
+        .find("## Unable to be expressed")
+        .map(|offset| template_results + offset)
+        .expect("the report template keeps its dead-end section");
+    let frozen = &reference[template_plan..template_results];
+    let results = &reference[template_results..template_unable];
+
+    assert!(
+        frozen.contains("- Artifact identity relation → comparisons it governs:")
+            && !results.contains("- Artifact identity relation"),
+        "the identity relation belongs to the frozen plan, because choosing one after results is what it forbids: reference={reference}"
+    );
+    for required in [
+        "- Frozen-input fault → refuting bytes → voided criterion:",
+        "- Material regression claim → attribution result:",
+    ] {
+        assert!(
+            results.contains(required),
+            "the results section must carry what the gate did with an unfrozen or refuted reading: missing `{required}`: reference={reference}"
+        );
+    }
+    assert!(
+        !frozen.contains("- Frozen-input fault") && !frozen.contains("- Material regression claim"),
+        "a fault found only once results exist must never be written back into the frozen plan: reference={reference}"
+    );
+}
+
+#[test]
 fn installed_event_schema_declares_close_validation_effort_as_optional() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
