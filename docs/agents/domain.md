@@ -63,3 +63,22 @@ localization here rather than editing the skill is the point. Editing it would a
 
 Amending in place still applies only when the decision stands. An actual reversal or replacement gets
 a new ADR that supersedes the old one, per the reference.
+
+## Superseding an accepted ADR in part
+
+The reference covers whole supersession and in-place amendment. This repository's ADRs are large
+enough that a successor routinely replaces one ruling and leaves the rest governing, and
+[`../adr/0003-no-new-instrument-for-conformance-only-evidence.md`](../adr/0003-no-new-instrument-for-conformance-only-evidence.md)
+is where that first happened. Two marks, both required, because either alone misleads:
+
+- **A suffix on the `Status:` line**, so a reader who checks only the status sees it:
+
+  > `Status: accepted (<date>, GitHub [#N](…)); superseded in part <date> by [ADR NNNN](…) (GitHub [#M](…)) for <the exact scope>`
+
+- **A `Superseded in part:` line** below the `Amended:` lines, in the same form they use, naming
+  what moved **and** what still governs.
+
+Mark the superseded reasoning where it sits, too. A rejected option whose recorded ground the
+successor voids says so inline, at the option, rather than relying on a header line — and if the
+ground was that option's only one, say whether the option is now **open** rather than declined, since
+a rejection with no surviving basis is not a rejection. Do not silently leave it standing.

@@ -16,6 +16,8 @@ Amended: 2026-08-11, GitHub [#33](https://github.com/joeloverbeck/skill-evidence
 
 Amended: 2026-08-12, GitHub [#45](https://github.com/joeloverbeck/skill-evidence/issues/45) — the provenance vouch now carries checked, generated whole-field citations and refuses when any instrument-limited event lacks one; the semantic reach-bound vouch remains a disclosed judgment rather than a compiled refusal.
 
+Amended: 2026-08-12, GitHub [#48](https://github.com/joeloverbeck/skill-evidence/issues/48) — the *Why* below rested on a fresh short-context trial being unable to express accumulated volume or run length. [ADR 0008](0008-a-long-course-trial-expresses-an-accumulated-context-constraint.md) found that premise conflated a *fresh* executor with a *short* one, so the door-leads-nowhere argument now rests on the residue that survives a long-course trial. The retirement decision and its reach are unchanged.
+
 A Skill Evolution review that closes `blocked_no_valid_test` reached no conclusion, so it adjudicates
 nothing and its trigger evidence stays open. That close still laid a watermark, and the watermark
 deferred the very evidence that opened the gate — labelled `queued_pre_close_evidence`, as though a
@@ -56,7 +58,14 @@ door was a new post-review incident, and the census in
 [`../../reports/conformance-evidence-census.md`](../../reports/conformance-evidence-census.md) shows
 why that door leads nowhere: every conformance-only incident carrying a run condition names
 accumulated volume or elapsed run length, which a fresh short-context trial cannot express whatever
-it then measures. A fifth incident hits the same wall as the first four.
+it then measures. A fifth incident hits the same wall as the first four. **Half of that wall has
+since come down.** [ADR 0008](0008-a-long-course-trial-expresses-an-accumulated-context-constraint.md)
+reaches accumulated volume and run length with a long-course reproduction trial, so a constraint of
+that kind no longer settles the question by being named — what survives on reachability grounds is
+cross-session accumulation and elapsed wall-clock. The exit itself is unmoved and stays wider than
+that residue: a constraint with no available witness, or an incidence too low to separate arms,
+still arrives here. That narrows one of several routes in; it changes nothing about what the exit
+then does, which is the decision this ADR records.
 
 The same document supplies the remedy: *when a gate reaches a state with no honest exit, the correct
 response is to give it an honest exit, not to wait for evidence that the situation is structurally

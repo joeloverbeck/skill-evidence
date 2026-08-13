@@ -160,6 +160,19 @@ the failure where the proposed constraint says it should not occur. Unestablishe
 constraints keep a trial slot; a field name alone establishes nothing.
 _Avoid_: root cause, precondition, trigger
 
+**Long-course reproduction trial**:
+The reproduction trial that varies a binding constraint of accumulated context, volume, or run
+length, by giving a fresh executor one raw task whose own work carries it to the scale the evidence
+packet establishes. A trial executor starts fresh because that is what makes the arms independent;
+it does not stay short because of it. What no single session can reach — accumulation across
+separate sessions, elapsed wall-clock a run cannot produce — is the residue that still makes a
+binding constraint itself unreachable. Unreachability is one ground for marking a mechanism unable
+to be expressed and never the only one: the witness rules, the intermittency routing, and the
+first-witness reading each keep their own, so the exit stays wider than this residue. Trial cost is
+none of them. See
+[`docs/adr/0008-a-long-course-trial-expresses-an-accumulated-context-constraint.md`](docs/adr/0008-a-long-course-trial-expresses-an-accumulated-context-constraint.md).
+_Avoid_: long-context trial, extended run, soak test, replay
+
 **Witness**:
 The observable in a finished run's own output that shows whether that run actually expressed the
 binding constraint. Fixed before any result exists; chosen afterwards, it is not evidence. An

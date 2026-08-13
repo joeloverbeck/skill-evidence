@@ -153,6 +153,9 @@ survives both caveats is the part that is not definitional — the recurrence ra
 span — and those carry the conclusion on their own.
 
 ## 5. The instrument for option (b) cannot be built for this population
+<!-- Superseded 2026-08-12; see the revision note at the end of this section. -->
+
+*This heading is itself the superseded claim: option (b) now stands open rather than declined.*
 
 Every one of these incidents that records a `run_condition` names accumulated volume or elapsed run
 length as the binding condition:
@@ -167,13 +170,29 @@ Not one is a discrete short step. Every one is a **late-in-a-long-run omission**
 executor starting fresh and short-context cannot express regardless of what it measures. Three
 records carry no `run_condition` and neither support nor weaken this.
 
+> **Revision note.** This section's heading and its closing clause about what a fresh short-context
+> executor cannot express were superseded on 2026-08-12 by
+> [`../docs/adr/0008-a-long-course-trial-expresses-an-accumulated-context-constraint.md`](../docs/adr/0008-a-long-course-trial-expresses-an-accumulated-context-constraint.md),
+> which found the clause conflated a *fresh* executor with a *short* one. The table above is
+> unchanged and is in fact why: every condition it records — passes, sub-agents, file diffs, tool
+> calls, findings — is work volume inside one session, which a long-course reproduction trial
+> reaches by working. Two restatements of the superseded premise elsewhere in this report go with
+> it: §6's *"Against (b) as conceived … which no fresh-executor trial can hold"*, and §6(d)1's
+> *"a diagnosis that no fresh-context trial could have reached"*. What survives is the narrower
+> residue no single session can reach — accumulation across separate sessions, and elapsed
+> wall-clock a run cannot produce — together with the separate limits a longer course does not
+> supply: a constraint with no available witness, and an incidence too low to separate arms. This
+> census's measurements, its §6 conclusions against (a) and for (c), and the rejection of (d)'s
+> longitudinal **acceptance** half are untouched.
+
 ## 6. What the evidence supports
 
 - **Against (a).** Two reasons. It would disarm the assurance-producing skills specifically (83% of
   `code-review`'s material evidence), and it would reward concealment: the more completely a check
   is skipped, the cleaner the record reads.
 - **Against (b) as conceived.** The binding constraint in every measured case is accumulated
-  context, which no fresh-executor trial can hold.
+  context, which no fresh-executor trial can hold. — *Superseded 2026-08-12; see §5's revision note.
+  A long-course trial holds it, and option (b) now stands open rather than declined.*
 - **For (c), as necessary but not sufficient.** It stops the projection reporting retained
   inconclusive evidence as handled. It supplies no exit.
 
@@ -189,7 +208,8 @@ to change, not the grading.
    failure, the evidence needed to authorize a fix is already in the store. This census is the
    existence proof: a positional and recurrence analysis over recorded incidents produced the
    diagnosis that no fresh-context trial could have reached, at the cost of an afternoon rather than
-   a harness.
+   a harness. — *Superseded 2026-08-12; see §5's revision note. A long-course trial could reach it;
+   the rejection of (d)'s longitudinal acceptance half is unaffected.*
 2. **The acceptance test is longitudinal, not comparative.** A candidate is accepted when the
    omission rate drops in subsequent real runs on the revised skill — measured from the same
    evidence stream that produced the diagnosis. Slower than a blind trial, and it cannot be forced;

@@ -690,7 +690,7 @@ fn installed_skill_evolution_reference_keeps_unestablished_constraints_in_trial(
 }
 
 #[test]
-fn installed_skill_evolution_reference_preserves_established_run_condition_routing() {
+fn installed_skill_evolution_reference_routes_established_run_conditions_by_kind() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
     let reference = fs::read_to_string(
@@ -709,9 +709,165 @@ fn installed_skill_evolution_reference_preserves_established_run_condition_routi
 
     assert!(
         plan.contains(
-            "When recorded run conditions agree that failures arrived at volume, late in a long run, or only intermittently, say so here and treat a fresh short-context single-run trial as unable to express that"
+            "When recorded run conditions agree that failures arrived at volume or late in a long run, say so here and freeze a long-course reproduction trial sized to the scale they establish"
         ),
-        "the provenance repair must preserve established run-condition routing for #41: reference={reference}"
+        "established run-condition routing must reach the long-course instrument rather than the exit: reference={reference}"
+    );
+    assert!(
+        plan.contains(
+            "When they agree that failures arrived only intermittently, say so here and treat a fresh single-run trial as unable to express that"
+        ),
+        "intermittency keeps the routing it had, on the single-run ground rather than the retired short-context one: reference={reference}"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_freezes_a_long_course_trial_for_accumulation_constraints() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    for required in [
+        "A trial executor starts fresh, which is what makes the arms independent; it does not have to stay short.",
+        "A constraint of accumulated context, volume, or run length is varied by a **long-course reproduction trial**: one raw task whose own work carries a fresh executor to the scale the packet establishes before it reaches the mechanism's failure boundary.",
+        "What remains inexpressible is the residue one executor session cannot reach at all — accumulation across separate sessions, or elapsed wall-clock a run cannot produce — and only that residue makes a binding constraint itself unreachable.",
+        "The witness rules below, the intermittency routing below, and step 5's first reading keep their own separate grounds for marking a mechanism unable to be expressed; this narrows the reachability ground alone.",
+    ] {
+        assert!(
+            plan.contains(required),
+            "installed step 4 must freeze a long-course trial for an accumulation constraint: missing `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
+fn installed_skill_evolution_reference_denies_cost_as_an_instrument_limit() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    assert!(
+        plan.contains(
+            "Trial cost is not that residue: a long-course trial is expensive, and expense is the maintainer's judgment about whether to spend the session, never a recorded claim that this instrument cannot test the evidence."
+        ),
+        "expense must not be recordable as an instrument limit: reference={reference}"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_reaches_long_course_scale_by_working_not_instruction() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    for required in [
+        "A long-course trial reaches its scale by working, never by instruction.",
+        "Telling an executor to accumulate context, to work for a stated number of steps, or to expect a late failure is behavioral scope under the logistics rule below, and it simulates the constraint instead of expressing it.",
+    ] {
+        assert!(
+            plan.contains(required),
+            "a long-course trial must express its constraint rather than announce it: missing `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
+fn installed_skill_evolution_reference_separates_frozen_scale_from_reached_reading() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    // The dead-end section is named in step 9's prose before the template repeats it, so each
+    // anchor searches forward from the previous one rather than from the start of the file.
+    let template_plan = reference
+        .find("## Frozen validation plan")
+        .expect("the report template keeps its frozen-plan section");
+    let template_results = reference[template_plan..]
+        .find("## Results")
+        .map(|offset| template_plan + offset)
+        .expect("the report template keeps its results section");
+    let template_unable = reference[template_results..]
+        .find("## Unable to be expressed")
+        .map(|offset| template_results + offset)
+        .expect("the report template keeps its dead-end section");
+    let frozen = &reference[template_plan..template_results];
+    let results = &reference[template_results..template_unable];
+
+    assert!(
+        frozen.contains("- Long-course scale → established source, or not applicable:")
+            && !frozen.contains("- Long-course scale reached:"),
+        "the frozen plan must carry the scale and its established source, and never the observed reading: reference={reference}"
+    );
+    assert!(
+        results.contains("- Long-course scale reached: yes/no/not applicable")
+            && !results.contains("- Long-course scale → established source"),
+        "whether the runs reached the scale must be reported with the other results: reference={reference}"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_frees_long_course_trials_from_short_context_predecessors() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    assert!(
+        plan.contains(
+            "A predecessor's short-context pass is not an equivalent trial to a long-course reproduction, and a same-target ruling that a mechanism was unable to be expressed under the short-context premise does not bind this review."
+        ),
+        "the no-equivalent-rerun rule must not foreclose the instrument that supersedes it: reference={reference}"
     );
 }
 
