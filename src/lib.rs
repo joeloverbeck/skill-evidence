@@ -1706,7 +1706,7 @@ fn append_prepared_lifecycle_event(
     prepared: &PreparedLifecycleEvent,
 ) -> Result<(), Error> {
     let events_path = target.evidence_directory.join("events.jsonl");
-    if let Err(error) = append_lifecycle_event_line(&events_path, &prepared.event) {
+    if let Err(error) = append_event(&events_path, &prepared.event) {
         let _ = fs::remove_file(&prepared.projection_temporary);
         return Err(error);
     }
@@ -1986,7 +1986,7 @@ pub fn record_use(
     );
     let projection_temporary = target.evidence_directory.join(".gate-status.json.tmp");
     prepare_gate_status(&projection_temporary, &status)?;
-    if let Err(error) = append_event_line(&events_path, &event) {
+    if let Err(error) = append_event(&events_path, &event) {
         let _ = fs::remove_file(&projection_temporary);
         return Err(error);
     }
@@ -2193,14 +2193,28 @@ impl Drop for EvidenceLock {
     }
 }
 
-fn append_event_line(path: &Path, event: &Value) -> Result<(), Error> {
-    let line =
-        serde_json::to_vec(event).expect("serializing a validated evidence event cannot fail");
-    append_serialized_line(path, line)
+/// The bytes an event is persisted as, chosen by the event's own type.
+///
+/// The two orders this returns are both recorded history and neither is a default:
+/// `use_recorded` is written by `serde_json`, whose `Value` is a `BTreeMap`, so its
+/// keys come out alphabetically, while every lifecycle type keeps the order
+/// JavaScript wrote it in. Which one an event gets is a property of the event, so it
+/// is decided here rather than by whichever writer happens to call. An unrecognized
+/// type reaches the longhand serializer and is refused by name; that is deliberate,
+/// because the alternative is guessing an order into an append-only stream that no
+/// release can regenerate.
+fn event_line_bytes(event: &Value) -> Result<Vec<u8>, Error> {
+    match event["event_type"].as_str() {
+        Some("use_recorded") => {
+            Ok(serde_json::to_vec(event)
+                .expect("serializing a validated evidence event cannot fail"))
+        }
+        _ => serialize_legacy_ordered_lifecycle_event(event),
+    }
 }
 
-fn append_lifecycle_event_line(path: &Path, event: &Value) -> Result<(), Error> {
-    append_serialized_line(path, serialize_legacy_ordered_lifecycle_event(event)?)
+fn append_event(path: &Path, event: &Value) -> Result<(), Error> {
+    append_serialized_line(path, event_line_bytes(event)?)
 }
 
 fn append_serialized_line(path: &Path, mut line: Vec<u8>) -> Result<(), Error> {
@@ -3166,5 +3180,272 @@ fn unsafe_failure_with_recovery(message: String, recovery: Recovery) -> Error {
         class: ErrorClass::UnsafeFailure,
         message,
         recovery: Some(recovery),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    /// The bytes production would append, through production's own dispatch.
+    fn persisted_bytes(event: &Value) -> Vec<u8> {
+        event_line_bytes(event).expect("an event fixture always serializes")
+    }
+
+    fn envelope(event_type: &str, operator_workflow: &str, payload: Value) -> Value {
+        json!({
+            "schema_version": 1,
+            "event_id": "evt_00000000-0000-4000-8000-000000000000",
+            "event_type": event_type,
+            "recorded_at": "2026-01-01T00:00:00Z",
+            "operator_workflow": operator_workflow,
+            "target": {
+                "name": "demo-skill",
+                "repo_relative_path": ".claude/skills/demo-skill",
+                "content_hash": "sha256:target",
+                "repo_head": "0000000000000000000000000000000000000000"
+            },
+            "top_level_session_id": "session-fixture",
+            "payload": payload
+        })
+    }
+
+    /// One event per writable shape, carrying every key its writer can emit.
+    ///
+    /// Maximal on purpose: a key the serializer forgets to persist can only show up as
+    /// a difference if the fixture supplied it in the first place. The two
+    /// `review_started` entries and the two `review_disposition` entries cover the
+    /// serializer's own branches — the proof variants, and the optional keys whose
+    /// omission keeps every close written before they existed byte-identical.
+    fn writable_event_shapes() -> Vec<(&'static str, Value)> {
+        vec![
+            (
+                "use_recorded",
+                envelope(
+                    "use_recorded",
+                    "skill-evidence-capture",
+                    json!({
+                        "qualifying_use": true,
+                        "retrospective": false,
+                        "task_label": "a task",
+                        "task_fingerprint": "fp_0001",
+                        "outcome": "friction",
+                        "symptom_key": "execution",
+                        "expected": "expected",
+                        "observed": "observed",
+                        "consequence": "consequence",
+                        "workaround_taken": "workaround",
+                        "run_condition": "condition",
+                        "evidence_refs": ["ref-a"],
+                        "same_run_group": false
+                    }),
+                ),
+            ),
+            (
+                "review_started (different_session proof)",
+                envelope(
+                    "review_started",
+                    "skill-evolution",
+                    json!({
+                        "review_id": "rev_0001",
+                        "target_hash": "sha256:target",
+                        "trigger_event_ids": ["evt_a", "evt_b"],
+                        "authorizing_rule": "threshold_reached",
+                        "risk_tier": "standard",
+                        "session_or_cooldown_proof": {
+                            "type": "different_session",
+                            "threshold_session_id": "session-threshold",
+                            "review_session_id": "session-review"
+                        },
+                        "operating_skill_hash": "sha256:operating",
+                        "operating_package_matches_shipped": true
+                    }),
+                ),
+            ),
+            (
+                "review_started (cooldown_elapsed proof)",
+                envelope(
+                    "review_started",
+                    "skill-evolution",
+                    json!({
+                        "review_id": "rev_0002",
+                        "target_hash": "sha256:target",
+                        "trigger_event_ids": ["evt_c"],
+                        "authorizing_rule": "cooldown_elapsed",
+                        "risk_tier": "standard",
+                        "session_or_cooldown_proof": {
+                            "type": "cooldown_elapsed",
+                            "not_before": "2026-01-01T00:00:00Z",
+                            "claimed_at": "2026-01-02T00:00:00Z"
+                        },
+                        "operating_skill_hash": "sha256:operating",
+                        "operating_package_matches_shipped": false
+                    }),
+                ),
+            ),
+            (
+                "validation_completed",
+                envelope(
+                    "validation_completed",
+                    "skill-evolution",
+                    json!({
+                        "review_id": "rev_0001",
+                        "decision": "accepted",
+                        "risk_tier": "standard",
+                        "candidate_hash": "sha256:candidate",
+                        "candidate_path": "candidate-evolution",
+                        "trial_count": 3,
+                        "artifacts_path": "artifacts",
+                        "summary": "a summary",
+                        "operating_skill_hash": "sha256:operating",
+                        "operating_package_matches_shipped": true
+                    }),
+                ),
+            ),
+            (
+                "change_landed",
+                envelope(
+                    "change_landed",
+                    "skill-evolution",
+                    json!({
+                        "review_id": "rev_0001",
+                        "before_hash": "sha256:before",
+                        "after_hash": "sha256:after",
+                        "changed_files": {
+                            "added": ["added.md"],
+                            "removed": ["removed.md"],
+                            "modified": ["SKILL.md"]
+                        },
+                        "mirror_status": "mirrored",
+                        "operating_skill_hash": "sha256:operating",
+                        "operating_package_matches_shipped": true
+                    }),
+                ),
+            ),
+            (
+                "review_disposition (every optional key present)",
+                envelope(
+                    "review_disposition",
+                    "skill-evolution",
+                    json!({
+                        "review_id": "rev_0001",
+                        "disposition": "landed",
+                        "adjudicated_event_ids": ["evt_a"],
+                        "instrument_limited_event_ids": ["evt_b"],
+                        "constraint_provenance": [{"event_id": "evt_a", "checked": true}],
+                        "external_owners": ["owner"],
+                        "note": "a note",
+                        "trial_count": 2,
+                        "artifacts_path": "artifacts",
+                        "operating_skill_hash": "sha256:operating",
+                        "operating_package_matches_shipped": true
+                    }),
+                ),
+            ),
+            (
+                "review_disposition (every optional key absent)",
+                envelope(
+                    "review_disposition",
+                    "skill-evolution",
+                    json!({
+                        "review_id": "rev_0002",
+                        "disposition": "abandoned",
+                        "adjudicated_event_ids": [],
+                        "note": "a note",
+                        "operating_skill_hash": "sha256:operating",
+                        "operating_package_matches_shipped": false
+                    }),
+                ),
+            ),
+        ]
+    }
+
+    /// The exact bytes each writable shape has been observed to persist.
+    ///
+    /// Frozen from the tree, not hand-authored. Two orders are visible here and both
+    /// are deliberate: `use_recorded` is written by `serde_json`, whose `Value` is a
+    /// `BTreeMap`, so its keys come out alphabetically; every lifecycle type is written
+    /// by the longhand serializer in the order JavaScript wrote it, `schema_version`
+    /// first. A nested payload object inside a lifecycle event is handed to `serde_json`
+    /// whole, so it alphabetizes too — see `constraint_provenance` below.
+    ///
+    /// Changing any byte here changes what a consumer's append-only stream receives from
+    /// the next event on. Nothing regenerates the events already written, so a diff in
+    /// this function is a decision about recorded history, not a test to update.
+    fn frozen_line(shape: &str) -> &'static str {
+        match shape {
+            "use_recorded" => {
+                r#"{"event_id":"evt_00000000-0000-4000-8000-000000000000","event_type":"use_recorded","operator_workflow":"skill-evidence-capture","payload":{"consequence":"consequence","evidence_refs":["ref-a"],"expected":"expected","observed":"observed","outcome":"friction","qualifying_use":true,"retrospective":false,"run_condition":"condition","same_run_group":false,"symptom_key":"execution","task_fingerprint":"fp_0001","task_label":"a task","workaround_taken":"workaround"},"recorded_at":"2026-01-01T00:00:00Z","schema_version":1,"target":{"content_hash":"sha256:target","name":"demo-skill","repo_head":"0000000000000000000000000000000000000000","repo_relative_path":".claude/skills/demo-skill"},"top_level_session_id":"session-fixture"}"#
+            }
+            "review_started (different_session proof)" => {
+                r#"{"schema_version":1,"event_id":"evt_00000000-0000-4000-8000-000000000000","event_type":"review_started","recorded_at":"2026-01-01T00:00:00Z","operator_workflow":"skill-evolution","target":{"name":"demo-skill","repo_relative_path":".claude/skills/demo-skill","content_hash":"sha256:target","repo_head":"0000000000000000000000000000000000000000"},"top_level_session_id":"session-fixture","payload":{"review_id":"rev_0001","target_hash":"sha256:target","trigger_event_ids":["evt_a","evt_b"],"authorizing_rule":"threshold_reached","risk_tier":"standard","session_or_cooldown_proof":{"type":"different_session","threshold_session_id":"session-threshold","review_session_id":"session-review"},"operating_skill_hash":"sha256:operating","operating_package_matches_shipped":true}}"#
+            }
+            "review_started (cooldown_elapsed proof)" => {
+                r#"{"schema_version":1,"event_id":"evt_00000000-0000-4000-8000-000000000000","event_type":"review_started","recorded_at":"2026-01-01T00:00:00Z","operator_workflow":"skill-evolution","target":{"name":"demo-skill","repo_relative_path":".claude/skills/demo-skill","content_hash":"sha256:target","repo_head":"0000000000000000000000000000000000000000"},"top_level_session_id":"session-fixture","payload":{"review_id":"rev_0002","target_hash":"sha256:target","trigger_event_ids":["evt_c"],"authorizing_rule":"cooldown_elapsed","risk_tier":"standard","session_or_cooldown_proof":{"type":"cooldown_elapsed","not_before":"2026-01-01T00:00:00Z","claimed_at":"2026-01-02T00:00:00Z"},"operating_skill_hash":"sha256:operating","operating_package_matches_shipped":false}}"#
+            }
+            "validation_completed" => {
+                r#"{"schema_version":1,"event_id":"evt_00000000-0000-4000-8000-000000000000","event_type":"validation_completed","recorded_at":"2026-01-01T00:00:00Z","operator_workflow":"skill-evolution","target":{"name":"demo-skill","repo_relative_path":".claude/skills/demo-skill","content_hash":"sha256:target","repo_head":"0000000000000000000000000000000000000000"},"top_level_session_id":"session-fixture","payload":{"review_id":"rev_0001","decision":"accepted","risk_tier":"standard","candidate_hash":"sha256:candidate","candidate_path":"candidate-evolution","trial_count":3,"artifacts_path":"artifacts","summary":"a summary","operating_skill_hash":"sha256:operating","operating_package_matches_shipped":true}}"#
+            }
+            "change_landed" => {
+                r#"{"schema_version":1,"event_id":"evt_00000000-0000-4000-8000-000000000000","event_type":"change_landed","recorded_at":"2026-01-01T00:00:00Z","operator_workflow":"skill-evolution","target":{"name":"demo-skill","repo_relative_path":".claude/skills/demo-skill","content_hash":"sha256:target","repo_head":"0000000000000000000000000000000000000000"},"top_level_session_id":"session-fixture","payload":{"review_id":"rev_0001","before_hash":"sha256:before","after_hash":"sha256:after","changed_files":{"added":["added.md"],"removed":["removed.md"],"modified":["SKILL.md"]},"mirror_status":"mirrored","operating_skill_hash":"sha256:operating","operating_package_matches_shipped":true}}"#
+            }
+            "review_disposition (every optional key present)" => {
+                r#"{"schema_version":1,"event_id":"evt_00000000-0000-4000-8000-000000000000","event_type":"review_disposition","recorded_at":"2026-01-01T00:00:00Z","operator_workflow":"skill-evolution","target":{"name":"demo-skill","repo_relative_path":".claude/skills/demo-skill","content_hash":"sha256:target","repo_head":"0000000000000000000000000000000000000000"},"top_level_session_id":"session-fixture","payload":{"review_id":"rev_0001","disposition":"landed","adjudicated_event_ids":["evt_a"],"instrument_limited_event_ids":["evt_b"],"constraint_provenance":[{"checked":true,"event_id":"evt_a"}],"external_owners":["owner"],"note":"a note","trial_count":2,"artifacts_path":"artifacts","operating_skill_hash":"sha256:operating","operating_package_matches_shipped":true}}"#
+            }
+            "review_disposition (every optional key absent)" => {
+                r#"{"schema_version":1,"event_id":"evt_00000000-0000-4000-8000-000000000000","event_type":"review_disposition","recorded_at":"2026-01-01T00:00:00Z","operator_workflow":"skill-evolution","target":{"name":"demo-skill","repo_relative_path":".claude/skills/demo-skill","content_hash":"sha256:target","repo_head":"0000000000000000000000000000000000000000"},"top_level_session_id":"session-fixture","payload":{"review_id":"rev_0002","disposition":"abandoned","adjudicated_event_ids":[],"note":"a note","operating_skill_hash":"sha256:operating","operating_package_matches_shipped":false}}"#
+            }
+            other => panic!("no frozen line recorded for {other}"),
+        }
+    }
+
+    /// The persisted line must carry back exactly the event that was validated.
+    ///
+    /// Validation, gate derivation and the returned receipt all read the in-memory
+    /// event; only this serializer decides what actually reaches the append-only
+    /// stream, and it names the keys it persists by hand. A payload key added to a
+    /// writer but not to that list would validate, derive and report while never being
+    /// written — and the store re-reads from disk, so the omission is permanent. This
+    /// test is what makes that a failure instead of silent loss.
+    #[test]
+    fn every_writable_event_persists_every_key_it_was_validated_with() {
+        for (shape, event) in writable_event_shapes() {
+            let written = persisted_bytes(&event);
+            let read_back: Value = serde_json::from_slice(&written)
+                .unwrap_or_else(|error| panic!("{shape}: persisted line is not JSON: {error}"));
+            assert_eq!(
+                read_back, event,
+                "{shape}: the persisted event differs from the event that was validated. \
+                 A key present in the writer and missing from \
+                 `serialize_legacy_ordered_lifecycle_event` is lost the moment it is written."
+            );
+        }
+    }
+
+    /// The bytes each writable type persists are frozen.
+    ///
+    /// `use_recorded` is the reason this test exists. Its byte order drifted once
+    /// already — the JavaScript predecessor wrote every type `schema_version` first,
+    /// and the Rust port writes `use_recorded` alphabetically, which
+    /// `fixtures/skill-evidence/further-incidents-v1` has frozen into the corpus.
+    /// Nothing noticed, because `rust_appended_lifecycle_events_keep_the_javascript_byte_order`
+    /// drives only the four evolution commands and never appends a use record. That
+    /// gap is what this closes: every writable type now has its bytes pinned, not
+    /// just the four the replay happens to exercise.
+    #[test]
+    fn the_persisted_bytes_of_every_writable_type_are_frozen() {
+        for (shape, event) in writable_event_shapes() {
+            let written = String::from_utf8(persisted_bytes(&event))
+                .unwrap_or_else(|error| panic!("{shape}: persisted line is not UTF-8: {error}"));
+            assert_eq!(
+                written,
+                frozen_line(shape),
+                "{shape}: the persisted byte order changed. Consumers hold over a thousand \
+                 events no release can regenerate; this is a change to what their streams \
+                 receive next, not a stale expectation."
+            );
+        }
     }
 }
