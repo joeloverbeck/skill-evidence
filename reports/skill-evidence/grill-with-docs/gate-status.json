@@ -1,14 +1,15 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-12T04:44:05.374187654Z",
+  "generated_at": "2026-08-13T15:42:38.899125758Z",
   "target_content_hash": "50ae74251f72b370e4b226fa12169ffaa18cac49a814ca5a5725460fe4e3063a",
-  "qualifying_uses_on_current_hash": 5,
+  "qualifying_uses_on_current_hash": 6,
   "open_incident_ids": [
     "evt_fd4e5936-9eef-43ed-8eeb-5e9b2b77ebc7",
     "evt_0b0ffe4a-1507-4051-876d-41c802c0351b",
     "evt_8ed29a27-85ef-4cea-9189-0a18b699bb26",
     "evt_cb30fe77-2977-42c8-9e7c-79ef74f0580a",
-    "evt_209c2aac-6e1f-4efe-80f0-e0a4fb4e9ae3"
+    "evt_209c2aac-6e1f-4efe-80f0-e0a4fb4e9ae3",
+    "evt_861a0f72-25a5-4942-853d-61d1a49c6fa3"
   ],
   "candidate_clusters": [
     {
@@ -17,9 +18,10 @@
         "evt_fd4e5936-9eef-43ed-8eeb-5e9b2b77ebc7",
         "evt_8ed29a27-85ef-4cea-9189-0a18b699bb26",
         "evt_cb30fe77-2977-42c8-9e7c-79ef74f0580a",
-        "evt_209c2aac-6e1f-4efe-80f0-e0a4fb4e9ae3"
+        "evt_209c2aac-6e1f-4efe-80f0-e0a4fb4e9ae3",
+        "evt_861a0f72-25a5-4942-853d-61d1a49c6fa3"
       ],
-      "independent_incidents": 3,
+      "independent_incidents": 4,
       "max_severity": "material_failure"
     },
     {
@@ -36,7 +38,9 @@
   "authorization_reason": "material_recurrence:execution",
   "trigger_event_ids": [
     "evt_fd4e5936-9eef-43ed-8eeb-5e9b2b77ebc7",
-    "evt_8ed29a27-85ef-4cea-9189-0a18b699bb26"
+    "evt_8ed29a27-85ef-4cea-9189-0a18b699bb26",
+    "evt_cb30fe77-2977-42c8-9e7c-79ef74f0580a",
+    "evt_209c2aac-6e1f-4efe-80f0-e0a4fb4e9ae3"
   ],
   "threshold_session_id": "f2859d4b-c88c-47b9-8251-0b235765d8f5",
   "not_before": null,
@@ -45,5 +49,5 @@
   "review_reentry_basis": "first_eligibility",
   "target_name": "grill-with-docs",
   "target_repo_relative_path": ".claude/skills/grill-with-docs",
-  "derivation_session_id": "ba9a63fe-ca8f-4cfd-88ff-92829173b6cd"
+  "derivation_session_id": "a417a001-640d-4459-8427-1bfddda047c2"
 }
