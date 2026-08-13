@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-12T15:44:52.520936199Z",
+  "generated_at": "2026-08-13T14:03:40.787743663Z",
   "target_content_hash": "9968ebd3d4508f01bb91ddac011c09330651bcea7c9a5fdcd9dcad593cb4f4bc",
-  "qualifying_uses_on_current_hash": 8,
+  "qualifying_uses_on_current_hash": 9,
   "open_incident_ids": [
     "evt_a6eaf146-e80f-4d8c-9346-16becd84a91d",
     "evt_35a84c74-5fa9-4319-aaa1-772400136d1d",
@@ -12,7 +12,8 @@
     "evt_51d8ebbf-947f-4bfb-9474-ae470258c501",
     "evt_9e5ca779-e8a5-4caf-85d8-645cc4d13b52",
     "evt_e7a51ddc-3bd2-4ccc-a061-5dfe68c8c9c7",
-    "evt_4d850574-05b3-41ab-a65b-e0eddd402e20"
+    "evt_4d850574-05b3-41ab-a65b-e0eddd402e20",
+    "evt_e8124276-da23-4a73-b35f-52e09401d80f"
   ],
   "candidate_clusters": [
     {
@@ -29,9 +30,10 @@
       "symptom_key": "execution",
       "open_event_ids": [
         "evt_e7a51ddc-3bd2-4ccc-a061-5dfe68c8c9c7",
-        "evt_4d850574-05b3-41ab-a65b-e0eddd402e20"
+        "evt_4d850574-05b3-41ab-a65b-e0eddd402e20",
+        "evt_e8124276-da23-4a73-b35f-52e09401d80f"
       ],
-      "independent_incidents": 1,
+      "independent_incidents": 2,
       "max_severity": "material_failure"
     }
   ],
@@ -46,7 +48,7 @@
   "review_reentry_basis": "queued_pre_close_evidence",
   "target_name": "triage",
   "target_repo_relative_path": ".claude/skills/triage",
-  "derivation_session_id": "bd16d06e-9797-4e48-967d-7d4bdbec019d",
+  "derivation_session_id": "f8e91767-b1ba-4115-ac95-a11d29b11591",
   "instrument_limited_incident_ids": [
     "evt_35a84c74-5fa9-4319-aaa1-772400136d1d",
     "evt_ebe48487-5c26-4fd4-af46-20a06ede8ee8",
