@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-12T16:11:29.534591058Z",
+  "generated_at": "2026-08-13T07:26:24.419158754Z",
   "target_content_hash": "b4aaa5ea17450343dfa971ab4f08a9a4427c36b1f956579c96f270e90e3af9dd",
-  "qualifying_uses_on_current_hash": 22,
+  "qualifying_uses_on_current_hash": 24,
   "open_incident_ids": [
     "evt_6044d588-9dd2-4aba-946e-26185c5f5dda",
     "evt_73bfa709-50b7-4365-822a-a6dbe225f036",
@@ -16,7 +16,12 @@
     "evt_15059197-d95a-4c02-829c-82963178a9fa",
     "evt_07e87e97-93e7-46d1-9d48-b1695e439c4e",
     "evt_6400fa6e-fd73-4f4e-9c7a-48dc820cc856",
-    "evt_573f8b30-a66b-44a8-a461-3c33d1e20277"
+    "evt_573f8b30-a66b-44a8-a461-3c33d1e20277",
+    "evt_bafb1be3-ba1b-4374-956d-99f627cbbbe1",
+    "evt_8cd606be-a0a8-4317-ac0b-8e91324b3598",
+    "evt_58c73327-0bef-4ea1-b385-1027721233d9",
+    "evt_93b0ed83-cd81-4d84-a7f1-4b4c5b822087",
+    "evt_726b3b12-f986-401f-b93f-54401e628698"
   ],
   "candidate_clusters": [
     {
@@ -45,10 +50,13 @@
       "symptom_key": "execution",
       "open_event_ids": [
         "evt_6b2319b8-62a4-4e9e-978c-0bc1a424cfc3",
-        "evt_c998437e-ee0a-41f6-a11b-82e7dc5794a8"
+        "evt_c998437e-ee0a-41f6-a11b-82e7dc5794a8",
+        "evt_bafb1be3-ba1b-4374-956d-99f627cbbbe1",
+        "evt_58c73327-0bef-4ea1-b385-1027721233d9",
+        "evt_93b0ed83-cd81-4d84-a7f1-4b4c5b822087"
       ],
-      "independent_incidents": 2,
-      "max_severity": "friction"
+      "independent_incidents": 4,
+      "max_severity": "material_failure"
     },
     {
       "symptom_key": "tool-compatibility",
@@ -62,10 +70,12 @@
     {
       "symptom_key": "coordination",
       "open_event_ids": [
-        "evt_573f8b30-a66b-44a8-a461-3c33d1e20277"
+        "evt_573f8b30-a66b-44a8-a461-3c33d1e20277",
+        "evt_8cd606be-a0a8-4317-ac0b-8e91324b3598",
+        "evt_726b3b12-f986-401f-b93f-54401e628698"
       ],
-      "independent_incidents": 1,
-      "max_severity": "friction"
+      "independent_incidents": 3,
+      "max_severity": "material_failure"
     }
   ],
   "state": "eligible",
@@ -81,5 +91,5 @@
   "review_reentry_basis": "post_review_incident",
   "target_name": "implement",
   "target_repo_relative_path": ".claude/skills/implement",
-  "derivation_session_id": "019ff5dc-2fdd-7d42-a851-23573ae826e4"
+  "derivation_session_id": "e0ed70f9-dd0c-4b48-9e66-4e985b59280e"
 }
