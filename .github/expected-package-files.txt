@@ -23,6 +23,7 @@ assets/skills/skill-evolution-status/agents/openai.yaml
 src/assets.rs
 src/bin/skill-evidence.rs
 src/cli.rs
+src/gate.rs
 src/host.rs
 src/lib.rs
 src/status_reports.rs

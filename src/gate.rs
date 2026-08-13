@@ -1416,7 +1416,57 @@ pub(crate) fn derive(
             .to_owned(),
         );
     }
+    reanchor_authorized_coverage(&mut status, events);
     status
+}
+
+fn reanchor_authorized_coverage(status: &mut GateStatus, events: &[EvidenceEvent]) {
+    let Some(reason) = status
+        .authorization_reason
+        .as_deref()
+        .and_then(ThresholdReason::parse)
+    else {
+        return;
+    };
+    let symptom = match &reason {
+        ThresholdReason::MaterialRecurrence(symptom)
+        | ThresholdReason::FrictionRecurrence(symptom) => symptom.clone(),
+        ThresholdReason::TenUseUnresolved => {
+            let Some(symptom) = status.trigger_event_ids.iter().find_map(|identity| {
+                events
+                    .iter()
+                    .find(|event| event.event_id == *identity)
+                    .and_then(EvidenceEvent::use_recorded)
+                    .and_then(|recorded| recorded.symptom_key.clone())
+            }) else {
+                return;
+            };
+            symptom
+        }
+        ThresholdReason::Severe => return,
+    };
+    let Some(cluster) = status
+        .candidate_clusters
+        .iter()
+        .find(|cluster| cluster.symptom_key == symptom)
+    else {
+        return;
+    };
+    let anchor_symptoms = [symptom.as_str()].into_iter().collect::<HashSet<_>>();
+    status.trigger_event_ids = cluster
+        .open_event_ids
+        .iter()
+        .filter(|identity| {
+            events
+                .iter()
+                .find(|event| event.event_id == **identity)
+                .and_then(EvidenceEvent::use_recorded)
+                .is_some_and(|recorded| {
+                    authorization_reason_names_incident(Some(&reason), &anchor_symptoms, recorded)
+                })
+        })
+        .cloned()
+        .collect();
 }
 
 fn threshold_trigger(

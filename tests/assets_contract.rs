@@ -1235,6 +1235,25 @@ fn installed_event_schema_declares_close_validation_effort_as_optional() {
 }
 
 #[test]
+fn installed_gate_schema_defines_trigger_ids_as_current_review_coverage() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let schema: serde_json::Value = serde_json::from_slice(
+        &fs::read(
+            root.path()
+                .join("schemas/skill-evidence/gate-status.v1.schema.json"),
+        )
+        .expect("read installed gate schema"),
+    )
+    .expect("installed gate schema JSON");
+
+    assert_eq!(
+        schema["properties"]["trigger_event_ids"]["description"],
+        "The open event IDs in the candidate cluster that the current authorization reason says a review would cover if claimed as of this derivation. A review_started event freezes this list at claim time."
+    );
+}
+
+#[test]
 fn installed_status_package_does_not_tie_retirement_to_one_disposition() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");

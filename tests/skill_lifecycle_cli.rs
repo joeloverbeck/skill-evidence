@@ -192,6 +192,66 @@ fn record_outcome_with_run_condition(
         .to_owned()
 }
 
+fn record_retrospective_outcome(root: &Path, label: &str, session: &str, symptom: &str) -> String {
+    let output = skill_evidence()
+        .args(["skills", "evidence", "record", "--root"])
+        .arg(root)
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--outcome",
+            "friction",
+            "--task-label",
+            label,
+            "--symptom-key",
+            symptom,
+            "--expected",
+            "expected",
+            "--observed",
+            "observed",
+            "--consequence",
+            "consequence",
+            "--run-condition",
+            "fixture incident",
+            "--retrospective",
+            "--evidence-ref",
+            "logs/retrospective-fixture.txt",
+            "--session-id",
+            session,
+        ])
+        .output()
+        .expect("record retrospective fixture incident");
+    assert!(
+        output.status.success(),
+        "retrospective record failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice::<Value>(&output.stdout).expect("record receipt JSON")["event_id"]
+        .as_str()
+        .expect("record receipt event id")
+        .to_owned()
+}
+
+fn run_evidence_derive(root: &Path, session: &str) -> Value {
+    let output = skill_evidence()
+        .args(["skills", "evidence", "derive", "--root"])
+        .arg(root)
+        .args([
+            "--target",
+            ".claude/skills/demo-skill",
+            "--session-id",
+            session,
+        ])
+        .output()
+        .expect("derive evidence store");
+    assert!(
+        output.status.success(),
+        "derive failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).expect("gate projection JSON")
+}
+
 fn replace_recorded_payload_field(
     root: &Path,
     event_id: &str,
@@ -868,6 +928,102 @@ fn skill_evolution_preflight_authorizes_a_fresh_session_with_the_bounded_packet(
         receipt["evidence_packet"]["prior_reviews"],
         serde_json::json!([])
     );
+}
+
+#[test]
+fn skill_evidence_derive_and_evolution_preflight_publish_same_current_coverage() {
+    let fixture = repository_with_demo_skill();
+    let anchor = record_outcome(
+        fixture.path(),
+        "ten-use anchor",
+        "anchor-session",
+        "output",
+        "friction",
+    );
+    let retrospective = record_retrospective_outcome(
+        fixture.path(),
+        "retrospective cluster member",
+        "retrospective-session",
+        "output",
+    );
+    for serial in 3..=10 {
+        record_clean_use(
+            fixture.path(),
+            &format!("clean task {serial}"),
+            &format!("clean-session-{serial}"),
+        );
+    }
+    let later_one = record_outcome(
+        fixture.path(),
+        "later output incident one",
+        "later-output-session-one",
+        "output",
+        "friction",
+    );
+    let later_two = record_outcome(
+        fixture.path(),
+        "later output incident two",
+        "later-output-session-two",
+        "output",
+        "friction",
+    );
+    let expected = serde_json::json!([anchor, later_one, later_two]);
+
+    let first_derive = run_evidence_derive(fixture.path(), "derive-before-preflight");
+    assert_eq!(first_derive["authorization_reason"], "ten_use_unresolved");
+    assert_eq!(first_derive["threshold_session_id"], "clean-session-10");
+    assert_eq!(first_derive["trigger_event_ids"], expected);
+    assert!(
+        first_derive["candidate_clusters"][0]["open_event_ids"]
+            .as_array()
+            .expect("anchor cluster event ids")
+            .contains(&serde_json::json!(retrospective)),
+        "the retrospective incident remains open in the cluster while staying outside review coverage"
+    );
+
+    let output = run_evolution_preflight(
+        fixture.path(),
+        "lock_current_projection_coverage",
+        "preflight-session",
+    );
+    assert!(
+        output.status.success(),
+        "preflight failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let preflight: Value = serde_json::from_slice(&output.stdout).expect("preflight receipt JSON");
+    assert_eq!(preflight["gate"]["trigger_event_ids"], expected);
+
+    let stream = fs::read_to_string(
+        fixture
+            .path()
+            .join("reports/skill-evidence/demo-skill/events.jsonl"),
+    )
+    .expect("read event stream");
+    let expected_ids = expected
+        .as_array()
+        .expect("expected trigger ids")
+        .iter()
+        .map(|identity| identity.as_str().expect("trigger event id"))
+        .collect::<Vec<_>>();
+    let expected_events = stream
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("event JSON"))
+        .filter(|event| {
+            event["event_id"]
+                .as_str()
+                .is_some_and(|identity| expected_ids.contains(&identity))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        preflight["evidence_packet"]["trigger_events"],
+        serde_json::json!(expected_events),
+        "the packet must carry every current coverage member as its full raw event"
+    );
+
+    let second_derive = run_evidence_derive(fixture.path(), "derive-after-preflight");
+    assert_eq!(second_derive["trigger_event_ids"], expected);
+    assert_eq!(gate(fixture.path())["trigger_event_ids"], expected);
 }
 
 #[test]

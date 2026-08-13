@@ -18,6 +18,8 @@ Amended: 2026-08-12, GitHub [#45](https://github.com/joeloverbeck/skill-evidence
 
 Amended: 2026-08-12, GitHub [#48](https://github.com/joeloverbeck/skill-evidence/issues/48) — the *Why* below rested on a fresh short-context trial being unable to express accumulated volume or run length. [ADR 0008](0008-a-long-course-trial-expresses-an-accumulated-context-constraint.md) found that premise conflated a *fresh* executor with a *short* one, so the door-leads-nowhere argument now rests on the residue that survives a long-course trial. The retirement decision and its reach are unchanged.
 
+Amended: 2026-08-13, GitHub [#55](https://github.com/joeloverbeck/skill-evidence/issues/55) — the live gate projection's trigger list now names what a review would cover if claimed at that derivation, rather than retaining the narrower threshold-time list until an evolution command happens to rewrite it. Claim-time freezing is unchanged.
+
 A Skill Evolution review that closes `blocked_no_valid_test` reached no conclusion, so it adjudicates
 nothing and its trigger evidence stays open. That close still laid a watermark, and the watermark
 deferred the very evidence that opened the gate — labelled `queued_pre_close_evidence`, as though a
@@ -290,6 +292,26 @@ the treadmill precisely because the evidence that could re-fire is then genuinel
   ahead of it. `Reach bound` does not name it and stays accurate as written, but it is read against
   the coverage list and the two converge once the freeze moves, so it is reviewed rather than assumed
   unchanged.
+  **The live projection now publishes that same reason-scoped coverage before the claim.**
+  `trigger_event_ids` means the open events the current authorization reason says a review would
+  cover if claimed as of the derivation. It does not preserve the identities that happened to be in
+  the cluster when the threshold first fired: `authorization_reason` and `threshold_session_id`
+  already preserve why and when authorization fired, while the projection's role in the reach-bound
+  vouch is to show what the review would cover now. The former split made identical streams alternate
+  between two published values depending on whether `skills evidence derive` or an evolution
+  preflight wrote last. Re-anchoring now belongs to the derivation itself, so derive, preflight, claim,
+  and the evidence packet share one value. Claim still freezes that list into `review_started`;
+  `severe` still keeps its one triggering incident; retrospective incidents remain outside a
+  `ten_use_unresolved` list; and an absent named cluster or an unresolvable trigger symptom leaves the
+  threshold derivation intact rather than replacing it with an empty list.
+
+  This changes regenerable projection output, not recorded history. No event shape or frozen corpus
+  moves. The published `gate-status.v1` description and its installed copy move with the compiled
+  behavior, so the release is a minor bump while `0.x` and consumers must preview the differing schema
+  with `skills evidence install --root .` before deliberately repeating with `--force`. What would
+  reopen this decision is a real consumer need for exact fire-time event identity that
+  `authorization_reason` and `threshold_session_id` cannot answer. That would warrant a distinct
+  published field rather than overloading `trigger_event_ids` with two meanings again.
 - **A wrong vouch stays wrong: there is no correction, supersession, or unretirement event, and
   none is being built.** The reach is mechanical, but the judgment that authorizes it — that this
   instrument cannot vary the named binding constraint — is semantic, and nothing in the stream can

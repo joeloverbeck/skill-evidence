@@ -22,10 +22,7 @@ mod gate;
 mod host;
 mod status_reports;
 
-use gate::{
-    EventKind, EvidenceEvent, GateClock, GateTarget, Outcome, ThresholdReason, ValidatedStream,
-    authorization_reason_names_incident,
-};
+use gate::{EventKind, EvidenceEvent, GateClock, GateTarget, Outcome, ValidatedStream};
 pub use host::{Host, Recovery};
 pub use status_reports::skill_evolution_status;
 pub use status_reports::{MethodGapResearchInventory, method_gap_research_inventory};
@@ -1367,8 +1364,7 @@ fn authorize_evolution(
 ) -> Result<(ValidatedStream, DirectoryHash, GateStatus), Error> {
     let hash = hash_target_directory(&target.target_real)?;
     let stream = read_stream(&target.evidence_directory.join("events.jsonl"))?;
-    let mut status = gate::derive(&stream, target.labels(), &hash.content_hash, inputs.clock());
-    reanchor_authorized_coverage(&mut status, stream.events());
+    let status = gate::derive(&stream, target.labels(), &hash.content_hash, inputs.clock());
     write_gate_status(&target.evidence_directory, &status)?;
     if status.state == "blocked" {
         return Err(evolution_refusal(
@@ -1419,55 +1415,6 @@ fn authorize_evolution(
         ));
     }
     Ok((stream, hash, status))
-}
-
-fn reanchor_authorized_coverage(status: &mut GateStatus, events: &[EvidenceEvent]) {
-    let Some(reason) = status
-        .authorization_reason
-        .as_deref()
-        .and_then(ThresholdReason::parse)
-    else {
-        return;
-    };
-    let symptom = match &reason {
-        ThresholdReason::MaterialRecurrence(symptom)
-        | ThresholdReason::FrictionRecurrence(symptom) => symptom.clone(),
-        ThresholdReason::TenUseUnresolved => {
-            let Some(symptom) = status.trigger_event_ids.iter().find_map(|identity| {
-                events
-                    .iter()
-                    .find(|event| event.event_id == *identity)
-                    .and_then(EvidenceEvent::use_recorded)
-                    .and_then(|recorded| recorded.symptom_key.clone())
-            }) else {
-                return;
-            };
-            symptom
-        }
-        ThresholdReason::Severe => return,
-    };
-    let Some(cluster) = status
-        .candidate_clusters
-        .iter()
-        .find(|cluster| cluster.symptom_key == symptom)
-    else {
-        return;
-    };
-    let anchor_symptoms = [symptom.as_str()].into_iter().collect::<HashSet<_>>();
-    status.trigger_event_ids = cluster
-        .open_event_ids
-        .iter()
-        .filter(|identity| {
-            events
-                .iter()
-                .find(|event| event.event_id == **identity)
-                .and_then(EvidenceEvent::use_recorded)
-                .is_some_and(|recorded| {
-                    authorization_reason_names_incident(Some(&reason), &anchor_symptoms, recorded)
-                })
-        })
-        .cloned()
-        .collect();
 }
 
 fn read_valid_lifecycle_stream(target: &TargetContext) -> Result<ValidatedStream, Error> {
