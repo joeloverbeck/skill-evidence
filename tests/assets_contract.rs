@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fs, path::PathBuf, process::Command};
+use std::{collections::BTreeMap, fs, path::PathBuf, process::Command, sync::LazyLock};
 
 use skill_evidence::{Host, assets};
 
@@ -34,6 +34,60 @@ fn rendered_for(template: &str, command: &str, cargo_package: &str, namespace: &
         .replace("{{cargo_package}}", cargo_package)
         .replace("{{command}}", command)
         .replace("{{namespace}}", namespace)
+}
+
+/// The text of every file `install` writes, from one install for the whole suite.
+///
+/// Most assertions below ask what a shipped package or schema says, and that
+/// answer does not depend on the temporary root each one used to reach it.
+/// Installing once keeps the question the tests actually ask in view: a new
+/// assertion costs a line rather than a preamble, and a failure names the
+/// package rather than the installer. Whether `install` puts the files there
+/// safely is a different question, asked by the install and withdrawal tests
+/// further down, which keep their own roots because the tree is what they are
+/// about.
+static SHIPPED: LazyLock<BTreeMap<String, String>> = LazyLock::new(|| {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    installed_text(root.path())
+});
+
+/// What `install` wrote at one shipped path, rendered for [`host`].
+fn shipped(relative_path: &str) -> &'static str {
+    SHIPPED
+        .get(relative_path)
+        .unwrap_or_else(|| panic!("{relative_path} is not a file this crate installs"))
+}
+
+/// Every regular file below `root`, keyed by its path relative to it.
+///
+/// Discovery links are symlinks to directories; skipping them rather than
+/// following them keeps each installed file under exactly one key.
+fn installed_text(root: &std::path::Path) -> BTreeMap<String, String> {
+    let mut text = BTreeMap::new();
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory).expect("read installed directory") {
+            let path = entry.expect("read installed entry").path();
+            let file_type = fs::symlink_metadata(&path)
+                .expect("installed metadata")
+                .file_type();
+            if file_type.is_dir() {
+                pending.push(path);
+            } else if file_type.is_file() {
+                let relative = path
+                    .strip_prefix(root)
+                    .expect("installed path below root")
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                text.insert(
+                    relative,
+                    fs::read_to_string(path).expect("read installed file"),
+                );
+            }
+        }
+    }
+    text
 }
 
 fn write_pristine_retired_package(root: &std::path::Path) {
@@ -113,14 +167,7 @@ fn snapshot_tree(root: &std::path::Path) -> BTreeMap<String, Vec<u8>> {
 
 #[test]
 fn installed_live_packages_do_not_point_to_nonexistent_archive_paths() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-
-    let capture = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evidence-capture/SKILL.md"),
-    )
-    .expect("read installed capture package");
+    let capture = shipped(".claude/skills/skill-evidence-capture/SKILL.md");
     assert!(
         capture.contains(
             "No report file is produced for ordinary capture; markdown reports belong to evolution runs."
@@ -130,14 +177,7 @@ fn installed_live_packages_do_not_point_to_nonexistent_archive_paths() {
 
     let mut offenders = Vec::new();
     for package in ["skill-evidence-capture", "skill-evolution"] {
-        let installed = fs::read_to_string(
-            root.path()
-                .join(".claude/skills")
-                .join(package)
-                .join("SKILL.md"),
-        )
-        .expect("read installed live package");
-        if installed.contains("archive/") {
+        if shipped(&format!(".claude/skills/{package}/SKILL.md")).contains("archive/") {
             offenders.push(package);
         }
     }
@@ -160,13 +200,7 @@ fn installed_live_packages_do_not_point_to_nonexistent_archive_paths() {
 /// the converse just as plainly, or the guidance itself becomes the diagnosis.
 #[test]
 fn installed_capture_package_records_one_incident_per_deviation_without_diagnosing() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let package = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evidence-capture/SKILL.md"),
-    )
-    .expect("read installed capture package");
+    let package = shipped(".claude/skills/skill-evidence-capture/SKILL.md");
 
     assert!(
         package.contains("one record per deviation"),
@@ -207,13 +241,7 @@ fn installed_capture_package_records_one_incident_per_deviation_without_diagnosi
 /// nothing will remove them and the next reader takes the stream as it stands.
 #[test]
 fn installed_capture_package_states_the_partial_append_terminal_state() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let package = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evidence-capture/SKILL.md"),
-    )
-    .expect("read installed capture package");
+    let package = shipped(".claude/skills/skill-evidence-capture/SKILL.md");
 
     assert!(
         package.contains("records already appended stand"),
@@ -232,13 +260,7 @@ fn installed_capture_package_states_the_partial_append_terminal_state() {
 /// commissioning decision rests on cannot carry it silently.
 #[test]
 fn installed_method_gap_package_separates_run_counts_from_record_counts() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let package = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/method-gap-research-status/SKILL.md"),
-    )
-    .expect("read installed method-gap package");
+    let package = shipped(".claude/skills/method-gap-research-status/SKILL.md");
 
     assert!(
         package.contains("`qualifying_uses` counts runs"),
@@ -260,13 +282,7 @@ fn installed_method_gap_package_separates_run_counts_from_record_counts() {
 /// who is never told the path exists will not use it, and the evidence is simply lost.
 #[test]
 fn installed_capture_package_states_a_clean_run_can_still_gain_an_incident() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let package = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evidence-capture/SKILL.md"),
-    )
-    .expect("read installed capture package");
+    let package = shipped(".claude/skills/skill-evidence-capture/SKILL.md");
 
     assert!(
         package.contains("a run already recorded clean can still gain an incident"),
@@ -284,13 +300,7 @@ fn installed_capture_package_states_a_clean_run_can_still_gain_an_incident() {
 /// recorded as two uses.
 #[test]
 fn installed_capture_package_bounds_further_incidents_to_one_session() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let package = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evidence-capture/SKILL.md"),
-    )
-    .expect("read installed capture package");
+    let package = shipped(".claude/skills/skill-evidence-capture/SKILL.md");
 
     assert!(
         package.contains("only within the top-level session that recorded the run"),
@@ -307,13 +317,7 @@ fn installed_capture_package_bounds_further_incidents_to_one_session() {
 /// operator must stop rather than mint a second qualifying use for the same run.
 #[test]
 fn installed_capture_package_bounds_cross_session_continuations_on_the_current_hash() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let package = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evidence-capture/SKILL.md"),
-    )
-    .expect("read installed capture package");
+    let package = shipped(".claude/skills/skill-evidence-capture/SKILL.md");
 
     assert!(
         package.contains(
@@ -329,13 +333,7 @@ fn installed_capture_package_bounds_cross_session_continuations_on_the_current_h
 
 #[test]
 fn installed_skill_evolution_reference_writes_the_report_before_close_and_amends_it_after() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let write = reference
         .find("Before any close, write the review report")
@@ -357,13 +355,7 @@ fn installed_skill_evolution_reference_writes_the_report_before_close_and_amends
 
 #[test]
 fn installed_skill_evolution_reference_uses_operating_identity_for_precedent() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains("--record-operating-skill-hash"),
@@ -386,13 +378,7 @@ fn installed_skill_evolution_reference_uses_operating_identity_for_precedent() {
 
 #[test]
 fn installed_skill_evolution_reference_weighs_trigger_workarounds_before_freezing_the_plan() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let ownership = reference
         .find("### 3. Determine target ownership and causal mechanism")
@@ -431,13 +417,7 @@ fn installed_skill_evolution_reference_weighs_trigger_workarounds_before_freezin
 
 #[test]
 fn installed_skill_evolution_reference_requires_per_mechanism_trials() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let ownership = reference
         .find("### 3. Determine target ownership and causal mechanism")
@@ -490,13 +470,7 @@ fn installed_skill_evolution_reference_requires_per_mechanism_trials() {
 
 #[test]
 fn installed_skill_evolution_reconciles_every_mechanism_clause_with_its_reproduction_oracle() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
@@ -540,13 +514,7 @@ fn installed_skill_evolution_reconciles_every_mechanism_clause_with_its_reproduc
 
 #[test]
 fn installed_skill_evolution_reference_reserves_blocked_for_the_whole_review() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
@@ -569,13 +537,7 @@ fn installed_skill_evolution_reference_reserves_blocked_for_the_whole_review() {
 
 #[test]
 fn installed_skill_evolution_reference_sources_each_binding_constraint_in_step_four() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
@@ -601,13 +563,7 @@ fn installed_skill_evolution_reference_sources_each_binding_constraint_in_step_f
 
 #[test]
 fn installed_skill_evolution_reference_tests_witnesses_against_a_clean_compliant_run() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
         .expect("the plan-freezing step remains explicit");
@@ -630,13 +586,7 @@ fn installed_skill_evolution_reference_tests_witnesses_against_a_clean_compliant
 
 #[test]
 fn installed_skill_evolution_reference_keeps_refuted_constraints_in_trial_per_trigger() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
         .expect("the plan-freezing step remains explicit");
@@ -659,13 +609,7 @@ fn installed_skill_evolution_reference_keeps_refuted_constraints_in_trial_per_tr
 
 #[test]
 fn installed_skill_evolution_reference_keeps_unestablished_constraints_in_trial() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
@@ -691,13 +635,7 @@ fn installed_skill_evolution_reference_keeps_unestablished_constraints_in_trial(
 
 #[test]
 fn installed_skill_evolution_reference_routes_established_run_conditions_by_kind() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
@@ -723,13 +661,7 @@ fn installed_skill_evolution_reference_routes_established_run_conditions_by_kind
 
 #[test]
 fn installed_skill_evolution_reference_freezes_a_long_course_trial_for_accumulation_constraints() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
@@ -754,13 +686,7 @@ fn installed_skill_evolution_reference_freezes_a_long_course_trial_for_accumulat
 
 #[test]
 fn installed_skill_evolution_reference_denies_cost_as_an_instrument_limit() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
@@ -780,13 +706,7 @@ fn installed_skill_evolution_reference_denies_cost_as_an_instrument_limit() {
 
 #[test]
 fn installed_skill_evolution_reference_reaches_long_course_scale_by_working_not_instruction() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
@@ -809,13 +729,7 @@ fn installed_skill_evolution_reference_reaches_long_course_scale_by_working_not_
 
 #[test]
 fn installed_skill_evolution_reference_separates_frozen_scale_from_reached_reading() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     // The dead-end section is named in step 9's prose before the template repeats it, so each
     // anchor searches forward from the previous one rather than from the start of the file.
@@ -847,13 +761,7 @@ fn installed_skill_evolution_reference_separates_frozen_scale_from_reached_readi
 
 #[test]
 fn installed_skill_evolution_reference_frees_long_course_trials_from_short_context_predecessors() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
@@ -873,13 +781,7 @@ fn installed_skill_evolution_reference_frees_long_course_trials_from_short_conte
 
 #[test]
 fn installed_skill_evolution_reference_keeps_trial_prompts_behavior_neutral_in_step_four() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
@@ -906,13 +808,7 @@ fn installed_skill_evolution_reference_keeps_trial_prompts_behavior_neutral_in_s
 
 #[test]
 fn installed_skill_evolution_reference_distinguishes_location_from_behavioral_scope() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
@@ -940,13 +836,7 @@ fn installed_skill_evolution_reference_distinguishes_location_from_behavioral_sc
 
 #[test]
 fn installed_skill_evolution_reference_separates_raw_tasks_from_executor_logistics_in_step_six() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let validation = reference
         .find("### 6. Run blind comparative validation")
@@ -973,13 +863,7 @@ fn installed_skill_evolution_reference_separates_raw_tasks_from_executor_logisti
 
 #[test]
 fn installed_skill_evolution_reference_discloses_evaluable_failure_readings_in_step_six() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
     let validation = reference
         .find("### 6. Run blind comparative validation")
         .expect("the blind-validation step remains explicit");
@@ -1001,13 +885,7 @@ fn installed_skill_evolution_reference_discloses_evaluable_failure_readings_in_s
 
 #[test]
 fn installed_skill_evolution_reference_freezes_artifact_identity_before_outcomes() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let freeze = reference
         .find("### 4. Freeze the validation plan before any candidate exists")
@@ -1031,13 +909,7 @@ fn installed_skill_evolution_reference_freezes_artifact_identity_before_outcomes
 
 #[test]
 fn installed_skill_evolution_reference_compares_under_the_frozen_relation_in_step_six() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let validation = reference
         .find("### 6. Run blind comparative validation")
@@ -1057,13 +929,7 @@ fn installed_skill_evolution_reference_compares_under_the_frozen_relation_in_ste
 
 #[test]
 fn installed_skill_evolution_reference_voids_a_symmetric_frozen_input_fault() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let acceptance = reference
         .find("### 7. Apply the acceptance gate")
@@ -1097,13 +963,7 @@ fn installed_skill_evolution_reference_voids_a_symmetric_frozen_input_fault() {
 
 #[test]
 fn installed_skill_evolution_reference_attributes_every_material_regression_claim() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let acceptance = reference
         .find("### 7. Apply the acceptance gate")
@@ -1166,13 +1026,7 @@ fn installed_skill_evolution_reference_attributes_every_material_regression_clai
 
 #[test]
 fn installed_skill_evolution_reference_reports_gate_attribution_in_its_own_section() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     // `## Unable to be expressed` is named in step 9's prose before the template repeats it, so the
     // anchors chain forward from the previous one rather than each searching from the start.
@@ -1212,16 +1066,9 @@ fn installed_skill_evolution_reference_reports_gate_attribution_in_its_own_secti
 
 #[test]
 fn installed_event_schema_declares_close_validation_effort_as_optional() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let schema: serde_json::Value = serde_json::from_slice(
-        &fs::read(
-            root.path()
-                .join("schemas/skill-evidence/event.v1.schema.json"),
-        )
-        .expect("read installed event schema"),
-    )
-    .expect("installed event schema JSON");
+    let schema: serde_json::Value =
+        serde_json::from_str(shipped("schemas/skill-evidence/event.v1.schema.json"))
+            .expect("installed event schema JSON");
     let payload = schema
         .pointer("/allOf/1/then/properties/payload")
         .expect("review_disposition payload schema");
@@ -1236,16 +1083,9 @@ fn installed_event_schema_declares_close_validation_effort_as_optional() {
 
 #[test]
 fn installed_gate_schema_defines_trigger_ids_as_current_review_coverage() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let schema: serde_json::Value = serde_json::from_slice(
-        &fs::read(
-            root.path()
-                .join("schemas/skill-evidence/gate-status.v1.schema.json"),
-        )
-        .expect("read installed gate schema"),
-    )
-    .expect("installed gate schema JSON");
+    let schema: serde_json::Value =
+        serde_json::from_str(shipped("schemas/skill-evidence/gate-status.v1.schema.json"))
+            .expect("installed gate schema JSON");
 
     assert_eq!(
         schema["properties"]["trigger_event_ids"]["description"],
@@ -1255,13 +1095,7 @@ fn installed_gate_schema_defines_trigger_ids_as_current_review_coverage() {
 
 #[test]
 fn installed_status_package_does_not_tie_retirement_to_one_disposition() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let package = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution-status/SKILL.md"),
-    )
-    .expect("read installed skill-evolution-status package");
+    let package = shipped(".claude/skills/skill-evolution-status/SKILL.md");
 
     assert!(
         package.contains(
@@ -1279,13 +1113,7 @@ fn installed_status_package_does_not_tie_retirement_to_one_disposition() {
 
 #[test]
 fn installed_status_package_treats_reporter_stdout_as_the_portable_payload() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let package = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution-status/SKILL.md"),
-    )
-    .expect("read installed skill-evolution-status package");
+    let package = shipped(".claude/skills/skill-evolution-status/SKILL.md");
     let prose = package.split_whitespace().collect::<Vec<_>>().join(" ");
 
     for required in [
@@ -1314,16 +1142,9 @@ fn installed_status_package_treats_reporter_stdout_as_the_portable_payload() {
 
 #[test]
 fn installed_event_schema_keeps_untestable_coverage_optional_and_open() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let schema: serde_json::Value = serde_json::from_slice(
-        &fs::read(
-            root.path()
-                .join("schemas/skill-evidence/event.v1.schema.json"),
-        )
-        .expect("read installed event schema"),
-    )
-    .expect("installed event schema JSON");
+    let schema: serde_json::Value =
+        serde_json::from_str(shipped("schemas/skill-evidence/event.v1.schema.json"))
+            .expect("installed event schema JSON");
     let payload = schema
         .pointer("/allOf/1/then/properties/payload")
         .expect("review_disposition payload schema");
@@ -1348,16 +1169,9 @@ fn installed_event_schema_keeps_untestable_coverage_optional_and_open() {
 
 #[test]
 fn installed_event_schema_keeps_constraint_provenance_optional_and_open() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let schema: serde_json::Value = serde_json::from_slice(
-        &fs::read(
-            root.path()
-                .join("schemas/skill-evidence/event.v1.schema.json"),
-        )
-        .expect("read installed event schema"),
-    )
-    .expect("installed event schema JSON");
+    let schema: serde_json::Value =
+        serde_json::from_str(shipped("schemas/skill-evidence/event.v1.schema.json"))
+            .expect("installed event schema JSON");
     let payload = schema
         .pointer("/allOf/1/then/properties/payload")
         .expect("review_disposition payload schema");
@@ -1407,16 +1221,9 @@ fn installed_event_schema_keeps_constraint_provenance_optional_and_open() {
 
 #[test]
 fn installed_outside_target_owner_contract_matches_the_published_schema() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let schema: serde_json::Value = serde_json::from_slice(
-        &fs::read(
-            root.path()
-                .join("schemas/skill-evidence/event.v1.schema.json"),
-        )
-        .expect("read installed event schema"),
-    )
-    .expect("installed event schema JSON");
+    let schema: serde_json::Value =
+        serde_json::from_str(shipped("schemas/skill-evidence/event.v1.schema.json"))
+            .expect("installed event schema JSON");
     let payload = schema
         .pointer("/allOf/1/then/properties/payload")
         .expect("review_disposition payload schema");
@@ -1463,11 +1270,7 @@ fn installed_outside_target_owner_contract_matches_the_published_schema() {
         "a stale installed schema must keep accepting the new optional payload key"
     );
 
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
     for kind in kinds {
         assert!(
             reference.contains(&format!("| `{kind}` |")),
@@ -1478,16 +1281,9 @@ fn installed_outside_target_owner_contract_matches_the_published_schema() {
 
 #[test]
 fn installed_event_schema_declares_operating_skill_hash_as_optional_and_open() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let schema: serde_json::Value = serde_json::from_slice(
-        &fs::read(
-            root.path()
-                .join("schemas/skill-evidence/event.v1.schema.json"),
-        )
-        .expect("read installed event schema"),
-    )
-    .expect("installed event schema JSON");
+    let schema: serde_json::Value =
+        serde_json::from_str(shipped("schemas/skill-evidence/event.v1.schema.json"))
+            .expect("installed event schema JSON");
     let identity_branch = schema["allOf"]
         .as_array()
         .expect("event conditionals")
@@ -1625,13 +1421,7 @@ fn installed_event_schema_declares_operating_skill_hash_as_optional_and_open() {
 
 #[test]
 fn installed_skill_evolution_reference_reports_the_close_retirement_reach() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains("Read `retired_from_gate_event_ids` from the close receipt"),
@@ -1658,13 +1448,7 @@ fn installed_skill_evolution_reference_reports_the_close_retirement_reach() {
 
 #[test]
 fn installed_skill_evolution_reference_reports_external_owners_to_the_maintainer() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         !reference.contains("Route outside-target evidence to its owner factually"),
@@ -1697,13 +1481,7 @@ fn installed_skill_evolution_reference_reports_external_owners_to_the_maintainer
 
 #[test]
 fn installed_skill_evolution_reference_records_the_unexpressible_mechanism_dead_end() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains(
@@ -1726,13 +1504,7 @@ fn installed_skill_evolution_reference_records_the_unexpressible_mechanism_dead_
 
 #[test]
 fn installed_skill_evolution_reference_carries_forward_a_repeated_untestable_mechanism() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains(
@@ -1748,13 +1520,7 @@ fn installed_skill_evolution_reference_carries_forward_a_repeated_untestable_mec
 
 #[test]
 fn installed_skill_evolution_reference_provides_a_fixed_report_home_for_dead_ends() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     for required in [
         "## Unable to be expressed",
@@ -1772,13 +1538,7 @@ fn installed_skill_evolution_reference_provides_a_fixed_report_home_for_dead_end
 
 #[test]
 fn installed_skill_evolution_reference_completes_with_the_unexpressible_mechanism_clause() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains(
@@ -1790,13 +1550,7 @@ fn installed_skill_evolution_reference_completes_with_the_unexpressible_mechanis
 
 #[test]
 fn installed_skill_evolution_reference_leaves_reviews_without_unexpressible_mechanisms_unchanged() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains(
@@ -1808,13 +1562,7 @@ fn installed_skill_evolution_reference_leaves_reviews_without_unexpressible_mech
 
 #[test]
 fn installed_skill_evolution_reference_routes_untestable_coverage_out_of_adjudication() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains("--instrument-limited <event-id>"),
@@ -1848,13 +1596,7 @@ fn installed_skill_evolution_reference_routes_untestable_coverage_out_of_adjudic
 
 #[test]
 fn installed_skill_evolution_reference_makes_every_close_route_explicit_and_inspectable() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     for required in [
         "For every event in the coverage list, add exactly one `--concluded <event-id>` or `--instrument-limited <event-id>`",
@@ -1873,13 +1615,7 @@ fn installed_skill_evolution_reference_makes_every_close_route_explicit_and_insp
 
 #[test]
 fn installed_skill_evolution_reference_supplies_checked_whole_field_provenance() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
     let report = reference
         .find("### 9. Report, close, amend, complete")
         .expect("the close step remains explicit");
@@ -1903,13 +1639,7 @@ fn installed_skill_evolution_reference_supplies_checked_whole_field_provenance()
 
 #[test]
 fn installed_skill_evolution_reference_preserves_the_complete_close_receipt_in_completion() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
     let report = reference
         .find("### 9. Report, close, amend, complete")
         .expect("the close step remains explicit");
@@ -1929,13 +1659,7 @@ fn installed_skill_evolution_reference_preserves_the_complete_close_receipt_in_c
 
 #[test]
 fn installed_skill_evolution_reference_bars_a_verdict_conformance_only_evidence_cannot_bear() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains("conformance-only") && reference.contains("outcome-graded"),
@@ -1964,13 +1688,7 @@ fn installed_skill_evolution_reference_bars_a_verdict_conformance_only_evidence_
 #[test]
 fn installed_skill_evolution_reference_names_which_instrument_limit_a_conformance_only_trigger_hits()
  {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains("Naming has two grounds, and they are different limits"),
@@ -2002,13 +1720,7 @@ fn installed_skill_evolution_reference_names_which_instrument_limit_a_conformanc
 
 #[test]
 fn installed_skill_evolution_reference_keeps_its_no_candidate_route_consistent_with_close() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains(
@@ -2020,13 +1732,7 @@ fn installed_skill_evolution_reference_keeps_its_no_candidate_route_consistent_w
 
 #[test]
 fn installed_skill_evolution_names_a_wholly_not_reproduced_review() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let current_arm = reference
         .find("### 5. Construct an isolated candidate")
@@ -2070,15 +1776,8 @@ fn installed_skill_evolution_names_a_wholly_not_reproduced_review() {
 
 #[test]
 fn installed_skill_evolution_reports_a_mixed_no_candidate_close_truthfully() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let package = fs::read_to_string(root.path().join(".claude/skills/skill-evolution/SKILL.md"))
-        .expect("read installed Skill Evolution package");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let package = shipped(".claude/skills/skill-evolution/SKILL.md");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains(
@@ -2115,13 +1814,7 @@ fn installed_skill_evolution_reports_a_mixed_no_candidate_close_truthfully() {
 
 #[test]
 fn installed_skill_evolution_reference_requires_pre_close_reach_bound_review() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains(
@@ -2157,13 +1850,7 @@ fn installed_skill_evolution_reference_requires_pre_close_reach_bound_review() {
 
 #[test]
 fn installed_skill_evolution_reference_freezes_coverage_at_claim() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains(
@@ -2187,13 +1874,7 @@ fn installed_skill_evolution_reference_freezes_coverage_at_claim() {
 
 #[test]
 fn installed_skill_evolution_reference_ties_mismatch_disclosure_to_unvouched_sibling() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     assert!(
         reference.contains(
@@ -2205,13 +1886,7 @@ fn installed_skill_evolution_reference_ties_mismatch_disclosure_to_unvouched_sib
 
 #[test]
 fn installed_skill_evolution_reference_vouches_for_constraint_provenance_before_close() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let report_and_close = reference
         .find("### 9. Report, close, amend, complete")
@@ -2241,13 +1916,7 @@ fn installed_skill_evolution_reference_vouches_for_constraint_provenance_before_
 
 #[test]
 fn installed_skill_evolution_reference_vouches_for_every_constraint_before_any_close() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let reference = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
-    )
-    .expect("read installed authorized-review reference");
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
     let report_and_close = reference
         .find("### 9. Report, close, amend, complete")
@@ -2271,13 +1940,7 @@ fn installed_skill_evolution_reference_vouches_for_every_constraint_before_any_c
 
 #[test]
 fn installed_skill_evolution_status_describes_reason_scoped_retirement() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let status_skill = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution-status/SKILL.md"),
-    )
-    .expect("read installed skill-evolution-status package");
+    let status_skill = shipped(".claude/skills/skill-evolution-status/SKILL.md");
 
     assert!(
         status_skill.contains(
@@ -2304,13 +1967,7 @@ fn installed_skill_evolution_status_describes_reason_scoped_retirement() {
 
 #[test]
 fn installed_skill_evolution_status_describes_deferred_review_bases_without_claiming_coverage() {
-    let root = tempfile::tempdir().expect("temporary repository root");
-    assets::install(root.path(), &host(), false).expect("install current assets");
-    let status_skill = fs::read_to_string(
-        root.path()
-            .join(".claude/skills/skill-evolution-status/SKILL.md"),
-    )
-    .expect("read installed skill-evolution-status package");
+    let status_skill = shipped(".claude/skills/skill-evolution-status/SKILL.md");
 
     assert!(
         status_skill.contains(
