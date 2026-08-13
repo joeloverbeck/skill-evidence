@@ -18,9 +18,14 @@ use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 pub mod assets;
 #[cfg(feature = "cli")]
 pub mod cli;
+mod gate;
 mod host;
 mod status_reports;
 
+use gate::{
+    EventKind, EvidenceEvent, GateClock, GateTarget, Outcome, ThresholdReason, ValidatedStream,
+    authorization_reason_names_incident,
+};
 pub use host::{Host, Recovery};
 pub use status_reports::skill_evolution_status;
 pub use status_reports::{MethodGapResearchInventory, method_gap_research_inventory};
@@ -70,21 +75,6 @@ const EXTERNAL_OWNER_KINDS: &[&str] = &[
     "model_limitation",
     "user_instruction",
 ];
-const USE_PAYLOAD_KEYS: &[&str] = &[
-    "qualifying_use",
-    "retrospective",
-    "task_label",
-    "task_fingerprint",
-    "outcome",
-    "symptom_key",
-    "expected",
-    "observed",
-    "consequence",
-    "workaround_taken",
-    "evidence_refs",
-    "same_run_group",
-];
-const USE_PAYLOAD_OPTIONAL_KEYS: &[&str] = &["run_condition"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorClass {
@@ -156,6 +146,21 @@ pub struct DerivationInputs {
     pub now_epoch_milliseconds: i64,
     pub session_id: String,
     pub lock_owner: String,
+}
+
+impl DerivationInputs {
+    /// The subset deriving actually reads.
+    ///
+    /// `lock_owner` is deliberately not part of it: a derivation takes no lock, and a
+    /// caller that only wants to read a gate should not have to invent an owner for
+    /// one it will never hold.
+    fn clock(&self) -> GateClock<'_> {
+        GateClock {
+            generated_at: &self.generated_at,
+            now_epoch_milliseconds: self.now_epoch_milliseconds,
+            session_id: &self.session_id,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -433,364 +438,6 @@ pub struct GateStatus {
     pub integrity_errors: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum EventType {
-    UseRecorded,
-    ReviewStarted,
-    ReviewDisposition,
-    ValidationCompleted,
-    ChangeLanded,
-    DecontaminationStarted,
-    DecontaminationCompleted,
-}
-
-impl EventType {
-    fn parse(value: &str) -> Option<Self> {
-        match value {
-            "use_recorded" => Some(Self::UseRecorded),
-            "review_started" => Some(Self::ReviewStarted),
-            "review_disposition" => Some(Self::ReviewDisposition),
-            "validation_completed" => Some(Self::ValidationCompleted),
-            "change_landed" => Some(Self::ChangeLanded),
-            "decontamination_started" => Some(Self::DecontaminationStarted),
-            "decontamination_completed" => Some(Self::DecontaminationCompleted),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Outcome {
-    Clean,
-    Friction,
-    MaterialFailure,
-    SevereIncident,
-}
-
-impl Outcome {
-    const ALLOWED: &'static str = "clean|friction|material_failure|severe_incident";
-
-    fn parse(value: &str) -> Option<Self> {
-        match value {
-            "clean" => Some(Self::Clean),
-            "friction" => Some(Self::Friction),
-            "material_failure" => Some(Self::MaterialFailure),
-            "severe_incident" => Some(Self::SevereIncident),
-            _ => None,
-        }
-    }
-
-    fn severity(self) -> u8 {
-        match self {
-            Self::Clean => 0,
-            Self::Friction => 1,
-            Self::MaterialFailure => 2,
-            Self::SevereIncident => 3,
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Clean => "clean",
-            Self::Friction => "friction",
-            Self::MaterialFailure => "material_failure",
-            Self::SevereIncident => "severe_incident",
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct UseRecordedEvent {
-    retrospective: bool,
-    task_fingerprint: String,
-    same_run_group: String,
-    outcome: Outcome,
-    symptom_key: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-enum EventKind {
-    UseRecorded(UseRecordedEvent),
-    ReviewStarted {
-        review_id: String,
-    },
-    ReviewDisposition {
-        review_id: String,
-        disposition: String,
-        adjudicated_event_ids: Vec<String>,
-        /// The subset of the coverage list this close could not decide — no trial could
-        /// express the mechanism, or the acceptance gate grades outcome while the evidence
-        /// bears no outcome claim. Empty for every close written before the key existed,
-        /// which is the same claim those closes were already making: everything covered
-        /// was decided.
-        instrument_limited_event_ids: Vec<String>,
-    },
-    ValidationCompleted {
-        review_id: String,
-    },
-    ChangeLanded {
-        review_id: String,
-    },
-    DecontaminationStarted {
-        review_id: String,
-    },
-    DecontaminationCompleted {
-        review_id: String,
-    },
-}
-
-#[derive(Debug, Clone)]
-struct EvidenceEvent {
-    event_id: String,
-    recorded_at: String,
-    target_content_hash: String,
-    top_level_session_id: String,
-    kind: EventKind,
-    raw: Value,
-}
-
-impl EvidenceEvent {
-    fn from_validated(event: &Value) -> Self {
-        let payload = event
-            .get("payload")
-            .and_then(Value::as_object)
-            .expect("validated payload");
-        let event_type = event
-            .get("event_type")
-            .and_then(Value::as_str)
-            .and_then(EventType::parse)
-            .expect("validated event type");
-        let review_id = || {
-            payload
-                .get("review_id")
-                .and_then(Value::as_str)
-                .expect("validated review id")
-                .to_owned()
-        };
-        let kind = match event_type {
-            EventType::UseRecorded => EventKind::UseRecorded(UseRecordedEvent {
-                retrospective: payload
-                    .get("retrospective")
-                    .and_then(Value::as_bool)
-                    .expect("validated retrospective flag"),
-                task_fingerprint: payload
-                    .get("task_fingerprint")
-                    .and_then(Value::as_str)
-                    .expect("validated task fingerprint")
-                    .to_owned(),
-                same_run_group: payload
-                    .get("same_run_group")
-                    .and_then(Value::as_str)
-                    .expect("validated run group")
-                    .to_owned(),
-                outcome: payload
-                    .get("outcome")
-                    .and_then(Value::as_str)
-                    .and_then(Outcome::parse)
-                    .expect("validated outcome"),
-                symptom_key: payload
-                    .get("symptom_key")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned),
-            }),
-            EventType::ReviewStarted => EventKind::ReviewStarted {
-                review_id: review_id(),
-            },
-            EventType::ReviewDisposition => EventKind::ReviewDisposition {
-                review_id: review_id(),
-                disposition: payload
-                    .get("disposition")
-                    .and_then(Value::as_str)
-                    .expect("validated review disposition")
-                    .to_owned(),
-                adjudicated_event_ids: payload
-                    .get("adjudicated_event_ids")
-                    .and_then(Value::as_array)
-                    .expect("validated adjudicated event identities")
-                    .iter()
-                    .map(|identity| {
-                        identity
-                            .as_str()
-                            .expect("validated adjudicated event identity")
-                            .to_owned()
-                    })
-                    .collect(),
-                instrument_limited_event_ids: payload
-                    .get("instrument_limited_event_ids")
-                    .and_then(Value::as_array)
-                    .map(|identities| {
-                        identities
-                            .iter()
-                            .map(|identity| {
-                                identity
-                                    .as_str()
-                                    .expect("validated instrument-limited event identity")
-                                    .to_owned()
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-            },
-            EventType::ValidationCompleted => EventKind::ValidationCompleted {
-                review_id: review_id(),
-            },
-            EventType::ChangeLanded => EventKind::ChangeLanded {
-                review_id: review_id(),
-            },
-            EventType::DecontaminationStarted => EventKind::DecontaminationStarted {
-                review_id: review_id(),
-            },
-            EventType::DecontaminationCompleted => EventKind::DecontaminationCompleted {
-                review_id: review_id(),
-            },
-        };
-        Self {
-            event_id: event
-                .get("event_id")
-                .and_then(Value::as_str)
-                .expect("validated event id")
-                .to_owned(),
-            recorded_at: event
-                .get("recorded_at")
-                .and_then(Value::as_str)
-                .expect("validated event timestamp")
-                .to_owned(),
-            target_content_hash: event
-                .pointer("/target/content_hash")
-                .and_then(Value::as_str)
-                .expect("validated target content hash")
-                .to_owned(),
-            top_level_session_id: event
-                .get("top_level_session_id")
-                .and_then(Value::as_str)
-                .expect("validated top-level session identity")
-                .to_owned(),
-            kind,
-            raw: event.clone(),
-        }
-    }
-
-    fn review_id(&self) -> Option<&str> {
-        match &self.kind {
-            EventKind::UseRecorded(_) => None,
-            EventKind::ReviewStarted { review_id }
-            | EventKind::ReviewDisposition { review_id, .. }
-            | EventKind::ValidationCompleted { review_id }
-            | EventKind::ChangeLanded { review_id }
-            | EventKind::DecontaminationStarted { review_id }
-            | EventKind::DecontaminationCompleted { review_id } => Some(review_id),
-        }
-    }
-
-    fn use_recorded(&self) -> Option<&UseRecordedEvent> {
-        match &self.kind {
-            EventKind::UseRecorded(recorded) => Some(recorded),
-            _ => None,
-        }
-    }
-
-    fn is_review_start(&self) -> bool {
-        matches!(self.kind, EventKind::ReviewStarted { .. })
-    }
-
-    fn starts_ownership(&self) -> bool {
-        matches!(
-            self.kind,
-            EventKind::ReviewStarted { .. } | EventKind::DecontaminationStarted { .. }
-        )
-    }
-
-    fn terminates_ownership(&self) -> bool {
-        matches!(
-            self.kind,
-            EventKind::ReviewDisposition { .. }
-                | EventKind::ChangeLanded { .. }
-                | EventKind::DecontaminationCompleted { .. }
-        )
-    }
-}
-
-#[derive(Debug)]
-enum ThresholdReason {
-    Severe,
-    MaterialRecurrence(String),
-    FrictionRecurrence(String),
-    TenUseUnresolved,
-}
-
-impl ThresholdReason {
-    fn parse(value: &str) -> Option<Self> {
-        match value {
-            "severe" => Some(Self::Severe),
-            "ten_use_unresolved" => Some(Self::TenUseUnresolved),
-            _ => value
-                .strip_prefix("material_recurrence:")
-                .filter(|symptom| !symptom.is_empty())
-                .map(|symptom| Self::MaterialRecurrence(symptom.to_owned()))
-                .or_else(|| {
-                    value
-                        .strip_prefix("friction_recurrence:")
-                        .filter(|symptom| !symptom.is_empty())
-                        .map(|symptom| Self::FrictionRecurrence(symptom.to_owned()))
-                }),
-        }
-    }
-
-    fn as_string(&self) -> String {
-        match self {
-            Self::Severe => "severe".to_owned(),
-            Self::MaterialRecurrence(symptom) => {
-                format!("material_recurrence:{symptom}")
-            }
-            Self::FrictionRecurrence(symptom) => {
-                format!("friction_recurrence:{symptom}")
-            }
-            Self::TenUseUnresolved => "ten_use_unresolved".to_owned(),
-        }
-    }
-
-    fn is_severe(&self) -> bool {
-        matches!(self, Self::Severe)
-    }
-}
-
-fn authorization_reason_names_incident(
-    reason: Option<&ThresholdReason>,
-    anchor_symptoms: &HashSet<&str>,
-    recorded: &UseRecordedEvent,
-) -> bool {
-    match reason {
-        Some(ThresholdReason::Severe) => false,
-        Some(ThresholdReason::TenUseUnresolved) => {
-            !recorded.retrospective
-                && recorded
-                    .symptom_key
-                    .as_deref()
-                    .is_some_and(|symptom| anchor_symptoms.contains(symptom))
-        }
-        Some(ThresholdReason::MaterialRecurrence(symptom)) => {
-            recorded.symptom_key.as_deref() == Some(symptom.as_str())
-                && recorded.outcome.severity() >= Outcome::MaterialFailure.severity()
-        }
-        Some(ThresholdReason::FrictionRecurrence(symptom)) => {
-            recorded.symptom_key.as_deref() == Some(symptom.as_str())
-        }
-        None => recorded
-            .symptom_key
-            .as_deref()
-            .is_some_and(|symptom| anchor_symptoms.contains(symptom)),
-    }
-}
-
-#[derive(Debug)]
-struct ThresholdTrigger {
-    reason: ThresholdReason,
-    trigger_event_ids: Vec<String>,
-    threshold_session_id: Option<String>,
-    fired_at: String,
-    event_index: usize,
-}
-
 pub fn resolve_top_level_session_id(
     explicit: Option<&str>,
     claude_code_session_id: Option<&str>,
@@ -879,11 +526,30 @@ pub fn skill_key_for_target(root: &Path, target: &Path) -> Result<String, Error>
         .ok_or_else(|| unsafe_failure("Derived evidence-store key is not valid UTF-8.".to_owned()))
 }
 
+/// Reads a target's recorded stream from disk.
+///
+/// A stream that is not there yet reads as an empty one rather than as a failure:
+/// nobody has recorded a use against this target, which is not an integrity problem.
+fn read_stream(path: &Path) -> Result<ValidatedStream, Error> {
+    match fs::read(path) {
+        Ok(bytes) => Ok(ValidatedStream::parse(&bytes, &path.display().to_string())),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(ValidatedStream::empty()),
+        Err(error) => Err(unsafe_failure(format!(
+            "Could not read event stream {}: {error}",
+            path.display()
+        ))),
+    }
+}
+
 pub fn read_validated_event_stream(path: &Path) -> Result<ValidatedEventStream, Error> {
-    let (events, integrity_errors) = read_event_stream(path)?;
+    let stream = read_stream(path)?;
     Ok(ValidatedEventStream {
-        events: events.into_iter().map(|event| event.raw).collect(),
-        integrity_errors,
+        integrity_errors: stream.integrity_errors().to_vec(),
+        events: stream
+            .events()
+            .iter()
+            .map(|event| event.raw.clone())
+            .collect(),
     })
 }
 
@@ -909,14 +575,8 @@ pub fn derive_store(
         )));
     }
     let hash = hash_target_directory(&target.target_real)?;
-    let (events, integrity_errors) = read_event_stream(&events_path)?;
-    let status = derive_gate(
-        &target,
-        &hash.content_hash,
-        &events,
-        integrity_errors,
-        inputs,
-    );
+    let stream = read_stream(&events_path)?;
+    let status = gate::derive(&stream, target.labels(), &hash.content_hash, inputs.clock());
     write_gate_status(&target.evidence_directory, &status)?;
     Ok(status)
 }
@@ -938,7 +598,7 @@ pub fn evolution_preflight(
         ))
     })?;
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
-    let (events, hash, status) = authorize_evolution(&target, &derivation_inputs)?;
+    let (stream, hash, status) = authorize_evolution(&target, &derivation_inputs)?;
     let mut receipt = serde_json::json!({
         "authorized": true,
         "target": {
@@ -958,7 +618,7 @@ pub fn evolution_preflight(
             "trigger_event_ids": status.trigger_event_ids,
             "threshold_session_id": status.threshold_session_id
         },
-        "evidence_packet": evolution_evidence_packet(&target, &events, &status)
+        "evidence_packet": evolution_evidence_packet(&target, stream.events(), &status)
     });
     if !operating_package.matches_shipped {
         receipt["operating_package_matches_shipped"] = serde_json::json!(false);
@@ -1023,7 +683,7 @@ pub fn evolution_claim(
         ))
     })?;
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
-    let (mut events, hash, status) = authorize_evolution(&target, &derivation_inputs)?;
+    let (stream, hash, status) = authorize_evolution(&target, &derivation_inputs)?;
     let proof = status.threshold_session_id.as_ref().map_or_else(
         || {
             serde_json::json!({
@@ -1062,7 +722,7 @@ pub fn evolution_claim(
     let after = append_lifecycle_event(
         &target,
         &hash.content_hash,
-        &mut events,
+        &stream,
         event,
         &derivation_inputs,
     )?;
@@ -1123,12 +783,12 @@ pub fn evolution_record_validation(
     let target = lifecycle_target_context(root, target, &inputs.operator_skill)?;
     let candidate_real = resolve_target(&target.repository_root, &request.candidate)?;
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
-    let mut events = read_valid_lifecycle_stream(&target)?;
-    find_review_start(&events, &request.review_id)?;
+    let stream = read_valid_lifecycle_stream(&target)?;
+    find_review_start(stream.events(), &request.review_id)?;
     let hash = hash_target_directory(&target.target_real)?;
     require_active_ownership(
         &target,
-        &events,
+        &stream,
         &hash.content_hash,
         &request.review_id,
         &derivation_inputs,
@@ -1163,7 +823,7 @@ pub fn evolution_record_validation(
     append_lifecycle_event(
         &target,
         &hash.content_hash,
-        &mut events,
+        &stream,
         event,
         &derivation_inputs,
     )?;
@@ -1193,12 +853,12 @@ pub fn evolution_land(
     // failure after that point could otherwise leave changed files without their event receipt.
     let operating_package = operating_package_provenance(inputs, host)?;
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
-    let mut events = read_valid_lifecycle_stream(&target)?;
-    let review = find_review_start(&events, &request.review_id)?;
+    let stream = read_valid_lifecycle_stream(&target)?;
+    let review = find_review_start(stream.events(), &request.review_id)?;
     let live_hash = hash_target_directory(&target.target_real)?.content_hash;
     require_active_ownership(
         &target,
-        &events,
+        &stream,
         &live_hash,
         &request.review_id,
         &derivation_inputs,
@@ -1219,7 +879,7 @@ pub fn evolution_land(
     }
     let preparation = prepare_validated_landing(
         &target,
-        &events,
+        stream.events(),
         &live_hash,
         &candidate_real,
         ValidatedLandingPolicy {
@@ -1260,7 +920,7 @@ pub fn evolution_land(
     append_lifecycle_event(
         &target,
         &landing.after_hash,
-        &mut events,
+        &stream,
         event,
         &derivation_inputs,
     )?;
@@ -1368,8 +1028,8 @@ pub fn evolution_close(
     let derivation_inputs = lifecycle_event_derivation_inputs(inputs)?;
     let target = lifecycle_target_context(root, target, &inputs.operator_skill)?;
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
-    let mut events = read_valid_lifecycle_stream(&target)?;
-    let review = find_review_start(&events, &request.review_id)?;
+    let stream = read_valid_lifecycle_stream(&target)?;
+    let review = find_review_start(stream.events(), &request.review_id)?;
     let trigger_event_ids = review
         .raw
         .pointer("/payload/trigger_event_ids")
@@ -1383,7 +1043,7 @@ pub fn evolution_close(
                 .to_owned()
         })
         .collect::<Vec<_>>();
-    if events.iter().any(|event| {
+    if stream.events().iter().any(|event| {
         matches!(event.kind, EventKind::ReviewDisposition { .. })
             && event.review_id() == Some(request.review_id.as_str())
     }) {
@@ -1407,7 +1067,7 @@ pub fn evolution_close(
         )));
     }
     let hash = hash_target_directory(&target.target_real)?.content_hash;
-    let landed = events.iter().any(|event| {
+    let landed = stream.events().iter().any(|event| {
         matches!(event.kind, EventKind::ChangeLanded { .. })
             && event.review_id() == Some(request.review_id.as_str())
     });
@@ -1422,7 +1082,7 @@ pub fn evolution_close(
     } else {
         let before = require_active_ownership(
             &target,
-            &events,
+            &stream,
             &hash,
             &request.review_id,
             &derivation_inputs,
@@ -1437,7 +1097,7 @@ pub fn evolution_close(
         Some(before)
     };
     if request.disposition == "candidate_rejected_validation" {
-        let latest = events.iter().rfind(|event| {
+        let latest = stream.events().iter().rfind(|event| {
             matches!(event.kind, EventKind::ValidationCompleted { .. })
                 && event.review_id() == Some(request.review_id.as_str())
         });
@@ -1454,7 +1114,8 @@ pub fn evolution_close(
             ));
         }
     }
-    let known = events
+    let known = stream
+        .events()
         .iter()
         .map(|event| event.event_id.as_str())
         .collect::<HashSet<_>>();
@@ -1515,7 +1176,8 @@ pub fn evolution_close(
             ));
         }
         let field = citation.field.as_str();
-        let field_value = events
+        let field_value = stream
+            .events()
             .iter()
             .find(|event| event.event_id == citation.event_id)
             .and_then(|event| event.raw.pointer(&format!("/payload/{field}")))
@@ -1648,7 +1310,7 @@ pub fn evolution_close(
         payload,
         inputs,
     );
-    let prepared = prepare_lifecycle_event(&target, &hash, &mut events, event, &derivation_inputs)?;
+    let prepared = prepare_lifecycle_event(&target, &hash, &stream, event, &derivation_inputs)?;
     let after = &prepared.status;
     let mut receipt = serde_json::json!({
         "closed": request.review_id,
@@ -1702,18 +1364,11 @@ pub fn evolution_close(
 fn authorize_evolution(
     target: &TargetContext,
     inputs: &DerivationInputs,
-) -> Result<(Vec<EvidenceEvent>, DirectoryHash, GateStatus), Error> {
+) -> Result<(ValidatedStream, DirectoryHash, GateStatus), Error> {
     let hash = hash_target_directory(&target.target_real)?;
-    let (events, integrity_errors) =
-        read_event_stream(&target.evidence_directory.join("events.jsonl"))?;
-    let mut status = derive_gate(
-        target,
-        &hash.content_hash,
-        &events,
-        integrity_errors,
-        inputs,
-    );
-    reanchor_authorized_coverage(&mut status, &events);
+    let stream = read_stream(&target.evidence_directory.join("events.jsonl"))?;
+    let mut status = gate::derive(&stream, target.labels(), &hash.content_hash, inputs.clock());
+    reanchor_authorized_coverage(&mut status, stream.events());
     write_gate_status(&target.evidence_directory, &status)?;
     if status.state == "blocked" {
         return Err(evolution_refusal(
@@ -1763,7 +1418,7 @@ fn authorize_evolution(
             status.instrument_limited_incident_ids.len(),
         ));
     }
-    Ok((events, hash, status))
+    Ok((stream, hash, status))
 }
 
 fn reanchor_authorized_coverage(status: &mut GateStatus, events: &[EvidenceEvent]) {
@@ -1815,16 +1470,15 @@ fn reanchor_authorized_coverage(status: &mut GateStatus, events: &[EvidenceEvent
         .collect();
 }
 
-fn read_valid_lifecycle_stream(target: &TargetContext) -> Result<Vec<EvidenceEvent>, Error> {
-    let (events, integrity_errors) =
-        read_event_stream(&target.evidence_directory.join("events.jsonl"))?;
-    if !integrity_errors.is_empty() {
+fn read_valid_lifecycle_stream(target: &TargetContext) -> Result<ValidatedStream, Error> {
+    let stream = read_stream(&target.evidence_directory.join("events.jsonl"))?;
+    if !stream.is_intact() {
         return Err(unsafe_failure(format!(
             "Event stream integrity failure — nothing done:\n  {}",
-            integrity_errors.join("\n  ")
+            stream.integrity_errors().join("\n  ")
         )));
     }
-    Ok(events)
+    Ok(stream)
 }
 
 fn find_review_start<'a>(
@@ -1846,13 +1500,13 @@ fn find_review_start<'a>(
 
 fn require_active_ownership(
     target: &TargetContext,
-    events: &[EvidenceEvent],
+    stream: &ValidatedStream,
     current_hash: &str,
     expected_id: &str,
     inputs: &DerivationInputs,
     label: &str,
 ) -> Result<GateStatus, Error> {
-    let status = derive_gate(target, current_hash, events, Vec::new(), inputs);
+    let status = gate::derive(stream, target.labels(), current_hash, inputs.clock());
     if status.active_review_id.as_deref() != Some(expected_id) {
         return Err(refusal(format!(
             "{label} {expected_id} does not own the target (active review: {}). Nothing done.",
@@ -2080,23 +1734,17 @@ struct PreparedLifecycleEvent {
 fn prepare_lifecycle_event(
     target: &TargetContext,
     current_hash: &str,
-    events: &mut Vec<EvidenceEvent>,
+    stream: &ValidatedStream,
     event: Value,
     inputs: &DerivationInputs,
 ) -> Result<PreparedLifecycleEvent, Error> {
-    let seen_ids = events
-        .iter()
-        .map(|existing| existing.event_id.clone())
-        .collect::<HashSet<_>>();
-    let validation_errors = validate_event(&event, &seen_ids);
-    if !validation_errors.is_empty() {
-        return Err(unsafe_failure(format!(
+    let extended = stream.accept_candidate(&event).map_err(|errors| {
+        unsafe_failure(format!(
             "Constructed event failed validation — nothing appended:\n  {}",
-            validation_errors.join("\n  ")
-        )));
-    }
-    events.push(EvidenceEvent::from_validated(&event));
-    let status = derive_gate(target, current_hash, events, Vec::new(), inputs);
+            errors.join("\n  ")
+        ))
+    })?;
+    let status = gate::derive(&extended, target.labels(), current_hash, inputs.clock());
     let projection_temporary = target.evidence_directory.join(".gate-status.json.tmp");
     prepare_gate_status(&projection_temporary, &status)?;
     Ok(PreparedLifecycleEvent {
@@ -2131,11 +1779,11 @@ fn append_prepared_lifecycle_event(
 fn append_lifecycle_event(
     target: &TargetContext,
     current_hash: &str,
-    events: &mut Vec<EvidenceEvent>,
+    stream: &ValidatedStream,
     event: Value,
     inputs: &DerivationInputs,
 ) -> Result<GateStatus, Error> {
-    let prepared = prepare_lifecycle_event(target, current_hash, events, event, inputs)?;
+    let prepared = prepare_lifecycle_event(target, current_hash, stream, event, inputs)?;
     let status = prepared.status.clone();
     append_prepared_lifecycle_event(target, &prepared)?;
     Ok(status)
@@ -2235,11 +1883,11 @@ pub fn record_use(
     let _lock = EvidenceLock::acquire(&target.evidence_directory, &inputs.lock_owner)?;
     let hash = hash_target_directory(&target.target_real)?;
     let events_path = target.evidence_directory.join("events.jsonl");
-    let (mut events, integrity_errors) = read_event_stream(&events_path)?;
-    if !integrity_errors.is_empty() {
+    let stream = read_stream(&events_path)?;
+    if !stream.is_intact() {
         return Err(unsafe_failure(format!(
             "Event stream integrity failure — nothing recorded:\n  {}",
-            integrity_errors.join("\n  ")
+            stream.integrity_errors().join("\n  ")
         )));
     }
 
@@ -2265,7 +1913,8 @@ pub fn record_use(
         )
     });
     let recorded_uses_on_this_hash = || {
-        events
+        stream
+            .events()
             .iter()
             .filter(|event| event.target_content_hash == hash.content_hash)
             .filter_map(|event| event.use_recorded().map(|recorded| (event, recorded)))
@@ -2370,31 +2019,23 @@ pub fn record_use(
             "same_run_group": same_run_group
         }
     });
-    let seen_ids = events
-        .iter()
-        .map(|existing| existing.event_id.clone())
-        .collect::<HashSet<_>>();
-    let validation_errors = validate_event(&event, &seen_ids);
-    if !validation_errors.is_empty() {
-        return Err(refusal(format!(
+    let recorded = stream.accept_candidate(&event).map_err(|errors| {
+        refusal(format!(
             "Constructed event is invalid: {}",
-            validation_errors.join("; ")
-        )));
-    }
-
-    events.push(EvidenceEvent::from_validated(&event));
+            errors.join("; ")
+        ))
+    })?;
     let derivation_inputs = DerivationInputs {
         generated_at: inputs.recorded_at.clone(),
         now_epoch_milliseconds: inputs.now_epoch_milliseconds,
         session_id: inputs.session_id.clone(),
         lock_owner: inputs.lock_owner.clone(),
     };
-    let status = derive_gate(
-        &target,
+    let status = gate::derive(
+        &recorded,
+        target.labels(),
         &hash.content_hash,
-        &events,
-        Vec::new(),
-        &derivation_inputs,
+        derivation_inputs.clock(),
     );
     let projection_temporary = target.evidence_directory.join(".gate-status.json.tmp");
     prepare_gate_status(&projection_temporary, &status)?;
@@ -2415,7 +2056,7 @@ pub fn record_use(
     let terminal_reply = build_reply(
         &inputs.event_id,
         &status,
-        some_run_holds_several_open_incidents(&events, &status.open_incident_ids),
+        some_run_holds_several_open_incidents(recorded.events(), &status.open_incident_ids),
     );
     Ok(RecordReceipt {
         schema: host.record_schema(),
@@ -2904,6 +2545,19 @@ struct TargetContext {
     evidence_directory: PathBuf,
 }
 
+impl TargetContext {
+    /// The two labels a projection copies from the target.
+    ///
+    /// Deriving needs no more of a target than this — not its canonical path, not
+    /// its evidence directory — so it is handed no more.
+    fn labels(&self) -> GateTarget<'_> {
+        GateTarget {
+            name: &self.target_name,
+            repo_relative_path: &self.repo_relative_path,
+        }
+    }
+}
+
 /// Resolves the target a lifecycle command names, refusing when it is the very
 /// package the running workflow is defined by.
 ///
@@ -2995,963 +2649,6 @@ fn hash_target_directory(target: &Path) -> Result<DirectoryHash, Error> {
         content_hash: format!("{:x}", hasher.finalize()),
         file_count: files.len(),
     })
-}
-
-fn read_event_stream(path: &Path) -> Result<(Vec<EvidenceEvent>, Vec<String>), Error> {
-    let bytes = match fs::read(path) {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Ok((Vec::new(), Vec::new()));
-        }
-        Err(error) => {
-            return Err(unsafe_failure(format!(
-                "Could not read event stream {}: {error}",
-                path.display()
-            )));
-        }
-    };
-    let text = match String::from_utf8(bytes) {
-        Ok(text) => text,
-        Err(_) => {
-            return Ok((
-                Vec::new(),
-                vec![format!(
-                    "event stream is not valid UTF-8: {}",
-                    path.display()
-                )],
-            ));
-        }
-    };
-    let mut events = Vec::new();
-    let mut errors = Vec::new();
-    let mut seen_ids = HashSet::new();
-    for (line_index, line) in text.lines().enumerate() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        match serde_json::from_str::<Value>(line) {
-            Ok(event) => {
-                let event_errors = validate_event(&event, &seen_ids);
-                if event_errors.is_empty() {
-                    if let Some(event_id) = non_empty_string(event.get("event_id")) {
-                        seen_ids.insert(event_id.to_owned());
-                    }
-                    events.push(EvidenceEvent::from_validated(&event));
-                } else {
-                    errors.extend(
-                        event_errors
-                            .into_iter()
-                            .map(|message| format!("line {}: {message}", line_index + 1)),
-                    );
-                }
-            }
-            Err(_) => errors.push(format!("line {}: not valid JSON", line_index + 1)),
-        }
-    }
-    Ok((events, errors))
-}
-
-fn is_valid_external_owner_entry(owner: &Value) -> bool {
-    owner.as_object().is_some_and(|entry| {
-        entry.len() == 3
-            && ["event_id", "kind", "reference"]
-                .iter()
-                .all(|field| entry.contains_key(*field))
-    }) && non_empty_string(owner.get("event_id")).is_some()
-        && non_empty_string(owner.get("kind"))
-            .is_some_and(|kind| EXTERNAL_OWNER_KINDS.contains(&kind))
-        && non_empty_string(owner.get("reference")).is_some()
-}
-
-fn is_valid_constraint_provenance_entry(citation: &Value) -> bool {
-    citation.as_object().is_some_and(|entry| {
-        ["constraint_label", "event_id", "field", "field_value"]
-            .iter()
-            .all(|field| entry.contains_key(*field))
-    }) && non_empty_string(citation.get("constraint_label")).is_some()
-        && non_empty_string(citation.get("event_id")).is_some()
-        && non_empty_string(citation.get("field"))
-            .is_some_and(|field| CONSTRAINT_PROVENANCE_FIELDS.contains(&field))
-        && non_empty_string(citation.get("field_value")).is_some()
-}
-
-fn validate_event(event: &Value, seen_ids: &HashSet<String>) -> Vec<String> {
-    let mut errors = Vec::new();
-    let Some(event) = event.as_object() else {
-        return vec!["event is not an object".to_owned()];
-    };
-    if event.get("schema_version").and_then(Value::as_u64) != Some(1) {
-        errors.push("schema_version must be 1".to_owned());
-    }
-    match non_empty_string(event.get("event_id")) {
-        None => errors.push("event_id missing".to_owned()),
-        Some(event_id) if seen_ids.contains(event_id) => {
-            errors.push(format!("duplicate event_id {event_id}"));
-        }
-        Some(_) => {}
-    }
-    let event_type_name = non_empty_string(event.get("event_type"));
-    let event_type = event_type_name.and_then(EventType::parse);
-    if event_type.is_none() {
-        errors.push(format!(
-            "unknown event_type {}",
-            event
-                .get("event_type")
-                .map_or_else(|| "null".to_owned(), Value::to_string)
-        ));
-    }
-    let timestamp_valid = non_empty_string(event.get("recorded_at"))
-        .is_some_and(|timestamp| OffsetDateTime::parse(timestamp, &Rfc3339).is_ok());
-    if !timestamp_valid {
-        errors.push("recorded_at is not a parseable timestamp".to_owned());
-    }
-    if non_empty_string(event.get("operator_workflow")).is_none() {
-        errors.push("operator_workflow missing".to_owned());
-    }
-    match event.get("target").and_then(Value::as_object) {
-        None => errors.push("target missing".to_owned()),
-        Some(target) => {
-            for key in ["name", "repo_relative_path", "content_hash", "repo_head"] {
-                if non_empty_string(target.get(key)).is_none() {
-                    errors.push(format!("target.{key} missing"));
-                }
-            }
-        }
-    }
-    if non_empty_string(event.get("top_level_session_id")).is_none() {
-        errors.push("top_level_session_id missing".to_owned());
-    }
-    let Some(payload) = event.get("payload").and_then(Value::as_object) else {
-        errors.push("payload missing".to_owned());
-        return errors;
-    };
-    if matches!(
-        event_type,
-        Some(
-            EventType::ReviewStarted
-                | EventType::ValidationCompleted
-                | EventType::ChangeLanded
-                | EventType::ReviewDisposition
-        )
-    ) && payload
-        .get("operating_skill_hash")
-        .is_some_and(|value| non_empty_string(Some(value)).is_none())
-    {
-        errors.push("operating_skill_hash must be a non-empty string when present".to_owned());
-    }
-    if matches!(
-        event_type,
-        Some(
-            EventType::ReviewStarted
-                | EventType::ValidationCompleted
-                | EventType::ChangeLanded
-                | EventType::ReviewDisposition
-        )
-    ) && payload
-        .get("operating_package_matches_shipped")
-        .is_some_and(|value| !value.is_boolean())
-    {
-        errors.push("operating_package_matches_shipped must be boolean when present".to_owned());
-    }
-
-    if event_type == Some(EventType::UseRecorded) {
-        let missing = USE_PAYLOAD_KEYS
-            .iter()
-            .copied()
-            .filter(|key| !payload.contains_key(*key))
-            .collect::<Vec<_>>();
-        let unknown = payload
-            .keys()
-            .filter(|key| {
-                !USE_PAYLOAD_KEYS.contains(&key.as_str())
-                    && !USE_PAYLOAD_OPTIONAL_KEYS.contains(&key.as_str())
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        if !missing.is_empty() || !unknown.is_empty() {
-            let mut message = format!(
-                "use_recorded payload keys must be [{}] plus any of [{}]",
-                USE_PAYLOAD_KEYS.join(", "),
-                USE_PAYLOAD_OPTIONAL_KEYS.join(", ")
-            );
-            if !missing.is_empty() {
-                message.push_str(&format!("; missing: {}", missing.join(", ")));
-            }
-            if !unknown.is_empty() {
-                message.push_str(&format!("; unknown: {}", unknown.join(", ")));
-            }
-            errors.push(message);
-            return errors;
-        }
-        if payload.get("qualifying_use").and_then(Value::as_bool) != Some(true) {
-            errors.push("qualifying_use must be true".to_owned());
-        }
-        if payload
-            .get("retrospective")
-            .and_then(Value::as_bool)
-            .is_none()
-        {
-            errors.push("retrospective must be boolean".to_owned());
-        }
-        for key in ["task_label", "task_fingerprint", "same_run_group"] {
-            if non_empty_string(payload.get(key)).is_none() {
-                errors.push(format!("{key} missing"));
-            }
-        }
-        let outcome = non_empty_string(payload.get("outcome")).and_then(Outcome::parse);
-        if outcome.is_none() {
-            errors.push(format!("outcome must be one of {}", Outcome::ALLOWED));
-        }
-        let evidence_refs = payload.get("evidence_refs").and_then(Value::as_array);
-        if evidence_refs.is_none_or(|references| {
-            references
-                .iter()
-                .any(|reference| non_empty_string(Some(reference)).is_none())
-        }) {
-            errors.push("evidence_refs must be an array of non-empty strings".to_owned());
-        } else if payload.get("retrospective").and_then(Value::as_bool) == Some(true)
-            && evidence_refs.is_some_and(Vec::is_empty)
-        {
-            errors.push("retrospective events require at least one evidence_ref".to_owned());
-        }
-        if outcome == Some(Outcome::Clean) {
-            for key in [
-                "symptom_key",
-                "expected",
-                "observed",
-                "consequence",
-                "workaround_taken",
-            ] {
-                if payload.get(key).is_some_and(|value| !value.is_null()) {
-                    errors.push(format!("{key} must be null for a clean outcome"));
-                }
-            }
-            if payload
-                .get("run_condition")
-                .is_some_and(|value| !value.is_null())
-            {
-                errors.push("run_condition must be null for a clean outcome".to_owned());
-            }
-        } else {
-            if non_empty_string(payload.get("symptom_key"))
-                .is_none_or(|key| !SYMPTOM_KEYS.contains(&key))
-            {
-                errors.push(format!(
-                    "symptom_key must be one of {}",
-                    SYMPTOM_KEYS.join("|")
-                ));
-            }
-            for key in ["expected", "observed", "consequence"] {
-                if non_empty_string(payload.get(key)).is_none() {
-                    errors.push(format!("{key} required for a non-clean outcome"));
-                }
-            }
-            for key in ["workaround_taken", "run_condition"] {
-                if payload.get(key).is_some_and(|value| {
-                    !value.is_null() && non_empty_string(Some(value)).is_none()
-                }) {
-                    errors.push(format!("{key} must be null or a non-empty string"));
-                }
-            }
-        }
-    } else if event_type == Some(EventType::ReviewStarted) {
-        if non_empty_string(payload.get("review_id")).is_none() {
-            errors.push("review_id missing".to_owned());
-        }
-    } else if event_type == Some(EventType::ReviewDisposition) {
-        if non_empty_string(payload.get("review_id")).is_none() {
-            errors.push("review_id missing".to_owned());
-        }
-        if non_empty_string(payload.get("disposition"))
-            .is_none_or(|disposition| !DISPOSITIONS.contains(&disposition))
-        {
-            errors.push(format!(
-                "disposition must be one of {}",
-                DISPOSITIONS.join("|")
-            ));
-        }
-        if payload
-            .get("adjudicated_event_ids")
-            .and_then(Value::as_array)
-            .is_none_or(|identities| {
-                identities.is_empty()
-                    || identities
-                        .iter()
-                        .any(|identity| non_empty_string(Some(identity)).is_none())
-            })
-        {
-            errors.push("adjudicated_event_ids must be a non-empty array of event ids".to_owned());
-        }
-        // Absent means the close concluded about everything it covered. A shape the reader
-        // cannot trust must not collapse into that claim, so it is an integrity error
-        // rather than a narrowing silently read as empty.
-        if payload
-            .get("instrument_limited_event_ids")
-            .is_some_and(|value| {
-                value.as_array().is_none_or(|identities| {
-                    identities.is_empty()
-                        || identities
-                            .iter()
-                            .any(|identity| non_empty_string(Some(identity)).is_none())
-                })
-            })
-        {
-            errors.push(
-                "instrument_limited_event_ids must be a non-empty array of event ids when present"
-                    .to_owned(),
-            );
-        }
-        if payload.get("constraint_provenance").is_some_and(|value| {
-            value.as_array().is_none_or(|citations| {
-                citations.is_empty()
-                    || citations
-                        .iter()
-                        .any(|citation| !is_valid_constraint_provenance_entry(citation))
-            })
-        }) {
-            errors.push(format!(
-                "constraint_provenance must be a non-empty array of citations containing non-empty constraint_label, event_id, field ({}), and field_value when present",
-                CONSTRAINT_PROVENANCE_FIELDS.join("|")
-            ));
-        }
-        if payload.get("external_owners").is_some_and(|value| {
-            value.as_array().is_none_or(|owners| {
-                owners.is_empty()
-                    || owners
-                        .iter()
-                        .any(|owner| !is_valid_external_owner_entry(owner))
-            })
-        }) {
-            errors.push(format!(
-                "external_owners must be a non-empty array of objects containing exactly event_id, kind ({}), and reference when present",
-                EXTERNAL_OWNER_KINDS.join("|")
-            ));
-        }
-        if let Some(owners) = payload.get("external_owners").and_then(Value::as_array)
-            && !owners.is_empty()
-            && owners.iter().all(is_valid_external_owner_entry)
-        {
-            let coverage = payload
-                .get("adjudicated_event_ids")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-                .collect::<Vec<_>>();
-            let undecidable = payload
-                .get("instrument_limited_event_ids")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-                .collect::<HashSet<_>>();
-            let concluded = coverage
-                .iter()
-                .copied()
-                .filter(|identity| !undecidable.contains(identity))
-                .collect::<HashSet<_>>();
-            let owner_ids = owners
-                .iter()
-                .filter_map(|owner| owner["event_id"].as_str())
-                .collect::<Vec<_>>();
-            let owner_id_set = owner_ids.iter().copied().collect::<HashSet<_>>();
-            if payload.get("disposition").and_then(Value::as_str) != Some("outside_target")
-                || owner_ids.len() != owner_id_set.len()
-                || owner_id_set != concluded
-            {
-                errors.push(
-                    "external_owners, when present, must name each concluded coverage event exactly once on an outside_target disposition"
-                        .to_owned(),
-                );
-            }
-        }
-        if payload
-            .get("trial_count")
-            .is_some_and(|value| value.as_u64().is_none_or(|count| count == 0))
-        {
-            errors.push("trial_count must be a positive integer when present".to_owned());
-        }
-        if payload
-            .get("artifacts_path")
-            .is_some_and(|value| non_empty_string(Some(value)).is_none())
-        {
-            errors.push("artifacts_path must be a non-empty string when present".to_owned());
-        }
-    } else if non_empty_string(payload.get("review_id")).is_none() {
-        errors.push(format!(
-            "{} payload requires review_id",
-            event_type_name.unwrap_or("unknown")
-        ));
-    }
-    errors
-}
-
-fn non_empty_string(value: Option<&Value>) -> Option<&str> {
-    value
-        .and_then(Value::as_str)
-        .filter(|value| !value.is_empty())
-}
-
-fn derive_gate(
-    target: &TargetContext,
-    current_hash: &str,
-    events: &[EvidenceEvent],
-    integrity_errors: Vec<String>,
-    inputs: &DerivationInputs,
-) -> GateStatus {
-    let mut status = GateStatus {
-        schema_version: 1,
-        generated_at: inputs.generated_at.clone(),
-        target_content_hash: current_hash.to_owned(),
-        qualifying_uses_on_current_hash: 0,
-        open_incident_ids: Vec::new(),
-        candidate_clusters: Vec::new(),
-        state: "closed".to_owned(),
-        authorized_workflow: None,
-        authorization_reason: None,
-        trigger_event_ids: Vec::new(),
-        threshold_session_id: None,
-        not_before: None,
-        active_review_id: None,
-        last_completed_review_id: None,
-        review_reentry_basis: None,
-        target_name: target.target_name.clone(),
-        target_repo_relative_path: target.repo_relative_path.clone(),
-        derivation_session_id: (inputs.session_id != "unavailable")
-            .then(|| inputs.session_id.clone()),
-        instrument_limited_incident_ids: Vec::new(),
-        integrity_errors,
-    };
-    if !status.integrity_errors.is_empty() {
-        status.state = "blocked".to_owned();
-        return status;
-    }
-    // The coverage list records what a close accounted for; the conclusion set is that
-    // list minus the events the close named as untestable. A close that recorded reaching
-    // no conclusion about an event never adjudicated it, whatever the target hash has done
-    // since, so this subtraction is unconditional exactly like the union it narrows.
-    // Whether such an event also leaves the gate is a separate question, answered below
-    // under ADR 0002's same-hash rule.
-    let mut adjudicated = HashSet::new();
-    for event in events {
-        let EventKind::ReviewDisposition {
-            disposition,
-            adjudicated_event_ids,
-            instrument_limited_event_ids,
-            ..
-        } = &event.kind
-        else {
-            continue;
-        };
-        if !EVOLUTION_ADJUDICATING_DISPOSITIONS.contains(&disposition.as_str()) {
-            continue;
-        }
-        for identity in adjudicated_event_ids {
-            if !instrument_limited_event_ids.contains(identity) {
-                adjudicated.insert(identity.as_str());
-            }
-        }
-    }
-    let recorded_symptoms = events
-        .iter()
-        .filter_map(|event| {
-            let symptom = event.use_recorded()?.symptom_key.as_deref()?;
-            Some((event.event_id.as_str(), symptom))
-        })
-        .collect::<HashMap<_, _>>();
-    let review_starts = events
-        .iter()
-        .filter(|event| event.is_review_start())
-        .map(|event| (event.review_id().expect("review start identity"), event))
-        .collect::<Vec<_>>();
-    // The watermark and the retirement scan both key on this, and they have to agree: a
-    // close that lays a watermark is exactly a close whose findings are about the target
-    // as it stands now.
-    let ran_on_current_hash = |review_id: &str| {
-        review_starts.iter().any(|(started_id, start)| {
-            *started_id == review_id && start.target_content_hash == current_hash
-        })
-    };
-    let mut last_same_hash_disposition_index = None;
-    let mut last_same_hash_close_was_instrument_limited = false;
-    for (index, event) in events.iter().enumerate() {
-        let EventKind::ReviewDisposition { disposition, .. } = &event.kind else {
-            continue;
-        };
-        let review_id = event.review_id().expect("review disposition identity");
-        if ran_on_current_hash(review_id) {
-            last_same_hash_disposition_index = Some(index);
-            last_same_hash_close_was_instrument_limited =
-                EVOLUTION_INSTRUMENT_LIMITED_DISPOSITIONS.contains(&disposition.as_str());
-        }
-    }
-    // What an instrument-limited close retires, and how far.
-    //
-    // Current claims freeze coverage at the claim. Historical claims retain the coverage
-    // they recorded; neither shape is reinterpreted. Retirement re-evaluates the review's
-    // own authorization reason at the close: for current claims it can reach reason-scoped
-    // incidents that arrived between claim and close, but not incidents that could never
-    // have contributed to that authorization.
-    //
-    // Restricted to closes whose review ran against the current hash. A finding about what
-    // this instrument cannot test says nothing about a target that has since changed.
-    let instrument_limited_closes = events
-        .iter()
-        .enumerate()
-        .filter_map(|(index, event)| {
-            let EventKind::ReviewDisposition {
-                disposition,
-                adjudicated_event_ids,
-                ..
-            } = &event.kind
-            else {
-                return None;
-            };
-            if !EVOLUTION_INSTRUMENT_LIMITED_DISPOSITIONS.contains(&disposition.as_str()) {
-                return None;
-            }
-            if !ran_on_current_hash(event.review_id().expect("review disposition identity")) {
-                return None;
-            }
-            let covered = adjudicated_event_ids
-                .iter()
-                .map(String::as_str)
-                .collect::<HashSet<_>>();
-            let symptoms = covered
-                .iter()
-                .filter_map(|identity| recorded_symptoms.get(identity).copied())
-                .collect::<HashSet<_>>();
-            let authorizing_reason = review_starts
-                .iter()
-                .find(|(started_id, _)| {
-                    *started_id == event.review_id().expect("review disposition identity")
-                })
-                .and_then(|(_, start)| {
-                    start
-                        .raw
-                        .pointer("/payload/authorizing_rule")
-                        .and_then(Value::as_str)
-                })
-                .and_then(ThresholdReason::parse);
-            Some((index, covered, symptoms, authorizing_reason))
-        })
-        .collect::<Vec<_>>();
-    // Coverage an adjudicating close named as untestable leaves the gate on the same
-    // warrant ADR 0002 gives an instrument-limited close: the review established that it could
-    // not decide them, so they stop clustering while staying open in the ledger.
-    //
-    // This reach never widens past the names. A close that examined its coverage list
-    // mechanism by mechanism said exactly which mechanisms it could not decide, so there is
-    // nothing left for a symptom-wide or reason-scoped rule to infer — and inferring one
-    // would retire evidence the review did not examine, which is what #16 narrowed away
-    // from. The names may rest on either limit: no trial could express the mechanism, or
-    // the acceptance gate grades outcome while the evidence bears no outcome claim.
-    //
-    // Same-hash only, for ADR 0002's reason: what this review could not decide about these
-    // bytes says nothing about a target that has since changed.
-    let named_untestable_coverage = events
-        .iter()
-        .filter_map(|event| {
-            let EventKind::ReviewDisposition {
-                disposition,
-                adjudicated_event_ids,
-                instrument_limited_event_ids,
-                ..
-            } = &event.kind
-            else {
-                return None;
-            };
-            if !EVOLUTION_ADJUDICATING_DISPOSITIONS.contains(&disposition.as_str()) {
-                return None;
-            }
-            if !ran_on_current_hash(event.review_id().expect("review disposition identity")) {
-                return None;
-            }
-            // Naming is a narrowing of the coverage list, so a name outside that list
-            // establishes nothing. The close refuses to write one; honouring it on read
-            // would let a hand-edited stream retire an incident no review accounted for.
-            Some(
-                instrument_limited_event_ids
-                    .iter()
-                    .filter(|identity| adjudicated_event_ids.contains(identity))
-                    .map(String::as_str),
-            )
-        })
-        .flatten()
-        .collect::<HashSet<_>>();
-    let started = events
-        .iter()
-        .filter(|event| event.starts_ownership())
-        .collect::<Vec<_>>();
-    let terminated = events
-        .iter()
-        .filter(|event| event.terminates_ownership())
-        .filter_map(|event| event.review_id())
-        .collect::<HashSet<_>>();
-    let active_starts = started
-        .iter()
-        .filter(|event| {
-            event
-                .review_id()
-                .is_some_and(|review_id| !terminated.contains(review_id))
-        })
-        .copied()
-        .collect::<Vec<_>>();
-    let completed_starts = started
-        .iter()
-        .filter(|event| {
-            event
-                .review_id()
-                .is_some_and(|review_id| terminated.contains(review_id))
-        })
-        .copied()
-        .collect::<Vec<_>>();
-    status.active_review_id = active_starts
-        .last()
-        .and_then(|event| event.review_id())
-        .map(str::to_owned);
-    status.last_completed_review_id = completed_starts
-        .last()
-        .and_then(|event| event.review_id())
-        .map(str::to_owned);
-    let event_positions = events
-        .iter()
-        .enumerate()
-        .map(|(index, event)| (event.event_id.as_str(), index))
-        .collect::<HashMap<_, _>>();
-    let mut cluster_events = Vec::<(String, Vec<&EvidenceEvent>)>::new();
-    let mut fired = None;
-    let mut queued_pre_close_evidence = false;
-    // The denominator counts runs, not records. One run can record several incidents —
-    // distinct deviations, each with its own identity so a close can name exactly the one
-    // its instrument could not test — and they share the run group that says they are one
-    // use. Counting records instead would let an honestly recorded run advance
-    // `ten_use_unresolved` faster than a compressed one, which is recording manufacturing
-    // its own authorization.
-    //
-    // Counted as the loop walks, so the running total the threshold below reads is the
-    // number of runs seen so far. Where a hash carries one record per run group this counts
-    // exactly what counting records counted, at every point in the walk and not only at the
-    // end — so no such stream re-derives to a different denominator than it already reports.
-    //
-    // Two separate grounds say existing streams are that shape, and only the first is
-    // structural. Every record written before this change met a write path that refused any
-    // repeat of a derived run group — the declared further incident that may now repeat one
-    // did not exist to be written. That argument does not reach a legacy group, whose check
-    // is scoped to one session, so a pre-session-scoped stream was never excluded by
-    // construction. Measured instead — 1251 use records across the three consumer
-    // repositories and this one, every `(hash, run group)` pair distinct.
-    let mut counted_run_groups = HashSet::new();
-    for (event_index, event) in events.iter().enumerate() {
-        let Some(recorded) = event.use_recorded() else {
-            continue;
-        };
-        if event.target_content_hash != current_hash {
-            continue;
-        }
-        if counted_run_groups.insert(recorded.same_run_group.as_str()) {
-            status.qualifying_uses_on_current_hash += 1;
-        }
-        let open_incident =
-            recorded.outcome != Outcome::Clean && !adjudicated.contains(event.event_id.as_str());
-        // A contemporaneous severe incident authorizes on its own below, from
-        // `open_incident` alone, so it was never deferred and this exit has no trap to
-        // release for it. Listing one here would have the projection report that it
-        // stopped driving the gate while it demonstrably still does.
-        //
-        // A *retrospective* severe incident is a different animal despite the same
-        // outcome: the loop skips it before that trigger, so it authorizes nothing and
-        // only counts toward a cluster. Carving it out would protect nothing and leave it
-        // discounting every later review of the symptom — so the carve-out keys on the
-        // property that justifies it, not on severity alone.
-        let authorizes_on_its_own =
-            recorded.outcome == Outcome::SevereIncident && !recorded.retrospective;
-        let instrument_limited_incident = open_incident
-            && !authorizes_on_its_own
-            && (named_untestable_coverage.contains(event.event_id.as_str())
-                || instrument_limited_closes.iter().any(
-                    |(close, covered, symptoms, authorizing_reason)| {
-                        covered.contains(event.event_id.as_str())
-                            || (event_index < *close
-                                && authorization_reason_names_incident(
-                                    authorizing_reason.as_ref(),
-                                    symptoms,
-                                    recorded,
-                                ))
-                    },
-                ));
-        if open_incident {
-            status.open_incident_ids.push(event.event_id.clone());
-        }
-        if instrument_limited_incident {
-            status
-                .instrument_limited_incident_ids
-                .push(event.event_id.clone());
-        }
-        let symptom = if open_incident && !instrument_limited_incident {
-            let symptom = recorded
-                .symptom_key
-                .as_deref()
-                .expect("validated symptom key")
-                .to_owned();
-            if !cluster_events.iter().any(|(key, _)| key == &symptom) {
-                cluster_events.push((symptom.clone(), Vec::new()));
-                status.candidate_clusters.push(CandidateCluster {
-                    symptom_key: symptom.clone(),
-                    open_event_ids: Vec::new(),
-                    independent_incidents: 0,
-                    max_severity: "friction".to_owned(),
-                });
-            }
-            let events_for_cluster = &mut cluster_events
-                .iter_mut()
-                .find(|(key, _)| key == &symptom)
-                .expect("cluster event list was inserted")
-                .1;
-            events_for_cluster.push(event);
-            let cluster = status
-                .candidate_clusters
-                .iter_mut()
-                .find(|cluster| cluster.symptom_key == symptom)
-                .expect("cluster was inserted");
-            cluster.open_event_ids.push(event.event_id.clone());
-            cluster.independent_incidents = independent_count(events_for_cluster);
-            if recorded.outcome.severity()
-                > Outcome::parse(&cluster.max_severity)
-                    .expect("candidate severity")
-                    .severity()
-            {
-                cluster.max_severity = recorded.outcome.as_str().to_owned();
-            }
-            Some(symptom)
-        } else {
-            None
-        };
-
-        if fired.is_some() || recorded.retrospective {
-            continue;
-        }
-        if open_incident && recorded.outcome == Outcome::SevereIncident {
-            fired = Some(threshold_trigger(
-                ThresholdReason::Severe,
-                &[event],
-                event,
-                event_index,
-            ));
-            continue;
-        }
-
-        let mut candidate = None;
-        if let Some(symptom) = symptom.as_deref() {
-            let events_for_cluster = &cluster_events
-                .iter()
-                .find(|(key, _)| key == symptom)
-                .expect("open incident cluster exists")
-                .1;
-            let material = events_for_cluster
-                .iter()
-                .copied()
-                .filter(|event| {
-                    event
-                        .use_recorded()
-                        .expect("cluster contains use records")
-                        .outcome
-                        .severity()
-                        >= Outcome::MaterialFailure.severity()
-                })
-                .collect::<Vec<_>>();
-            if recorded.outcome.severity() >= Outcome::MaterialFailure.severity()
-                && independent_count(&material) >= 2
-            {
-                candidate = Some(threshold_trigger(
-                    ThresholdReason::MaterialRecurrence(symptom.to_owned()),
-                    &material,
-                    event,
-                    event_index,
-                ));
-            } else if independent_count(events_for_cluster) >= 3 {
-                candidate = Some(threshold_trigger(
-                    ThresholdReason::FrictionRecurrence(symptom.to_owned()),
-                    events_for_cluster,
-                    event,
-                    event_index,
-                ));
-            }
-        }
-        let open_contemporaneous = cluster_events
-            .iter()
-            .flat_map(|(_, cluster)| cluster.iter().copied())
-            .filter(|incident| {
-                incident
-                    .use_recorded()
-                    .is_some_and(|recorded| !recorded.retrospective)
-            })
-            .collect::<Vec<_>>();
-        if candidate.is_none()
-            && status.qualifying_uses_on_current_hash >= 10
-            && !open_contemporaneous.is_empty()
-        {
-            let anchor = last_same_hash_disposition_index
-                .and_then(|watermark| {
-                    open_contemporaneous.iter().copied().find(|incident| {
-                        event_positions
-                            .get(incident.event_id.as_str())
-                            .is_some_and(|index| *index > watermark)
-                    })
-                })
-                .unwrap_or(open_contemporaneous[0]);
-            let symptom = anchor
-                .use_recorded()
-                .and_then(|recorded| recorded.symptom_key.as_deref())
-                .expect("validated symptom key");
-            let triggers = cluster_events
-                .iter()
-                .find(|(key, _)| key == symptom)
-                .expect("anchor cluster exists")
-                .1
-                .iter()
-                .filter(|event| {
-                    event
-                        .use_recorded()
-                        .is_some_and(|recorded| !recorded.retrospective)
-                })
-                .copied()
-                .collect::<Vec<_>>();
-            candidate = Some(threshold_trigger(
-                ThresholdReason::TenUseUnresolved,
-                &triggers,
-                event,
-                event_index,
-            ));
-        }
-        if let Some(candidate) = candidate {
-            if let Some(watermark) = last_same_hash_disposition_index {
-                let has_post_review_incident = open_contemporaneous.iter().any(|incident| {
-                    event_positions
-                        .get(incident.event_id.as_str())
-                        .is_some_and(|index| *index > watermark)
-                });
-                if event_index > watermark && has_post_review_incident {
-                    fired = Some(candidate);
-                } else {
-                    queued_pre_close_evidence = true;
-                }
-            } else {
-                fired = Some(candidate);
-            }
-        }
-    }
-    if status.active_review_id.is_some() {
-        status.state = "review_in_progress".to_owned();
-    } else if let Some(trigger) = fired {
-        let severe = trigger.reason.is_severe();
-        status.authorized_workflow = Some("skill-evolution".to_owned());
-        status.authorization_reason = Some(trigger.reason.as_string());
-        status.trigger_event_ids = trigger.trigger_event_ids;
-        status.review_reentry_basis = Some(
-            if last_same_hash_disposition_index.is_none() {
-                "first_eligibility"
-            } else if severe
-                && last_same_hash_disposition_index.is_some_and(|index| trigger.event_index < index)
-            {
-                "unadjudicated_severe"
-            } else {
-                "post_review_incident"
-            }
-            .to_owned(),
-        );
-        status.threshold_session_id = trigger.threshold_session_id.clone();
-        let cooldown_passed = if let Some(threshold_session_id) = trigger.threshold_session_id {
-            inputs.session_id != "unavailable" && inputs.session_id != threshold_session_id
-        } else {
-            let fired_at = OffsetDateTime::parse(&trigger.fired_at, &Rfc3339)
-                .expect("validated event timestamp parses");
-            let not_before_milliseconds =
-                i64::try_from(fired_at.unix_timestamp_nanos() / 1_000_000)
-                    .expect("event timestamp milliseconds fit in i64")
-                    + 12 * 60 * 60 * 1_000;
-            status.not_before = Some(format_timestamp_milliseconds(not_before_milliseconds));
-            inputs.now_epoch_milliseconds >= not_before_milliseconds
-        };
-        status.state = cooldown_state(severe, cooldown_passed).to_owned();
-    } else if !status.open_incident_ids.is_empty() {
-        status.state = "collecting".to_owned();
-    }
-    if queued_pre_close_evidence && status.state == "collecting" {
-        // Evidence the last same-hash review never covered is deferred behind it either
-        // way. What differs is what that deferral means: a review that adjudicated
-        // accounted for the evidence it saw, while an instrument-limited close accounted
-        // for nothing. Keyed on instrument-limited rather than on non-adjudicating in
-        // general, because `superseded_by_target_version` also reaches no conclusion and
-        // its reporting is deliberately left alone — see ADR 0002.
-        status.review_reentry_basis = Some(
-            if last_same_hash_close_was_instrument_limited {
-                "queued_behind_instrument_limited_review"
-            } else {
-                "queued_pre_close_evidence"
-            }
-            .to_owned(),
-        );
-    }
-    status
-}
-
-fn threshold_trigger(
-    reason: ThresholdReason,
-    trigger_events: &[&EvidenceEvent],
-    threshold_event: &EvidenceEvent,
-    event_index: usize,
-) -> ThresholdTrigger {
-    ThresholdTrigger {
-        reason,
-        trigger_event_ids: trigger_events
-            .iter()
-            .map(|event| event.event_id.clone())
-            .collect(),
-        threshold_session_id: (threshold_event.top_level_session_id != "unavailable")
-            .then(|| threshold_event.top_level_session_id.clone()),
-        fired_at: threshold_event.recorded_at.clone(),
-        event_index,
-    }
-}
-
-fn cooldown_state(severe: bool, cooldown_passed: bool) -> &'static str {
-    match (severe, cooldown_passed) {
-        (true, true) => "quarantined_eligible",
-        (true, false) => "quarantined_pending_cooldown",
-        (false, true) => "eligible",
-        (false, false) => "eligible_pending_cooldown",
-    }
-}
-
-fn format_timestamp_milliseconds(epoch_milliseconds: i64) -> String {
-    let timestamp =
-        OffsetDateTime::from_unix_timestamp_nanos(i128::from(epoch_milliseconds) * 1_000_000)
-            .expect("supported evidence timestamps fit OffsetDateTime");
-    let format = time::format_description::parse_borrowed::<3>(
-        "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z",
-    )
-    .expect("static timestamp format is valid");
-    timestamp
-        .format(&format)
-        .expect("UTC timestamp always formats")
-}
-
-fn independent_count(events: &[&EvidenceEvent]) -> usize {
-    events
-        .iter()
-        .map(|event| {
-            (
-                event.top_level_session_id.as_str(),
-                event
-                    .use_recorded()
-                    .expect("incident cluster contains use records")
-                    .task_fingerprint
-                    .as_str(),
-            )
-        })
-        .collect::<HashSet<_>>()
-        .len()
 }
 
 fn write_gate_status(directory: &Path, status: &GateStatus) -> Result<(), Error> {

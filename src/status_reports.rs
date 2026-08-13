@@ -13,10 +13,11 @@ use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 use crate::assets;
 
+use crate::gate::{self, EvidenceEvent, GateClock, Outcome, format_timestamp_milliseconds};
+
 use super::{
-    CandidateCluster, DerivationInputs, Error, EvidenceEvent, Host, Outcome, SESSION_UNAVAILABLE,
-    derive_gate, format_timestamp_milliseconds, hash_target_directory,
-    parse_method_gap_family_selector, read_event_stream, refusal, target_context, unsafe_failure,
+    CandidateCluster, Error, Host, SESSION_UNAVAILABLE, hash_target_directory,
+    parse_method_gap_family_selector, read_stream, refusal, target_context, unsafe_failure,
 };
 
 const MAX_LINEAGE_BYTES: u64 = 2 * 1024 * 1024;
@@ -187,30 +188,26 @@ pub fn method_gap_research_inventory(
                     .to_string_lossy()
                     .replace(std::path::MAIN_SEPARATOR, "/")
             });
-            let (events, stream_errors) =
-                read_event_stream(&target.evidence_directory.join("events.jsonl"))?;
-            let mut integrity_errors = stream_errors;
-            match validated_event_target_path(&events) {
+            let mut stream = read_stream(&target.evidence_directory.join("events.jsonl"))?;
+            match validated_event_target_path(stream.events()) {
                 Ok(Some(event_path)) if event_path != target_path => {
-                    integrity_errors.push(format!(
+                    stream = stream.with_integrity_error(format!(
                         "evidence target path {event_path} does not match canonical target {target_path}"
                     ));
                 }
                 Ok(_) => {}
-                Err(error) => integrity_errors.push(error),
+                Err(error) => stream = stream.with_integrity_error(error),
             }
-            let inputs = DerivationInputs {
-                generated_at: generated_at.clone(),
-                now_epoch_milliseconds,
-                session_id: SESSION_UNAVAILABLE.to_owned(),
-                lock_owner: "read-only-method-gap-status".to_owned(),
-            };
-            let gate = derive_gate(
-                &target,
+            let integrity_errors = stream.integrity_errors().to_vec();
+            let gate = gate::derive(
+                &stream,
+                target.labels(),
                 &hash.content_hash,
-                &events,
-                integrity_errors.clone(),
-                &inputs,
+                GateClock {
+                    generated_at: &generated_at,
+                    now_epoch_milliseconds,
+                    session_id: SESSION_UNAVAILABLE,
+                },
             );
             Ok(MethodGapTargetInventory {
                 target_name,
@@ -220,7 +217,7 @@ pub fn method_gap_research_inventory(
                 evidence_store,
                 evidence_integrity_errors: integrity_errors,
                 current_evidence: summarize_current_evidence(
-                    &events,
+                    stream.events(),
                     &gate.target_content_hash,
                     &gate.open_incident_ids,
                 ),
@@ -298,11 +295,10 @@ pub fn skill_evolution_status(
     };
     stores.sort();
     let stores_scanned = stores.len();
-    let inputs = DerivationInputs {
-        generated_at,
+    let clock = GateClock {
+        generated_at: &generated_at,
         now_epoch_milliseconds,
-        session_id: session_id.to_owned(),
-        lock_owner: "read-only-evolution-status".to_owned(),
+        session_id,
     };
     let mut ready = Vec::new();
     let mut deferred = Vec::new();
@@ -318,7 +314,7 @@ pub fn skill_evolution_status(
             .to_owned();
         let events_path = store.join("events.jsonl");
         let has_event_stream = events_path.is_file();
-        let (events, errors) = match read_event_stream(&events_path) {
+        let stream = match read_stream(&events_path) {
             Ok(stream) => stream,
             Err(error) => {
                 indeterminate.push(EvolutionIndeterminateEntry {
@@ -330,8 +326,10 @@ pub fn skill_evolution_status(
                 continue;
             }
         };
+        let errors = stream.integrity_errors().to_vec();
         let (projection, projection_error) = read_gate_projection(&store.join("gate-status.json"));
-        let (event_target_path, identity_error) = match validated_event_target_path(&events) {
+        let (event_target_path, identity_error) = match validated_event_target_path(stream.events())
+        {
             Ok(path) => (path, None),
             Err(error) => (None, Some(error)),
         };
@@ -427,22 +425,20 @@ pub fn skill_evolution_status(
                 continue;
             }
         };
-        let status = derive_gate(&target, &hash.content_hash, &events, errors, &inputs);
+        let status = gate::derive(&stream, target.labels(), &hash.content_hash, clock);
         if status.state == "review_in_progress" {
-            let started = events.iter().rev().find(|event| {
+            let started = stream.events().iter().rev().find(|event| {
                 event.starts_ownership() && event.review_id() == status.active_review_id.as_deref()
             });
-            let without_active_start = events
-                .iter()
-                .filter(|event| started.is_none_or(|started| event.event_id != started.event_id))
-                .cloned()
-                .collect::<Vec<_>>();
-            let underlying = derive_gate(
-                &target,
-                &hash.content_hash,
+            let without_active_start = started.map_or_else(
+                || stream.clone(),
+                |started| stream.without_event(&started.event_id),
+            );
+            let underlying = gate::derive(
                 &without_active_start,
-                Vec::new(),
-                &inputs,
+                target.labels(),
+                &hash.content_hash,
+                clock,
             );
             if started.is_some_and(|event| !event.is_review_start())
                 && underlying.authorization_reason.is_none()

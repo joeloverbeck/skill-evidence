@@ -82,6 +82,18 @@ One target's accumulated evidence — its append-only event stream plus the proj
 it — living at `reports/skill-evidence/<skill-key>/` in a consumer's repository.
 _Avoid_: log directory, evidence folder, database
 
+**Validated event stream**:
+One target's recorded events as the reader admitted them, together with the integrity errors it
+found. Deriving a gate projection reads one of these and nothing else, so a stream carrying
+integrity errors cannot silently produce a clean gate — it produces a `blocked` one. It is what
+the reader produced, never what the file contains: a line the reader rejected is an integrity
+error here and still a line in the stream forever, because nothing rewrites an appended event.
+
+The crate's `read_validated_event_stream` hands a consumer those same two facts with each
+admitted event left as the JSON it was recorded as. That is this concept rendered for a reader
+outside the process, not a second concept, and the name it returns under says so.
+_Avoid_: parsed stream, event list, clean stream, valid events
+
 ### Identity
 
 **Target**:

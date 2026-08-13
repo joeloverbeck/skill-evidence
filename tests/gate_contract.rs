@@ -1,11 +1,22 @@
 #![forbid(unsafe_code)]
+//! What the evidence store on disk adds to a derivation.
+//!
+//! The clustering, threshold and retirement rules are not here: they are behavioural
+//! tests of the gate derivation itself and live beside it in `src/gate.rs`, where they
+//! need no repository, no lock and no projection file. What remains here is what only
+//! a real store can show: that deriving respects a lock it does not own, that the hash
+//! it derives against is the target's own content, and that the acts which touch a
+//! consumer's files either complete or leave nothing behind.
 
 use std::{fs, path::Path};
 
 mod support;
 
 use serde_json::{Value, json};
-use skill_evidence::{DerivationInputs, GateStatus, derive_store, hash_skill};
+use skill_evidence::{
+    DerivationInputs, GateStatus, RecordInputs, RecordUseRequest, derive_store, hash_skill,
+    record_use,
+};
 use tempfile::TempDir;
 
 struct Fixture {
@@ -60,71 +71,6 @@ impl Fixture {
         )
         .expect("derive gate")
     }
-
-    fn target(&self) -> Value {
-        json!({
-            "name": "demo-skill",
-            "repo_relative_path": self.target_relative,
-            "content_hash": self.target_hash,
-            "repo_head": "fixture-head"
-        })
-    }
-
-    /// The claim and close a completed review leaves behind. Every test that needs the
-    /// pair differs only in the review id, the disposition, and the coverage.
-    fn review(&self, review_id: &str, disposition: &str, covered: &[&str]) -> [Value; 2] {
-        [
-            json!({
-                "schema_version": 1,
-                "event_id": format!("evt_review_started_{review_id}"),
-                "event_type": "review_started",
-                "recorded_at": "2026-01-02T20:00:00Z",
-                "operator_workflow": "skill-evolution",
-                "target": self.target(),
-                "top_level_session_id": format!("review-session-{review_id}"),
-                "payload": {"review_id": review_id}
-            }),
-            json!({
-                "schema_version": 1,
-                "event_id": format!("evt_review_disposition_{review_id}"),
-                "event_type": "review_disposition",
-                "recorded_at": "2026-01-02T21:00:00Z",
-                "operator_workflow": "skill-evolution",
-                "target": self.target(),
-                "top_level_session_id": format!("review-session-{review_id}"),
-                "payload": {
-                    "review_id": review_id,
-                    "disposition": disposition,
-                    "adjudicated_event_ids": covered
-                }
-            }),
-        ]
-    }
-
-    fn review_with_authorizing_rule(
-        &self,
-        review_id: &str,
-        disposition: &str,
-        covered: &[&str],
-        authorizing_rule: &str,
-    ) -> [Value; 2] {
-        let mut review = self.review(review_id, disposition, covered);
-        review[0]["payload"]["authorizing_rule"] = json!(authorizing_rule);
-        review
-    }
-
-    fn review_naming_untestable_coverage(
-        &self,
-        review_id: &str,
-        disposition: &str,
-        covered: &[&str],
-        untestable: &[&str],
-    ) -> [Value; 2] {
-        let mut review = self.review(review_id, disposition, covered);
-        review[1]["payload"]["instrument_limited_event_ids"] = json!(untestable);
-        review
-    }
-
     fn use_event(
         &self,
         serial: usize,
@@ -162,1057 +108,6 @@ impl Fixture {
             }
         })
     }
-
-    /// Another incident from the run `of_run` already recorded — what a
-    /// `--further-incident` record writes.
-    ///
-    /// Two such records are siblings *of each other*, in the sense CONTEXT.md's *Further
-    /// incident* entry defines. Every bare "sibling" in this file means that relation — a
-    /// run-mate — never the cluster-mate sense ADR 0002 uses when it says a friction sibling
-    /// cannot lower a `material_recurrence` bar.
-    ///
-    /// Siblings carry their own event identity and their own symptom, and share the run's
-    /// group, task label, and task fingerprint. The caller passes the run's session, since
-    /// one run is one session.
-    fn further_incident_event(
-        &self,
-        serial: usize,
-        of_run: usize,
-        outcome: &str,
-        symptom_key: Option<&str>,
-        session_id: &str,
-    ) -> Value {
-        let mut event = self.use_event(serial, outcome, symptom_key, session_id);
-        event["payload"]["task_label"] = json!(format!("task {of_run}"));
-        event["payload"]["task_fingerprint"] = json!(format!("fingerprint-{of_run}"));
-        event["payload"]["same_run_group"] = json!(format!("run-{of_run}"));
-        event
-    }
-}
-
-/// The denominator measures how much use this exact target version has seen, and one run
-/// is one use however many ways it deviated. Counting records instead would let an
-/// operator who recorded a run honestly advance it toward `ten_use_unresolved` faster than
-/// one who compressed the same run into a single receipt — recording would manufacture its
-/// own authorization.
-#[test]
-fn qualifying_uses_count_run_groups_rather_than_records() {
-    let fixture = Fixture::new();
-    fixture.write_events(&[
-        fixture.use_event(1, "friction", Some("execution"), "session-a"),
-        fixture.further_incident_event(2, 1, "friction", Some("output"), "session-a"),
-        fixture.further_incident_event(3, 1, "friction", Some("state"), "session-a"),
-        fixture.use_event(4, "clean", None, "session-b"),
-    ]);
-
-    let status = fixture.derive("session-c", 1_767_398_400_000);
-    assert_eq!(
-        status.qualifying_uses_on_current_hash, 2,
-        "three siblings record one run, so two runs are two uses"
-    );
-    assert_eq!(
-        status.open_incident_ids,
-        ["evt_1", "evt_2", "evt_3"],
-        "every sibling stays separately addressable in the ledger"
-    );
-}
-
-#[test]
-fn friction_recurrence_requires_a_fresh_top_level_session() {
-    let fixture = Fixture::new();
-    fixture.write_events(&[
-        fixture.use_event(1, "friction", Some("execution"), "session-a"),
-        fixture.use_event(2, "friction", Some("execution"), "session-b"),
-        fixture.use_event(3, "friction", Some("execution"), "session-c"),
-    ]);
-
-    let same_session = fixture.derive("session-c", 1_767_398_400_000);
-    assert_eq!(same_session.state, "eligible_pending_cooldown");
-    assert_eq!(
-        same_session.authorization_reason.as_deref(),
-        Some("friction_recurrence:execution")
-    );
-    assert_eq!(
-        same_session.threshold_session_id.as_deref(),
-        Some("session-c")
-    );
-    assert_eq!(same_session.trigger_event_ids, ["evt_1", "evt_2", "evt_3"]);
-
-    let fresh_session = fixture.derive("session-d", 1_767_398_400_000);
-    assert_eq!(fresh_session.state, "eligible");
-    assert_eq!(
-        fresh_session.derivation_session_id.as_deref(),
-        Some("session-d")
-    );
-}
-
-/// The whole point of recording a run's deviations separately is that a close can name
-/// exactly the one no trial could express. That is worth nothing if the name reaches the
-/// run: the sibling that a same-hash predecessor already confirmed as a real target defect
-/// would be gate-retired along with it, which is the cost `evt_41dfe1f4` actually paid.
-///
-/// Sharing a run group is a statement about how the evidence was recorded, never about what
-/// a review could decide. Retirement follows the names and nothing else.
-#[test]
-fn naming_one_sibling_untestable_leaves_its_siblings_clustering() {
-    let fixture = Fixture::new();
-    let mut events = vec![
-        fixture.use_event(1, "friction", Some("execution"), "session-a"),
-        fixture.further_incident_event(2, 1, "friction", Some("execution"), "session-a"),
-        fixture.use_event(3, "friction", Some("execution"), "session-b"),
-    ];
-    events.extend(fixture.review_naming_untestable_coverage(
-        "rev_1",
-        "closed_no_skill_defect",
-        &["evt_2"],
-        &["evt_2"],
-    ));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("session-c", 1_767_398_400_000);
-    assert_eq!(
-        status.open_incident_ids,
-        ["evt_1", "evt_2", "evt_3"],
-        "a named event was never adjudicated, so it stays open in the ledger"
-    );
-    assert_eq!(
-        status.instrument_limited_incident_ids,
-        ["evt_2"],
-        "retirement reaches the name, not the run group it belongs to"
-    );
-    let cluster = status
-        .candidate_clusters
-        .iter()
-        .find(|cluster| cluster.symptom_key == "execution")
-        .expect("the unnamed incidents still cluster");
-    assert_eq!(cluster.open_event_ids, ["evt_1", "evt_3"]);
-    assert_eq!(cluster.independent_incidents, 2);
-    assert_eq!(status.qualifying_uses_on_current_hash, 2);
-}
-
-/// Independence is what makes a recurrence claim mean anything, and it is derived from the
-/// top-level session and the task fingerprint — both of which siblings share, because they
-/// record one run. Letting a run reach a threshold by deviating twice would say two
-/// independent incidents recurred when one run misbehaved once.
-///
-/// The contrast is
-/// `two_independent_material_failures_fire_the_material_recurrence_gate`: the same two
-/// records from distinct sessions do fire.
-#[test]
-fn siblings_of_one_run_cannot_reach_material_recurrence() {
-    let fixture = Fixture::new();
-    fixture.write_events(&[
-        fixture.use_event(1, "material_failure", Some("output"), "session-a"),
-        fixture.further_incident_event(2, 1, "material_failure", Some("output"), "session-a"),
-    ]);
-
-    let status = fixture.derive("session-b", 1_767_398_400_000);
-    assert_eq!(status.state, "collecting");
-    assert_eq!(status.authorization_reason, None);
-    assert_eq!(status.trigger_event_ids, [] as [String; 0]);
-    let cluster = status
-        .candidate_clusters
-        .iter()
-        .find(|cluster| cluster.symptom_key == "output")
-        .expect("the siblings cluster on their shared symptom");
-    assert_eq!(cluster.open_event_ids, ["evt_1", "evt_2"]);
-    assert_eq!(
-        cluster.independent_incidents, 1,
-        "one run contributes one independent incident however many ways it deviated"
-    );
-}
-
-#[test]
-fn two_independent_material_failures_fire_the_material_recurrence_gate() {
-    let fixture = Fixture::new();
-    fixture.write_events(&[
-        fixture.use_event(1, "material_failure", Some("output"), "session-a"),
-        fixture.use_event(2, "material_failure", Some("output"), "session-b"),
-    ]);
-
-    let status = fixture.derive("session-b", 1_767_398_400_000);
-    assert_eq!(status.state, "eligible_pending_cooldown");
-    assert_eq!(
-        status.authorization_reason.as_deref(),
-        Some("material_recurrence:output")
-    );
-    assert_eq!(status.trigger_event_ids, ["evt_1", "evt_2"]);
-}
-
-#[test]
-fn one_contemporaneous_severe_incident_quarantines_the_target() {
-    let fixture = Fixture::new();
-    fixture.write_events(&[fixture.use_event(
-        1,
-        "severe_incident",
-        Some("state"),
-        "threshold-session",
-    )]);
-
-    let same_session = fixture.derive("threshold-session", 1_767_398_400_000);
-    assert_eq!(same_session.state, "quarantined_pending_cooldown");
-    assert_eq!(same_session.authorization_reason.as_deref(), Some("severe"));
-    assert_eq!(same_session.trigger_event_ids, ["evt_1"]);
-
-    let fresh_session = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(fresh_session.state, "quarantined_eligible");
-}
-
-#[test]
-fn unavailable_threshold_session_uses_the_twelve_hour_clock() {
-    let fixture = Fixture::new();
-    fixture.write_events(&[
-        fixture.use_event(1, "friction", Some("cost"), "unavailable"),
-        fixture.use_event(2, "friction", Some("cost"), "unavailable"),
-        fixture.use_event(3, "friction", Some("cost"), "unavailable"),
-    ]);
-
-    let before_deadline = fixture.derive("fresh-host-session", 1_767_365_999_999);
-    assert_eq!(before_deadline.state, "eligible_pending_cooldown");
-    assert_eq!(before_deadline.threshold_session_id, None);
-    assert_eq!(
-        before_deadline.not_before.as_deref(),
-        Some("2026-01-02T15:00:00.000Z")
-    );
-
-    let at_deadline = fixture.derive("fresh-host-session", 1_767_366_000_000);
-    assert_eq!(at_deadline.state, "eligible");
-}
-
-#[test]
-fn every_v1_event_type_is_accepted_and_review_ownership_is_derived() {
-    let fixture = Fixture::new();
-    let target = fixture.target();
-    let lifecycle = |serial: usize, event_type: &str, payload: Value| {
-        json!({
-            "schema_version": 1,
-            "event_id": format!("evt_{serial}"),
-            "event_type": event_type,
-            "recorded_at": format!("2026-01-02T0{serial}:00:00Z"),
-            "operator_workflow": "skill-evolution",
-            "target": target,
-            "top_level_session_id": "review-session",
-            "payload": payload
-        })
-    };
-    fixture.write_events(&[
-        fixture.use_event(1, "friction", Some("execution"), "session-a"),
-        lifecycle(2, "review_started", json!({"review_id": "review-1"})),
-        lifecycle(3, "validation_completed", json!({"review_id": "review-1"})),
-        lifecycle(4, "change_landed", json!({"review_id": "review-1"})),
-        lifecycle(
-            5,
-            "decontamination_started",
-            json!({"review_id": "decontamination-1"}),
-        ),
-        lifecycle(
-            6,
-            "decontamination_completed",
-            json!({"review_id": "decontamination-1"}),
-        ),
-        lifecycle(
-            7,
-            "review_disposition",
-            json!({
-                "review_id": "review-1",
-                "disposition": "monitor_for_recurrence",
-                "adjudicated_event_ids": ["evt_1"]
-            }),
-        ),
-    ]);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(status.state, "closed");
-    assert_eq!(status.open_incident_ids, Vec::<String>::new());
-    assert_eq!(status.active_review_id, None);
-    assert_eq!(
-        status.last_completed_review_id.as_deref(),
-        Some("decontamination-1")
-    );
-}
-
-#[test]
-fn ten_uses_with_one_open_contemporaneous_incident_fire_the_ten_use_gate() {
-    let fixture = Fixture::new();
-    let mut events = vec![fixture.use_event(1, "friction", Some("cost"), "incident-session")];
-    for serial in 2..=10 {
-        events.push(fixture.use_event(serial, "clean", None, &format!("session-{serial}")));
-    }
-    fixture.write_events(&events);
-
-    let status = fixture.derive("session-10", 1_767_398_400_000);
-    assert_eq!(status.qualifying_uses_on_current_hash, 10);
-    assert_eq!(status.state, "eligible_pending_cooldown");
-    assert_eq!(
-        status.authorization_reason.as_deref(),
-        Some("ten_use_unresolved")
-    );
-    assert_eq!(status.trigger_event_ids, ["evt_1"]);
-}
-
-#[test]
-fn retrospective_tenth_use_does_not_complete_the_ten_use_gate() {
-    let fixture = Fixture::new();
-    let mut events = vec![fixture.use_event(1, "friction", Some("cost"), "incident-session")];
-    for serial in 2..=9 {
-        events.push(fixture.use_event(serial, "clean", None, &format!("session-{serial}")));
-    }
-    let mut retrospective = fixture.use_event(10, "clean", None, "retrospective-session");
-    retrospective["payload"]["retrospective"] = Value::Bool(true);
-    retrospective["payload"]["evidence_refs"] = json!(["logs/retrospective-use.txt"]);
-    events.push(retrospective);
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(status.qualifying_uses_on_current_hash, 10);
-    assert_eq!(status.state, "collecting");
-    assert_eq!(status.authorization_reason, None);
-    assert_eq!(status.threshold_session_id, None);
-}
-
-#[test]
-fn first_ten_use_threshold_wins_over_a_later_severe_incident() {
-    let fixture = Fixture::new();
-    let mut events = vec![fixture.use_event(1, "friction", Some("cost"), "incident-session")];
-    for serial in 2..=10 {
-        events.push(fixture.use_event(serial, "clean", None, &format!("session-{serial}")));
-    }
-    events.push(fixture.use_event(11, "severe_incident", Some("state"), "later-session"));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(status.qualifying_uses_on_current_hash, 11);
-    assert_eq!(status.state, "eligible");
-    assert_eq!(
-        status.authorization_reason.as_deref(),
-        Some("ten_use_unresolved")
-    );
-    assert_eq!(status.trigger_event_ids, ["evt_1"]);
-    assert_eq!(status.threshold_session_id.as_deref(), Some("session-10"));
-}
-
-#[test]
-fn completed_same_hash_review_does_not_reopen_from_queued_pre_close_evidence() {
-    let fixture = Fixture::new();
-    let mut events = vec![
-        fixture.use_event(1, "friction", Some("execution"), "session-1"),
-        fixture.use_event(2, "material_failure", Some("output"), "session-2"),
-        fixture.use_event(3, "material_failure", Some("output"), "session-3"),
-    ];
-    for serial in 4..=10 {
-        events.push(fixture.use_event(serial, "clean", None, &format!("session-{serial}")));
-    }
-    events.extend(fixture.review(
-        "review-queued",
-        "candidate_rejected_validation",
-        &["evt_2", "evt_3"],
-    ));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(status.state, "collecting");
-    assert_eq!(status.authorization_reason, None);
-    assert_eq!(
-        status.review_reentry_basis.as_deref(),
-        Some("queued_pre_close_evidence")
-    );
-    assert_eq!(status.open_incident_ids, ["evt_1"]);
-}
-
-/// `blocked_no_valid_test` reaches no conclusion about the skill, so it adjudicates
-/// nothing — but it does establish that this instrument cannot test the evidence it
-/// covered. That evidence stops driving the gate. It stays an open incident, because
-/// nothing was decided about it; it simply no longer clusters, so it can never again
-/// reach a threshold the review already proved untestable.
-#[test]
-fn blocked_no_valid_test_retires_covered_incidents_from_the_gate() {
-    let fixture = Fixture::new();
-    let mut events = (1..=3)
-        .map(|serial| {
-            fixture.use_event(
-                serial,
-                "friction",
-                Some("execution"),
-                &format!("session-{serial}"),
-            )
-        })
-        .collect::<Vec<_>>();
-    events.extend(fixture.review(
-        "review-blocked",
-        "blocked_no_valid_test",
-        &["evt_1", "evt_2", "evt_3"],
-    ));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(status.state, "collecting");
-    assert_eq!(status.authorization_reason, None);
-    assert_eq!(
-        status.open_incident_ids,
-        ["evt_1", "evt_2", "evt_3"],
-        "a blocked close adjudicates nothing, so the incidents remain open in the ledger"
-    );
-    assert!(
-        status.candidate_clusters.is_empty(),
-        "evidence a review proved untestable must stop clustering, or one new incident \
-         re-fires the same threshold the instrument already failed: {:?}",
-        status.candidate_clusters
-    );
-    assert_eq!(
-        status.review_reentry_basis, None,
-        "nothing is queued behind the close: the covered evidence left the gate"
-    );
-}
-
-/// The trigger list is frozen when the threshold fires, but incidents keep arriving while
-/// the review runs — issue #1's own `grilling` cluster had "a fourth in the same cluster
-/// open too". A straggler the close did not list has the same symptom and the same binding
-/// constraint the instrument could not vary, so leaving it clustered lowers the bar for
-/// the next review instead of resetting it: two new incidents would re-authorize a
-/// threshold that takes three.
-#[test]
-fn a_blocked_close_retires_the_stragglers_in_the_clusters_it_covered() {
-    let fixture = Fixture::new();
-    // Three fire the threshold; the fourth lands while the review is still open, so it is
-    // never in the frozen trigger list.
-    let mut events = (1..=4)
-        .map(|serial| {
-            fixture.use_event(
-                serial,
-                "friction",
-                Some("execution"),
-                &format!("session-{serial}"),
-            )
-        })
-        .collect::<Vec<_>>();
-    events.extend(fixture.review(
-        "review-blocked",
-        "blocked_no_valid_test",
-        &["evt_1", "evt_2", "evt_3"],
-    ));
-    // Two genuinely new incidents. Three are needed for friction_recurrence, so these
-    // must not be enough on their own.
-    events.extend((5..=6).map(|serial| {
-        fixture.use_event(
-            serial,
-            "friction",
-            Some("execution"),
-            &format!("session-{serial}"),
-        )
-    }));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(
-        status.instrument_limited_incident_ids,
-        ["evt_1", "evt_2", "evt_3", "evt_4"],
-        "the straggler shares the symptom the instrument could not test"
-    );
-    assert_eq!(
-        status.authorization_reason, None,
-        "two new incidents must not re-authorize a threshold that takes three: {:?}",
-        status.candidate_clusters
-    );
-    assert_eq!(status.state, "collecting");
-}
-
-/// A `material_recurrence` trigger list holds only the material incidents, so a cluster's
-/// merely-frictional siblings are never in it whatever the timing. Left clustered they
-/// would discount every future review of that symptom, not just the next one.
-#[test]
-fn a_blocked_close_retires_frictional_siblings_a_material_trigger_list_cannot_name() {
-    let fixture = Fixture::new();
-    let mut events = vec![
-        fixture.use_event(1, "friction", Some("output"), "session-1"),
-        fixture.use_event(2, "material_failure", Some("output"), "session-2"),
-        fixture.use_event(3, "material_failure", Some("output"), "session-3"),
-    ];
-    events.extend(fixture.review(
-        "review-blocked",
-        "blocked_no_valid_test",
-        &["evt_2", "evt_3"],
-    ));
-    events.extend((4..=5).map(|serial| {
-        fixture.use_event(
-            serial,
-            "friction",
-            Some("output"),
-            &format!("session-{serial}"),
-        )
-    }));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(
-        status.instrument_limited_incident_ids,
-        ["evt_1", "evt_2", "evt_3"],
-        "the frictional sibling shares the retired symptom"
-    );
-    assert_eq!(status.authorization_reason, None);
-    assert_eq!(status.state, "collecting");
-}
-
-#[test]
-fn a_ten_use_blocked_close_leaves_retrospective_incidents_in_the_anchor_cluster() {
-    let fixture = Fixture::new();
-    let mut events = vec![fixture.use_event(1, "friction", Some("cost"), "session-1")];
-    let mut retrospective = fixture.use_event(2, "friction", Some("cost"), "session-2");
-    retrospective["payload"]["retrospective"] = json!(true);
-    retrospective["payload"]["evidence_refs"] = json!(["logs/retrospective-cost.txt"]);
-    events.push(retrospective);
-    events.extend(
-        (3..=10)
-            .map(|serial| fixture.use_event(serial, "clean", None, &format!("session-{serial}"))),
-    );
-    events.extend(fixture.review_with_authorizing_rule(
-        "review-blocked",
-        "blocked_no_valid_test",
-        &["evt_1"],
-        "ten_use_unresolved",
-    ));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(status.instrument_limited_incident_ids, ["evt_1"]);
-    assert_eq!(
-        status.candidate_clusters[0].open_event_ids,
-        ["evt_2"],
-        "ten-use retirement names only contemporaneous incidents in the anchor cluster"
-    );
-}
-
-/// Evidence recorded after an instrument-limited close is new evidence, whatever its
-/// symptom. Retirement that kept reaching forward would silence the symptom permanently —
-/// the gate would never speak about it again, which is a worse failure than the trap.
-#[test]
-fn a_blocked_close_does_not_retire_evidence_recorded_after_it() {
-    let fixture = Fixture::new();
-    let mut events = (1..=3)
-        .map(|serial| {
-            fixture.use_event(
-                serial,
-                "friction",
-                Some("execution"),
-                &format!("session-{serial}"),
-            )
-        })
-        .collect::<Vec<_>>();
-    events.extend(fixture.review(
-        "review-blocked",
-        "blocked_no_valid_test",
-        &["evt_1", "evt_2", "evt_3"],
-    ));
-    events.extend((4..=6).map(|serial| {
-        fixture.use_event(
-            serial,
-            "friction",
-            Some("execution"),
-            &format!("session-{serial}"),
-        )
-    }));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(
-        status.instrument_limited_incident_ids,
-        ["evt_1", "evt_2", "evt_3"],
-        "only evidence that existed when the review closed is retired"
-    );
-    assert_eq!(
-        status.authorization_reason.as_deref(),
-        Some("friction_recurrence:execution"),
-        "three genuinely new incidents reach the threshold on their own"
-    );
-    assert_eq!(status.trigger_event_ids, ["evt_4", "evt_5", "evt_6"]);
-}
-
-/// Retirement and the watermark can come from different closes. Here a blocked close
-/// retires one cluster, and a later adjudicating close lays the watermark over another —
-/// so the projection reports `queued_pre_close_evidence` (that close did reach a
-/// conclusion) while still carrying retired evidence the adjudicating close never touched.
-#[test]
-fn retirement_and_the_watermark_can_come_from_different_closes() {
-    let fixture = Fixture::new();
-    let target = fixture.target();
-    let review = |serial: usize, review_id: &str, event_type: &str, payload: Value| {
-        json!({
-            "schema_version": 1,
-            "event_id": format!("evt_{review_id}_{event_type}"),
-            "event_type": event_type,
-            "recorded_at": format!("2026-01-02T{serial:02}:30:00Z"),
-            "operator_workflow": "skill-evolution",
-            "target": target,
-            "top_level_session_id": format!("review-session-{review_id}"),
-            "payload": payload
-        })
-    };
-    let mut events = (1..=3)
-        .map(|serial| {
-            fixture.use_event(
-                serial,
-                "friction",
-                Some("execution"),
-                &format!("session-{serial}"),
-            )
-        })
-        .collect::<Vec<_>>();
-    events.push(review(
-        3,
-        "blocked",
-        "review_started",
-        json!({"review_id": "rev-blocked"}),
-    ));
-    events.push(review(
-        4,
-        "blocked",
-        "review_disposition",
-        json!({
-            "review_id": "rev-blocked",
-            "disposition": "blocked_no_valid_test",
-            "adjudicated_event_ids": ["evt_1", "evt_2", "evt_3"]
-        }),
-    ));
-    // A second cluster that reaches its threshold and is never reviewed — this is what
-    // ends up queued behind the watermark.
-    events.extend((5..=7).map(|serial| {
-        fixture.use_event(
-            serial,
-            "friction",
-            Some("output"),
-            &format!("session-{serial}"),
-        )
-    }));
-    // A third, reviewed to a real conclusion. Its close lays the watermark.
-    events.extend((8..=9).map(|serial| {
-        fixture.use_event(
-            serial,
-            "material_failure",
-            Some("state"),
-            &format!("session-{serial}"),
-        )
-    }));
-    events.push(review(
-        10,
-        "closed",
-        "review_started",
-        json!({"review_id": "rev-closed"}),
-    ));
-    events.push(review(
-        11,
-        "closed",
-        "review_disposition",
-        json!({
-            "review_id": "rev-closed",
-            "disposition": "monitor_for_recurrence",
-            "adjudicated_event_ids": ["evt_8", "evt_9"]
-        }),
-    ));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(
-        status.instrument_limited_incident_ids,
-        ["evt_1", "evt_2", "evt_3"],
-        "the adjudicating close retired nothing; the earlier blocked close did"
-    );
-    assert_eq!(
-        status.review_reentry_basis.as_deref(),
-        Some("queued_pre_close_evidence"),
-        "the watermark close reached a conclusion, so its own label is the honest one"
-    );
-}
-
-/// The severe carve-out is justified by severe incidents authorizing on their own, ahead
-/// of any watermark — but a *retrospective* one never fires that trigger, while still
-/// counting toward a cluster. Carving it out therefore protects nothing and leaves it
-/// discounting the next review, so the carve-out has to key on the property that actually
-/// justifies it.
-#[test]
-fn a_blocked_close_retires_a_retrospective_severe_incident_it_covered() {
-    let fixture = Fixture::new();
-    let mut retrospective = fixture.use_event(1, "severe_incident", Some("execution"), "session-1");
-    retrospective["payload"]["retrospective"] = json!(true);
-    retrospective["payload"]["evidence_refs"] = json!(["logs/retrospective-severe.txt"]);
-    let mut events = vec![retrospective];
-    events.extend((2..=3).map(|serial| {
-        fixture.use_event(
-            serial,
-            "friction",
-            Some("execution"),
-            &format!("session-{serial}"),
-        )
-    }));
-    events.extend(fixture.review(
-        "review-blocked",
-        "blocked_no_valid_test",
-        &["evt_1", "evt_2", "evt_3"],
-    ));
-    events.extend((4..=5).map(|serial| {
-        fixture.use_event(
-            serial,
-            "friction",
-            Some("execution"),
-            &format!("session-{serial}"),
-        )
-    }));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(
-        status.instrument_limited_incident_ids,
-        ["evt_1", "evt_2", "evt_3"],
-        "a retrospective severe incident authorizes nothing, so nothing is protected by \
-         leaving it clustered"
-    );
-    assert_eq!(
-        status.authorization_reason, None,
-        "two new incidents must not re-authorize a threshold that takes three: {:?}",
-        status.candidate_clusters
-    );
-}
-
-/// Retiring evidence from the gate is the honest exit; retiring it silently is not.
-/// A reader of the projection alone must be able to see that real incidents stopped
-/// driving this gate, and which ones.
-#[test]
-fn the_projection_names_the_evidence_a_blocked_close_retired() {
-    let fixture = Fixture::new();
-    let mut events = (1..=3)
-        .map(|serial| {
-            fixture.use_event(
-                serial,
-                "friction",
-                Some("execution"),
-                &format!("session-{serial}"),
-            )
-        })
-        .collect::<Vec<_>>();
-    events.extend(fixture.review(
-        "review-blocked",
-        "blocked_no_valid_test",
-        &["evt_1", "evt_2", "evt_3"],
-    ));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(
-        status.instrument_limited_incident_ids,
-        ["evt_1", "evt_2", "evt_3"]
-    );
-}
-
-/// The exit exists to undo a deferral, and a severe incident was never deferred: it
-/// authorizes on its own, ahead of the watermark. Retiring one would leave the projection
-/// claiming the incident stopped driving the gate while it still authorizes the review.
-#[test]
-fn a_blocked_close_does_not_quiet_a_severe_incident() {
-    let fixture = Fixture::new();
-    let mut events = vec![fixture.use_event(1, "severe_incident", Some("execution"), "session-1")];
-    events.extend(fixture.review("review-blocked-severe", "blocked_no_valid_test", &["evt_1"]));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(status.state, "quarantined_eligible");
-    assert_eq!(status.authorization_reason.as_deref(), Some("severe"));
-    assert_eq!(
-        status.review_reentry_basis.as_deref(),
-        Some("unadjudicated_severe")
-    );
-    assert!(
-        status.instrument_limited_incident_ids.is_empty(),
-        "a severe incident is not retired by an instrument-limited close: {:?}",
-        status.instrument_limited_incident_ids
-    );
-    assert_eq!(status.candidate_clusters.len(), 1);
-}
-
-/// A review claimed on one cluster leaves the others accumulating. When it closes
-/// having reached no conclusion, evidence it never covered is still deferred behind
-/// it — but calling that `queued_pre_close_evidence` reports it as accounted for by a
-/// review that accounted for nothing. The ledger says inconclusive; so must the
-/// projection.
-#[test]
-fn evidence_behind_an_instrument_limited_close_is_not_reported_as_accounted_for() {
-    let fixture = Fixture::new();
-    let mut events = (1..=3)
-        .map(|serial| {
-            fixture.use_event(
-                serial,
-                "friction",
-                Some("execution"),
-                &format!("session-{serial}"),
-            )
-        })
-        .collect::<Vec<_>>();
-    events.extend((4..=6).map(|serial| {
-        fixture.use_event(
-            serial,
-            "friction",
-            Some("output"),
-            &format!("session-{serial}"),
-        )
-    }));
-    events.extend(fixture.review(
-        "review-blocked",
-        "blocked_no_valid_test",
-        &["evt_1", "evt_2", "evt_3"],
-    ));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(status.state, "collecting");
-    assert_eq!(status.authorization_reason, None);
-    assert_eq!(
-        status.review_reentry_basis.as_deref(),
-        Some("queued_behind_instrument_limited_review")
-    );
-    assert_eq!(
-        status.instrument_limited_incident_ids,
-        ["evt_1", "evt_2", "evt_3"],
-        "only the covered cluster left the gate"
-    );
-}
-
-/// `superseded_by_target_version` reaches no conclusion either, but it is not
-/// instrument-limited: nothing was established about whether the evidence can be
-/// tested, only that the target moved underneath the review. Its evidence keeps
-/// driving the gate exactly as before.
-///
-/// The blocked-close half of this contract is
-/// [`blocked_no_valid_test_retires_covered_incidents_from_the_gate`] and
-/// [`a_blocked_close_does_not_quiet_a_severe_incident`].
-#[test]
-fn superseded_by_target_version_does_not_retire_covered_incidents() {
-    struct Case {
-        name: &'static str,
-        disposition: &'static str,
-        outcomes: &'static [&'static str],
-        expected_state: &'static str,
-        expected_reason: Option<&'static str>,
-        expected_reentry_basis: &'static str,
-    }
-
-    for case in [
-        Case {
-            name: "superseded review queues retained pre-close evidence",
-            disposition: "superseded_by_target_version",
-            outcomes: &["friction", "friction", "friction"],
-            expected_state: "collecting",
-            expected_reason: None,
-            expected_reentry_basis: "queued_pre_close_evidence",
-        },
-        Case {
-            name: "superseded severe review remains quarantined",
-            disposition: "superseded_by_target_version",
-            outcomes: &["severe_incident"],
-            expected_state: "quarantined_eligible",
-            expected_reason: Some("severe"),
-            expected_reentry_basis: "unadjudicated_severe",
-        },
-    ] {
-        let fixture = Fixture::new();
-        let mut events = case
-            .outcomes
-            .iter()
-            .enumerate()
-            .map(|(index, outcome)| {
-                fixture.use_event(
-                    index + 1,
-                    outcome,
-                    Some("execution"),
-                    &format!("session-{}", index + 1),
-                )
-            })
-            .collect::<Vec<_>>();
-        let covered_ids = (1..=case.outcomes.len())
-            .map(|serial| format!("evt_{serial}"))
-            .collect::<Vec<_>>();
-        events.extend(fixture.review(
-            "review-non-adjudicating",
-            case.disposition,
-            &covered_ids.iter().map(String::as_str).collect::<Vec<_>>(),
-        ));
-        fixture.write_events(&events);
-
-        let status = fixture.derive("fresh-session", 1_767_398_400_000);
-        assert_eq!(status.state, case.expected_state, "{}", case.name);
-        assert_eq!(
-            status.authorization_reason.as_deref(),
-            case.expected_reason,
-            "{}",
-            case.name
-        );
-        assert_eq!(
-            status.review_reentry_basis.as_deref(),
-            Some(case.expected_reentry_basis),
-            "{}",
-            case.name
-        );
-        assert_eq!(status.open_incident_ids, covered_ids, "{}", case.name);
-        assert_eq!(status.candidate_clusters.len(), 1, "{}", case.name);
-        assert_eq!(
-            status.candidate_clusters[0].open_event_ids, covered_ids,
-            "{}",
-            case.name
-        );
-    }
-}
-
-#[test]
-fn every_adjudicating_evolution_disposition_retires_covered_incidents() {
-    for disposition in [
-        "resolved_by_change",
-        "closed_no_skill_defect",
-        "outside_target",
-        "insufficient_independence",
-        "monitor_for_recurrence",
-        "candidate_rejected_validation",
-    ] {
-        let fixture = Fixture::new();
-        let target = json!({
-            "name": "demo-skill",
-            "repo_relative_path": fixture.target_relative,
-            "content_hash": fixture.target_hash,
-            "repo_head": "fixture-head"
-        });
-        fixture.write_events(&[
-            fixture.use_event(1, "friction", Some("execution"), "session-1"),
-            json!({
-                "schema_version": 1,
-                "event_id": "evt_review_started",
-                "event_type": "review_started",
-                "recorded_at": "2026-01-02T02:00:00Z",
-                "operator_workflow": "skill-evolution",
-                "target": target,
-                "top_level_session_id": "review-session",
-                "payload": {"review_id": "review-adjudicating"}
-            }),
-            json!({
-                "schema_version": 1,
-                "event_id": "evt_review_disposition",
-                "event_type": "review_disposition",
-                "recorded_at": "2026-01-02T03:00:00Z",
-                "operator_workflow": "skill-evolution",
-                "target": target,
-                "top_level_session_id": "review-session",
-                "payload": {
-                    "review_id": "review-adjudicating",
-                    "disposition": disposition,
-                    "adjudicated_event_ids": ["evt_1"]
-                }
-            }),
-        ]);
-
-        let status = fixture.derive("fresh-session", 1_767_398_400_000);
-        assert_eq!(status.state, "closed", "disposition {disposition}");
-        assert!(
-            status.open_incident_ids.is_empty(),
-            "disposition {disposition}"
-        );
-        assert!(
-            status.candidate_clusters.is_empty(),
-            "disposition {disposition}"
-        );
-    }
-}
-
-#[test]
-fn an_adjudicating_close_leaves_coverage_it_named_untestable_open_and_unclustered() {
-    let fixture = Fixture::new();
-    let mut events = vec![
-        fixture.use_event(1, "friction", Some("execution"), "session-1"),
-        fixture.use_event(2, "friction", Some("execution"), "session-2"),
-    ];
-    events.extend(fixture.review_naming_untestable_coverage(
-        "review-mixed",
-        "candidate_rejected_validation",
-        &["evt_1", "evt_2"],
-        &["evt_1"],
-    ));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-
-    assert_eq!(
-        status.open_incident_ids,
-        vec!["evt_1".to_owned()],
-        "the review reached no conclusion about evt_1, so it stays open"
-    );
-    assert_eq!(
-        status.instrument_limited_incident_ids,
-        vec!["evt_1".to_owned()],
-        "evt_1 retires from the gate as untestable rather than as adjudicated"
-    );
-    assert!(
-        status.candidate_clusters.is_empty(),
-        "an incident retired as untestable can never reach a threshold again"
-    );
-}
-
-#[test]
-fn post_review_incident_reopens_ten_use_gate_with_its_bounded_cluster() {
-    let fixture = Fixture::new();
-    let mut events = vec![
-        fixture.use_event(1, "friction", Some("output"), "session-1"),
-        fixture.use_event(2, "friction", Some("tool-compatibility"), "session-2"),
-        fixture.use_event(3, "friction", Some("tool-compatibility"), "session-3"),
-        fixture.use_event(4, "friction", Some("tool-compatibility"), "session-4"),
-    ];
-    for serial in 5..=9 {
-        events.push(fixture.use_event(serial, "clean", None, &format!("session-{serial}")));
-    }
-    events.extend(fixture.review(
-        "review-post",
-        "candidate_rejected_validation",
-        &["evt_2", "evt_3", "evt_4"],
-    ));
-    events.push(fixture.use_event(10, "friction", Some("execution"), "session-10"));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("session-10", 1_767_398_400_000);
-    assert_eq!(status.state, "eligible_pending_cooldown");
-    assert_eq!(
-        status.authorization_reason.as_deref(),
-        Some("ten_use_unresolved")
-    );
-    assert_eq!(
-        status.review_reentry_basis.as_deref(),
-        Some("post_review_incident")
-    );
-    assert_eq!(status.trigger_event_ids, ["evt_10"]);
-}
-
-#[test]
-fn queued_pre_close_threshold_does_not_mask_a_later_post_review_incident() {
-    let fixture = Fixture::new();
-    let mut events = vec![
-        fixture.use_event(1, "material_failure", Some("output"), "session-1"),
-        fixture.use_event(2, "material_failure", Some("output"), "session-2"),
-        fixture.use_event(3, "friction", Some("tool-compatibility"), "session-3"),
-        fixture.use_event(4, "friction", Some("tool-compatibility"), "session-4"),
-        fixture.use_event(5, "friction", Some("tool-compatibility"), "session-5"),
-    ];
-    for serial in 6..=10 {
-        events.push(fixture.use_event(serial, "clean", None, &format!("session-{serial}")));
-    }
-    events.extend(fixture.review(
-        "review-masked",
-        "candidate_rejected_validation",
-        &["evt_3", "evt_4", "evt_5"],
-    ));
-    events.push(fixture.use_event(11, "friction", Some("execution"), "session-11"));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("session-11", 1_767_398_400_000);
-    assert_eq!(
-        status.authorization_reason.as_deref(),
-        Some("ten_use_unresolved")
-    );
-    assert_eq!(status.trigger_event_ids, ["evt_11"]);
-    assert_eq!(
-        status.review_reentry_basis.as_deref(),
-        Some("post_review_incident")
-    );
 }
 
 #[test]
@@ -1252,70 +147,6 @@ fn derive_does_not_remove_or_bypass_a_foreign_store_lock() {
 }
 
 #[test]
-fn repeated_same_session_and_task_incidents_are_not_independent() {
-    let fixture = Fixture::new();
-    let mut events = (1..=3)
-        .map(|serial| fixture.use_event(serial, "friction", Some("execution"), "same-session"))
-        .collect::<Vec<_>>();
-    for event in &mut events {
-        event["payload"]["task_fingerprint"] = json!("same-task");
-    }
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(status.state, "collecting");
-    assert_eq!(status.candidate_clusters[0].independent_incidents, 1);
-}
-
-#[test]
-fn retrospective_incident_can_support_but_not_complete_a_threshold() {
-    let fixture = Fixture::new();
-    let mut retrospective = fixture.use_event(3, "friction", Some("cost"), "retrospective-session");
-    retrospective["payload"]["retrospective"] = json!(true);
-    retrospective["payload"]["evidence_refs"] = json!(["reports/evidence.txt"]);
-    fixture.write_events(&[
-        fixture.use_event(1, "friction", Some("cost"), "session-1"),
-        fixture.use_event(2, "friction", Some("cost"), "session-2"),
-        retrospective,
-    ]);
-    assert_eq!(
-        fixture.derive("fresh-session", 1_767_398_400_000).state,
-        "collecting"
-    );
-
-    let mut events = fs::read_to_string(
-        fixture
-            .root
-            .path()
-            .join("reports/skill-evidence/demo-skill/events.jsonl"),
-    )
-    .expect("read events")
-    .lines()
-    .map(|line| serde_json::from_str::<Value>(line).expect("event JSON"))
-    .collect::<Vec<_>>();
-    events.push(fixture.use_event(4, "friction", Some("cost"), "session-4"));
-    fixture.write_events(&events);
-    assert_eq!(
-        fixture.derive("session-4", 1_767_398_400_000).state,
-        "eligible_pending_cooldown"
-    );
-}
-
-#[test]
-fn ten_clean_uses_authorize_nothing() {
-    let fixture = Fixture::new();
-    let events = (1..=10)
-        .map(|serial| fixture.use_event(serial, "clean", None, &format!("session-{serial}")))
-        .collect::<Vec<_>>();
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(status.qualifying_uses_on_current_hash, 10);
-    assert_eq!(status.state, "closed");
-    assert_eq!(status.authorized_workflow, None);
-}
-
-#[test]
 fn target_hash_change_partitions_prospective_evidence() {
     let fixture = Fixture::new();
     fixture.write_events(&[
@@ -1339,193 +170,125 @@ fn target_hash_change_partitions_prospective_evidence() {
     assert_ne!(status.target_content_hash, fixture.target_hash);
 }
 
+/// The projection is swapped into place atomically, so a failure at the swap leaves
+/// the recorded stream exactly as it was and does not half-write the projection.
+///
+/// `docs/principles/evidence-substrate-integrity.md` puts this at the top of what a
+/// side effect on a consumer's files must carry: "An act that half-applies and records
+/// nothing is the worst outcome available and must not be reachable." Deriving reads
+/// the stream and never writes it, so the check here is that the failure stays inside
+/// the projection and the append-only stream is untouched.
 #[test]
-fn active_review_owns_the_target() {
+fn a_failed_projection_swap_leaves_the_recorded_stream_untouched() {
     let fixture = Fixture::new();
-    let target = fixture.target();
     fixture.write_events(&[
-        fixture.use_event(1, "friction", Some("execution"), "session-1"),
-        json!({
-            "schema_version": 1,
-            "event_id": "evt_review_started",
-            "event_type": "review_started",
-            "recorded_at": "2026-01-02T02:00:00Z",
-            "operator_workflow": "skill-evolution",
-            "target": target,
-            "top_level_session_id": "review-session",
-            "payload": {"review_id": "active-review"}
-        }),
-    ]);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(status.state, "review_in_progress");
-    assert_eq!(status.active_review_id.as_deref(), Some("active-review"));
-}
-
-#[test]
-fn unadjudicated_severe_incident_remains_quarantined_across_later_disposition() {
-    let fixture = Fixture::new();
-    let target = fixture.target();
-    fixture.write_events(&[
-        fixture.use_event(1, "material_failure", Some("output"), "session-1"),
-        fixture.use_event(2, "material_failure", Some("output"), "session-2"),
-        fixture.use_event(3, "severe_incident", Some("state"), "session-3"),
-        json!({
-            "schema_version": 1,
-            "event_id": "evt_review_started",
-            "event_type": "review_started",
-            "recorded_at": "2026-01-02T04:00:00Z",
-            "operator_workflow": "skill-evolution",
-            "target": target,
-            "top_level_session_id": "review-session",
-            "payload": {"review_id": "review-severe"}
-        }),
-        json!({
-            "schema_version": 1,
-            "event_id": "evt_review_disposition",
-            "event_type": "review_disposition",
-            "recorded_at": "2026-01-02T05:00:00Z",
-            "operator_workflow": "skill-evolution",
-            "target": target,
-            "top_level_session_id": "review-session",
-            "payload": {
-                "review_id": "review-severe",
-                "disposition": "candidate_rejected_validation",
-                "adjudicated_event_ids": ["evt_1", "evt_2"]
-            }
-        }),
-    ]);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-    assert_eq!(status.state, "quarantined_eligible");
-    assert_eq!(status.authorization_reason.as_deref(), Some("severe"));
-    assert_eq!(
-        status.review_reentry_basis.as_deref(),
-        Some("unadjudicated_severe")
-    );
-    assert_eq!(status.trigger_event_ids, ["evt_3"]);
-}
-
-/// ADR 0002's carve-out reaches the naming channel too: a contemporaneous severe incident
-/// authorizes on its own, so listing it as retired would have the projection claim it
-/// stopped driving the gate while it demonstrably still does. Naming it therefore stops it
-/// being adjudicated and nothing more — and the gate keeps re-authorizing, which is the
-/// safety claim rather than a defect.
-#[test]
-fn naming_a_contemporaneous_severe_incident_stops_adjudication_without_retiring_it() {
-    let fixture = Fixture::new();
-    let mut events = vec![fixture.use_event(1, "severe_incident", Some("execution"), "session-1")];
-    events.extend(fixture.review_naming_untestable_coverage(
-        "review-severe",
-        "monitor_for_recurrence",
-        &["evt_1"],
-        &["evt_1"],
-    ));
-    fixture.write_events(&events);
-
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
-
-    assert_eq!(status.open_incident_ids, vec!["evt_1".to_owned()]);
-    assert_eq!(
-        status.instrument_limited_incident_ids,
-        Vec::<String>::new(),
-        "it never left the gate, so the projection must not say it did"
-    );
-    assert_eq!(
-        status.authorized_workflow.as_deref(),
-        Some("skill-evolution"),
-        "and it still authorizes on its own"
-    );
-}
-
-/// The close refuses to name coverage it does not hold. Derivation must not honour it
-/// either, or a hand-edited stream retires an incident the review never accounted for —
-/// the widening the command exists to prevent.
-#[test]
-fn untestable_coverage_outside_the_coverage_list_retires_nothing() {
-    let fixture = Fixture::new();
-    let mut events = vec![
         fixture.use_event(1, "friction", Some("execution"), "session-1"),
         fixture.use_event(2, "friction", Some("execution"), "session-2"),
-    ];
-    events.extend(fixture.review_naming_untestable_coverage(
-        "review-overreaching",
-        "monitor_for_recurrence",
-        &["evt_1"],
-        &["evt_2"],
-    ));
-    fixture.write_events(&events);
+    ]);
+    let evidence = fixture
+        .root
+        .path()
+        .join("reports/skill-evidence/demo-skill");
+    let events_path = evidence.join("events.jsonl");
+    let recorded = fs::read(&events_path).expect("read recorded stream");
 
-    let status = fixture.derive("fresh-session", 1_767_398_400_000);
+    // A non-empty directory where the projection belongs: `rename` cannot replace it.
+    let projection = evidence.join("gate-status.json");
+    fs::create_dir_all(&projection).expect("stand a directory where the projection goes");
+    fs::write(projection.join("occupant"), b"not a projection\n").expect("occupy it");
 
-    assert_eq!(
-        status.instrument_limited_incident_ids,
-        Vec::<String>::new(),
-        "evt_2 is outside the coverage list, so this close established nothing about it"
+    let error = derive_store(
+        fixture.root.path(),
+        Path::new(fixture.target_relative),
+        &DerivationInputs {
+            generated_at: "2026-01-03T00:00:00Z".to_owned(),
+            now_epoch_milliseconds: 1_767_398_400_000,
+            session_id: "derive-session".to_owned(),
+            lock_owner: "derive-owner".to_owned(),
+        },
+    )
+    .expect_err("an unreplaceable projection must fail the derivation");
+
+    assert_eq!(error.class(), skill_evidence::ErrorClass::UnsafeFailure);
+    assert!(
+        error.to_string().contains("atomically replace"),
+        "the failure names the swap it could not complete: {error}"
     );
     assert_eq!(
-        status.open_incident_ids,
-        vec!["evt_2".to_owned()],
-        "and it stays open, driving the gate as before"
+        fs::read(&events_path).expect("stream survives"),
+        recorded,
+        "deriving reads the stream and never rewrites it, least of all when it fails"
     );
     assert_eq!(
-        status.candidate_clusters.len(),
-        1,
-        "and stays in its cluster"
+        fs::read_to_string(projection.join("occupant")).expect("occupant survives"),
+        "not a projection\n",
+        "nothing was half-written over what stood where the projection goes"
     );
 }
 
+/// A failed append records nothing: no event, no projection, and no temporary left to
+/// be mistaken for one.
+///
+/// `docs/principles/evidence-substrate-integrity.md` names this the worst outcome
+/// available — "An act that half-applies and records nothing … must not be reachable."
+/// `record_use` stages the projection before it appends precisely so the append can
+/// still fail safely, and this is the test of that ordering.
+///
+/// A dangling symlink is what makes the failure reachable without a fault-injection
+/// seam: reading it raises `NotFound`, which the reader absorbs as an empty stream, so
+/// the run proceeds all the way to the append and only then cannot open the path.
+#[cfg(unix)]
 #[test]
-fn untestable_coverage_refuses_a_malformed_shape_on_read() {
-    for (case, invalid) in [
-        ("not an array", json!("evt_1")),
-        ("non-string member", json!([42])),
-        ("empty array", json!([])),
-        ("empty member", json!([""])),
-    ] {
-        let fixture = Fixture::new();
-        let mut events = vec![fixture.use_event(1, "friction", Some("execution"), "session-1")];
-        let mut review = fixture.review("review-malformed", "monitor_for_recurrence", &["evt_1"]);
-        review[1]["payload"]["instrument_limited_event_ids"] = invalid;
-        events.extend(review);
-        fixture.write_events(&events);
+fn a_failed_append_leaves_no_event_and_no_projection() {
+    let fixture = Fixture::new();
+    let evidence = fixture
+        .root
+        .path()
+        .join("reports/skill-evidence/demo-skill");
+    fs::create_dir_all(&evidence).expect("create evidence directory");
+    std::os::unix::fs::symlink("./absent/events.jsonl", evidence.join("events.jsonl"))
+        .expect("dangle the stream at a path that cannot be opened");
 
-        let status = fixture.derive("fresh-session", 1_767_398_400_000);
+    let error = record_use(
+        fixture.root.path(),
+        Path::new(fixture.target_relative),
+        &RecordUseRequest {
+            outcome: "friction".to_owned(),
+            task_label: "Append must fail safely".to_owned(),
+            symptom_key: Some("execution".to_owned()),
+            expected: Some("expected".to_owned()),
+            observed: Some("observed".to_owned()),
+            consequence: Some("consequence".to_owned()),
+            workaround: None,
+            run_condition: Some("first append against an empty store".to_owned()),
+            retrospective: false,
+            evidence_refs: Vec::new(),
+            same_run_group: None,
+            further_incident: false,
+        },
+        &RecordInputs {
+            event_id: "evt_unappendable".to_owned(),
+            recorded_at: "2026-01-02T03:04:05.678Z".to_owned(),
+            now_epoch_milliseconds: 1_767_320_645_678,
+            repository_head: "head".to_owned(),
+            session_id: "session".to_owned(),
+            lock_owner: "lock-owner".to_owned(),
+        },
+        &support::host(),
+    )
+    .expect_err("an unappendable stream must fail the record");
 
-        assert_eq!(status.state, "blocked", "case {case}");
-        assert!(
-            status
-                .integrity_errors
-                .iter()
-                .any(|error| error.contains("instrument_limited_event_ids")),
-            "case {case}: a shape the reader cannot trust must not be silently read as an empty narrowing: {:?}",
-            status.integrity_errors
-        );
-    }
-}
-
-#[test]
-fn optional_incident_text_fields_refuse_non_string_or_empty_values_on_read() {
-    for (field, invalid) in [
-        ("workaround_taken", json!(false)),
-        ("workaround_taken", json!("")),
-        ("run_condition", json!(false)),
-        ("run_condition", json!("")),
-    ] {
-        let fixture = Fixture::new();
-        let mut event = fixture.use_event(1, "friction", Some("execution"), "session-1");
-        event["payload"][field] = invalid;
-        fixture.write_events(&[event]);
-
-        let status = fixture.derive("fresh-session", 1_767_398_400_000);
-        assert_eq!(status.state, "blocked", "field {field}");
-        assert!(
-            status
-                .integrity_errors
-                .iter()
-                .any(|error| error.contains(field)),
-            "missing {field} integrity error: {:?}",
-            status.integrity_errors
-        );
-    }
+    assert_eq!(error.class(), skill_evidence::ErrorClass::UnsafeFailure);
+    assert!(
+        !evidence.join(".gate-status.json.tmp").exists(),
+        "the staged projection is discarded when the append it was staged for fails"
+    );
+    assert!(
+        !evidence.join("gate-status.json").exists(),
+        "no projection is published for an event that was never recorded"
+    );
+    assert!(
+        !evidence.join("absent").exists(),
+        "nothing was created behind the dangling stream"
+    );
 }

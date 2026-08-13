@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-13T07:29:57.340655222Z",
+  "generated_at": "2026-08-13T13:37:09.370816505Z",
   "target_content_hash": "58ee690ec479d13e9ff51567f4e57087f319ac7a1aca6511d61c8628f5e43fa6",
-  "qualifying_uses_on_current_hash": 39,
+  "qualifying_uses_on_current_hash": 40,
   "open_incident_ids": [
     "evt_7814cfa8-ad78-4511-b202-f78ad96902d3",
     "evt_c5666704-0654-4a6f-9626-2deb557e1302",
@@ -17,7 +17,12 @@
     "evt_e6f12d99-54ae-42bb-bbc2-b2911226a80a",
     "evt_6f3eb962-540d-4bab-94dc-06835fd176b0",
     "evt_966b403f-dee2-45ea-8d7e-d421e142f2b1",
-    "evt_c312aad4-b0a8-4396-96a1-7b240942e00c"
+    "evt_c312aad4-b0a8-4396-96a1-7b240942e00c",
+    "evt_04861eba-713e-4caa-b70f-a7634c38e7a6",
+    "evt_507fb751-bb88-4fc9-82cc-dcc18e03bcf5",
+    "evt_e5e679fd-25c7-4f95-b193-cbb13d6c4fed",
+    "evt_a597f189-eb05-4938-a80f-dd513a297c5e",
+    "evt_dbdce886-81c8-48d5-b685-c82a8bdf8c05"
   ],
   "candidate_clusters": [
     {
@@ -29,18 +34,23 @@
         "evt_4e9e554e-0b12-4c25-b57c-9c14d7f6dd7b",
         "evt_e6f12d99-54ae-42bb-bbc2-b2911226a80a",
         "evt_6f3eb962-540d-4bab-94dc-06835fd176b0",
-        "evt_966b403f-dee2-45ea-8d7e-d421e142f2b1"
+        "evt_966b403f-dee2-45ea-8d7e-d421e142f2b1",
+        "evt_04861eba-713e-4caa-b70f-a7634c38e7a6",
+        "evt_e5e679fd-25c7-4f95-b193-cbb13d6c4fed"
       ],
-      "independent_incidents": 6,
+      "independent_incidents": 7,
       "max_severity": "material_failure"
     },
     {
       "symptom_key": "output",
       "open_event_ids": [
         "evt_853b65f5-fc30-45d1-a3f4-85f547df6957",
-        "evt_c312aad4-b0a8-4396-96a1-7b240942e00c"
+        "evt_c312aad4-b0a8-4396-96a1-7b240942e00c",
+        "evt_507fb751-bb88-4fc9-82cc-dcc18e03bcf5",
+        "evt_a597f189-eb05-4938-a80f-dd513a297c5e",
+        "evt_dbdce886-81c8-48d5-b685-c82a8bdf8c05"
       ],
-      "independent_incidents": 2,
+      "independent_incidents": 3,
       "max_severity": "material_failure"
     }
   ],
@@ -57,7 +67,7 @@
   "review_reentry_basis": "post_review_incident",
   "target_name": "code-review",
   "target_repo_relative_path": ".claude/skills/code-review",
-  "derivation_session_id": "e0ed70f9-dd0c-4b48-9e66-4e985b59280e",
+  "derivation_session_id": "827703fb-f235-4245-a718-173339cdd3f5",
   "instrument_limited_incident_ids": [
     "evt_7814cfa8-ad78-4511-b202-f78ad96902d3",
     "evt_c5666704-0654-4a6f-9626-2deb557e1302",
