@@ -2,6 +2,8 @@
 
 Status: accepted (2026-08-12, GitHub [#48](https://github.com/joeloverbeck/skill-evidence/issues/48))
 
+Amended: 2026-08-13, GitHub [#51](https://github.com/joeloverbeck/skill-evidence/issues/51) — the release forward-test reached a terminal state this decision makes ordinary and the enumeration had no name for; `not_reproduced_witnesses_expressed` is added. No instrument decision changed.
+
 Supersedes the instrument half of
 [ADR 0003](0003-no-new-instrument-for-conformance-only-evidence.md) for constraints of accumulated
 context, volume, and run length. That decision's conformance/outcome ruling is untouched and still
@@ -290,6 +292,17 @@ review. It never decides what a close asserts.
   reach this exit honestly without any constraint being unreachable, and the cross-session and
   elapsed-wall-clock residue is what remains of the reachability ground specifically, not of the
   exit.
+- **A terminal outcome that was rare becomes ordinary, and it needed a name.** Before this
+  decision an accumulation-bound mechanism was marked unable to be expressed and its review closed
+  `blocked_no_valid_test`, so the reading *not reproduced with witnesses expressed* arrived mostly
+  alongside an untestable sibling — which is the only shape `mixed_no_candidate` was defined for.
+  A long-course trial changes that: the mechanism now gets tested, and a trial that reaches its
+  scale without the failure recurring leaves every mechanism on that single reading. The
+  enumeration had no name for it while still requiring one — *"Name the terminal outcome in the
+  report and completion"* — so a reviewer could not comply. `not_reproduced_witnesses_expressed` fills
+  it, on the same `monitor_for_recurrence` disposition. This was found by the `0.11.0` release
+  forward-test on its first run, not predicted here, and it is recorded as this decision's
+  consequence because this decision is what made the state common.
 - **Intermittency's routing outcome is unchanged, and deliberately so; only its stated ground
   moved.** The sentence this decision rewrote carried volume, late-run, and intermittent conditions
   together to one exit. Splitting it moves the first two and leaves the third reaching that same

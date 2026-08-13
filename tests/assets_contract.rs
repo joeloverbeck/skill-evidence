@@ -1789,6 +1789,56 @@ fn installed_skill_evolution_reference_keeps_its_no_candidate_route_consistent_w
 }
 
 #[test]
+fn installed_skill_evolution_names_a_wholly_not_reproduced_review() {
+    let root = tempfile::tempdir().expect("temporary repository root");
+    assets::install(root.path(), &host(), false).expect("install current assets");
+    let reference = fs::read_to_string(
+        root.path()
+            .join(".claude/skills/skill-evolution/references/authorized-review.md"),
+    )
+    .expect("read installed authorized-review reference");
+
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let validation = reference
+        .find("### 6. Run blind comparative validation")
+        .expect("the candidate-arm step remains explicit");
+    let arm = &reference[current_arm..validation];
+
+    assert!(
+        arm.contains(
+            "When the review carries `monitor_for_recurrence` and step 3 reached no conclusion of its own that names the whole review — `outside_target` or `resolved_no_change` — name its terminal outcome from the readings:"
+        ),
+        "the shared precondition must be stated once, and must not be blocked by a per-trigger conclusion that names no review: reference={reference}"
+    );
+    assert!(
+        arm.contains(
+            "`not_reproduced_witnesses_expressed` when none was unable to be expressed and at least one was not reproduced with witnesses expressed"
+        ),
+        "step 5 must name the wholly not-reproduced outcome, and guard it existentially so a zero-mechanism review cannot satisfy it vacuously: reference={reference}"
+    );
+    assert!(
+        arm.contains(
+            "A review that did reach such a conclusion names its outcome instead, whatever its siblings' readings"
+        ),
+        "the guard must reach a tested sibling's reading, not only an untested one: reference={reference}"
+    );
+    assert!(
+        arm.contains(
+            "a review that also tested a mechanism takes its outcome from the branch above"
+        ),
+        "a per-trigger not_reproducible sibling must leave the review nameable rather than stranding it: reference={reference}"
+    );
+    assert!(
+        reference.contains(
+            "one of the two no-candidate outcomes step 5 branches between — `mixed_no_candidate` and `not_reproduced_witnesses_expressed` —"
+        ),
+        "the roster must defer to step 5's branch rather than restate its conditions and drop its precondition: reference={reference}"
+    );
+}
+
+#[test]
 fn installed_skill_evolution_reports_a_mixed_no_candidate_close_truthfully() {
     let root = tempfile::tempdir().expect("temporary repository root");
     assets::install(root.path(), &host(), false).expect("install current assets");
@@ -1802,7 +1852,7 @@ fn installed_skill_evolution_reports_a_mixed_no_candidate_close_truthfully() {
 
     assert!(
         reference.contains(
-            "A mixed no-candidate review terminates as `mixed_no_candidate` with disposition `monitor_for_recurrence`"
+            "`mixed_no_candidate` when at least one mechanism was unable to be expressed"
         ),
         "the no-candidate branch must name the mixed result instead of borrowing the narrower ownership conclusion: reference={reference}"
     );
@@ -1811,10 +1861,10 @@ fn installed_skill_evolution_reports_a_mixed_no_candidate_close_truthfully() {
         "the mixed route must explicitly reject the previous false terminal label: reference={reference}"
     );
     assert!(
-        reference.contains(
-            "`mixed_no_candidate` when `monitor_for_recurrence` closes a review in which no mechanism reproduced, at least one was not reproduced with witnesses expressed, and at least one was unable to be expressed"
+        !reference.contains(
+            "`mixed_no_candidate` when `monitor_for_recurrence` closes a review in which no mechanism reproduced"
         ),
-        "the terminal roster must define the mixed label by its per-mechanism readings: reference={reference}"
+        "the roster must not restate step 5's branch conditions, which is how the two drifted apart: reference={reference}"
     );
     assert!(
         reference.contains("- Terminal outcome:"),
