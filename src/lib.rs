@@ -7,7 +7,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     thread,
-    time::Duration,
+    time::{Duration, UNIX_EPOCH},
 };
 
 use serde::Serialize;
@@ -2162,10 +2162,14 @@ impl EvidenceLock {
             }
         }
         if !acquired {
-            return Err(unsafe_failure(format!(
-                "Could not acquire evidence lock at {}; nothing recorded.",
-                directory.display()
-            )));
+            return Err(unsafe_failure_with_recovery(
+                format!(
+                    "Could not acquire evidence lock at {}: {}; nothing recorded.",
+                    directory.display(),
+                    held_lock_description(&directory)
+                ),
+                Recovery::ReleaseEvidenceLock,
+            ));
         }
         let owner_path = directory.join("owner");
         if let Err(error) = fs::write(&owner_path, owner) {
@@ -2191,6 +2195,62 @@ impl Drop for EvidenceLock {
             let _ = fs::remove_dir(&self.directory);
         }
     }
+}
+
+/// What a lock this process could not take says about itself.
+///
+/// [`Drop`] releases a lock only while the run that took it is alive to run it, so a
+/// killed run leaves its lock behind and every later command on that evidence store
+/// stops here. This unsafe failure is the only place an operator learns which of the
+/// two they are facing: queued behind a run that is working, or stranded behind one
+/// that died. Both facts are read off the lock rather than asserted — the holder from
+/// the `owner` file it wrote, the moment it began from the directory's own timestamp.
+/// Either can be missing, on a lock caught mid-creation or a filesystem that keeps no
+/// timestamp, and naming one of them still beats naming neither.
+fn held_lock_description(directory: &Path) -> String {
+    let holder = fs::read_to_string(directory.join("owner"))
+        .ok()
+        .map(|owner| owner.trim().to_owned())
+        .filter(|owner| !owner.is_empty())
+        .map_or_else(
+            || "held by an unnamed owner".to_owned(),
+            |owner| format!("held by \"{owner}\""),
+        );
+    match lock_start_milliseconds(directory) {
+        Some(milliseconds) => format!(
+            "{holder} since {}",
+            gate::format_timestamp_milliseconds(milliseconds)
+        ),
+        None => holder,
+    }
+}
+
+/// When a lock directory was last written, as epoch milliseconds.
+///
+/// For a lock this process could not take, that is when it began: `acquire` writes
+/// the `owner` file into the directory immediately after creating it and nothing
+/// writes there again, so the only later modification is the holder's own [`Drop`]
+/// removing the file it is about to remove the directory with.
+///
+/// `None` rather than a guess whenever the filesystem does not keep the timestamp or
+/// reports one no calendar can express. This is a diagnostic inside an unsafe
+/// failure, and one that panics on its way to being written tells the operator
+/// nothing at all.
+fn lock_start_milliseconds(directory: &Path) -> Option<i64> {
+    /// Midnight opening the year 10000 UTC, past what [`time`] can express.
+    const BEYOND_EXPRESSIBLE_MILLISECONDS: i64 = 253_402_300_800_000;
+
+    let milliseconds = i64::try_from(
+        fs::metadata(directory)
+            .ok()?
+            .modified()
+            .ok()?
+            .duration_since(UNIX_EPOCH)
+            .ok()?
+            .as_millis(),
+    )
+    .ok()?;
+    (milliseconds < BEYOND_EXPRESSIBLE_MILLISECONDS).then_some(milliseconds)
 }
 
 /// The bytes an event is persisted as, chosen by the event's own type.

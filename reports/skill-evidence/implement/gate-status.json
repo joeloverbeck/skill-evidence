@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-13T14:31:46.945482296Z",
+  "generated_at": "2026-08-14T08:40:55.271286381Z",
   "target_content_hash": "b4aaa5ea17450343dfa971ab4f08a9a4427c36b1f956579c96f270e90e3af9dd",
-  "qualifying_uses_on_current_hash": 25,
+  "qualifying_uses_on_current_hash": 26,
   "open_incident_ids": [
     "evt_6044d588-9dd2-4aba-946e-26185c5f5dda",
     "evt_73bfa709-50b7-4365-822a-a6dbe225f036",
@@ -23,7 +23,9 @@
     "evt_93b0ed83-cd81-4d84-a7f1-4b4c5b822087",
     "evt_726b3b12-f986-401f-b93f-54401e628698",
     "evt_b84ee5e7-326c-4b43-9cad-a00985c55ba8",
-    "evt_52f5b732-9aaa-487e-a1e4-b1a697d4b367"
+    "evt_52f5b732-9aaa-487e-a1e4-b1a697d4b367",
+    "evt_10793409-e361-4040-a5be-2a3ed5ae7957",
+    "evt_1d0637a9-4d2b-4374-b797-454e400c960e"
   ],
   "candidate_clusters": [
     {
@@ -57,9 +59,11 @@
         "evt_58c73327-0bef-4ea1-b385-1027721233d9",
         "evt_93b0ed83-cd81-4d84-a7f1-4b4c5b822087",
         "evt_b84ee5e7-326c-4b43-9cad-a00985c55ba8",
-        "evt_52f5b732-9aaa-487e-a1e4-b1a697d4b367"
+        "evt_52f5b732-9aaa-487e-a1e4-b1a697d4b367",
+        "evt_10793409-e361-4040-a5be-2a3ed5ae7957",
+        "evt_1d0637a9-4d2b-4374-b797-454e400c960e"
       ],
-      "independent_incidents": 5,
+      "independent_incidents": 6,
       "max_severity": "material_failure"
     },
     {
@@ -100,5 +104,5 @@
   "review_reentry_basis": "post_review_incident",
   "target_name": "implement",
   "target_repo_relative_path": ".claude/skills/implement",
-  "derivation_session_id": "019ffa60-9ceb-7721-93ea-cec980edfc4e"
+  "derivation_session_id": "ff7be8ee-53d5-49be-a6df-372305119e65"
 }

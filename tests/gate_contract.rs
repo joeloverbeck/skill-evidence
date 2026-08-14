@@ -12,12 +12,14 @@ use std::{fs, path::Path};
 
 mod support;
 
+use regex::Regex;
 use serde_json::{Value, json};
 use skill_evidence::{
     DerivationInputs, GateStatus, RecordInputs, RecordUseRequest, derive_store, hash_skill,
     record_use,
 };
 use tempfile::TempDir;
+use time::{Duration, OffsetDateTime, PrimitiveDateTime};
 
 struct Fixture {
     root: TempDir,
@@ -144,6 +146,109 @@ fn derive_does_not_remove_or_bypass_a_foreign_store_lock() {
         fs::read(evidence.join("gate-status.json")).expect("projection remains"),
         b"foreign projection\n"
     );
+}
+
+/// A lock outlives the run that took it when that run is killed, and the unsafe
+/// failure is the only place an operator learns anything about the lock they are now
+/// stuck behind. Naming the holder and when the lock began is what separates "another
+/// run is working right now" from "something died holding this".
+#[test]
+fn a_blocked_acquisition_reports_the_lock_holder_and_when_the_lock_began() {
+    let fixture = Fixture::new();
+    let evidence = fixture
+        .root
+        .path()
+        .join("reports/skill-evidence/demo-skill");
+    let lock = evidence.join(".lock");
+    fs::create_dir_all(&evidence).expect("create evidence directory");
+    let taken_at = OffsetDateTime::now_utc();
+    fs::create_dir(&lock).expect("create foreign lock");
+    fs::write(lock.join("owner"), "foreign-owner").expect("write foreign owner");
+
+    let error = derive_store(
+        fixture.root.path(),
+        Path::new(fixture.target_relative),
+        &DerivationInputs {
+            generated_at: "2026-01-03T00:00:00Z".to_owned(),
+            now_epoch_milliseconds: 1_767_398_400_000,
+            session_id: "derive-session".to_owned(),
+            lock_owner: "derive-owner".to_owned(),
+        },
+    )
+    .expect_err("foreign lock must block derive");
+
+    let message = error.to_string();
+    assert!(
+        message.contains("foreign-owner"),
+        "the report must name the holder: {message}"
+    );
+    let began = sole_timestamp(&message);
+    assert!(
+        (began - taken_at).abs() < Duration::seconds(5),
+        "the report must say when the lock began, not what the injected clock reads: {message}"
+    );
+}
+
+/// Knowing a lock is a corpse is only half an escape. The crate will not remove a lock
+/// it does not own, so the failure has to name the act that releases it — and naming
+/// an act means naming a binary, which is the host's half of the error.
+#[test]
+fn a_blocked_acquisition_names_the_operator_action_that_releases_the_lock() {
+    let fixture = Fixture::new();
+    let lock = fixture
+        .root
+        .path()
+        .join("reports/skill-evidence/demo-skill/.lock");
+    fs::create_dir_all(&lock).expect("create foreign lock");
+    fs::write(lock.join("owner"), "foreign-owner").expect("write foreign owner");
+
+    let error = derive_store(
+        fixture.root.path(),
+        Path::new(fixture.target_relative),
+        &DerivationInputs {
+            generated_at: "2026-01-03T00:00:00Z".to_owned(),
+            now_epoch_milliseconds: 1_767_398_400_000,
+            session_id: "derive-session".to_owned(),
+            lock_owner: "derive-owner".to_owned(),
+        },
+    )
+    .expect_err("foreign lock must block derive");
+
+    let recovery = error
+        .recovery()
+        .expect("a blocked acquisition names an operator action");
+    let instruction = support::host().recovery_instruction(recovery);
+    assert!(
+        instruction.contains(".lock"),
+        "the operator action must point at the lock: {instruction}"
+    );
+    assert!(
+        lock.is_dir(),
+        "naming the action must not perform it: the lock is the operator's to release"
+    );
+}
+
+/// The one UTC instant a message reports, parsed back so a test can compare it with
+/// an instant it observed itself rather than with the way the code computed it.
+fn sole_timestamp(message: &str) -> OffsetDateTime {
+    let pattern = Regex::new(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z")
+        .expect("static pattern is valid");
+    let found = pattern
+        .find_iter(message)
+        .map(|found| found.as_str().to_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        found.len(),
+        1,
+        "expected exactly one UTC timestamp in: {message}"
+    );
+    let format = time::format_description::parse_borrowed::<3>(
+        "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z",
+    )
+    .expect("static timestamp format is valid");
+    PrimitiveDateTime::parse(&found[0], &format)
+        .expect("reported timestamp parses")
+        .assume_utc()
 }
 
 #[test]
