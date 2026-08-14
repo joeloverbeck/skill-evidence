@@ -92,6 +92,10 @@ impl Host {
                 "Run `{} skills evidence derive --target <skill-dir>`.",
                 self.command
             ),
+            Recovery::ReleaseEvidenceLock => format!(
+                "Once no other `{}` run is writing to that evidence store, remove the `.lock` directory named above and run this command again.",
+                self.command
+            ),
         }
     }
 }
@@ -109,4 +113,12 @@ pub enum Recovery {
     /// it was not replaced. The stream is intact and the projection is stale
     /// until it is derived again.
     RederiveGate,
+    /// A lock on the evidence store outlived the run that took it, so every
+    /// command on that store now stops before doing anything.
+    ///
+    /// Releasing it is the operator's act and not this crate's: a lock that
+    /// looks abandoned may belong to a run still working, and taking it would
+    /// put two writers on one append-only stream. The crate says what it found
+    /// and who holds it; the operator decides that the holder is gone.
+    ReleaseEvidenceLock,
 }

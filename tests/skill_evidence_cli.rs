@@ -1557,6 +1557,52 @@ fn concurrent_skill_evidence_records_are_serialized_into_one_current_projection(
     assert!(!evidence.join(".lock").exists());
 }
 
+/// A lock the crate will not break is only escapable if the operator is told they may
+/// break it. [`Error`](skill_evidence::Error) deliberately omits that sentence,
+/// because naming the act means naming a binary — so the surface that prints the
+/// error is the only place the escape route exists.
+#[test]
+fn a_record_blocked_by_an_abandoned_lock_tells_the_operator_how_to_release_it() {
+    let fixture = repository_with_demo_skill();
+    let evidence = fixture.path().join("reports/skill-evidence/demo-skill");
+    let lock = evidence.join(".lock");
+    fs::create_dir_all(&lock).expect("create abandoned lock");
+    fs::write(lock.join("owner"), "lock_a-run-that-died").expect("write abandoned owner");
+
+    let blocked = clean_record(
+        fixture.path(),
+        "task behind an abandoned lock",
+        "session-blocked",
+    )
+    .output()
+    .expect("run record behind the abandoned lock");
+
+    assert_eq!(blocked.status.code(), Some(1));
+    let report = String::from_utf8_lossy(&blocked.stderr);
+    assert!(
+        report.contains("lock_a-run-that-died"),
+        "the operator must learn who holds it: {report}"
+    );
+    assert!(
+        report.contains(lock.to_string_lossy().as_ref()),
+        "the operator must learn which lock: {report}"
+    );
+    assert!(
+        report.contains(
+            &support::host().recovery_instruction(skill_evidence::Recovery::ReleaseEvidenceLock)
+        ),
+        "the operator must learn what to do about it: {report}"
+    );
+    assert!(
+        lock.is_dir(),
+        "the lock is the operator's to release, not the command's"
+    );
+    assert!(
+        !evidence.join("events.jsonl").exists(),
+        "a record that never got the lock appends nothing"
+    );
+}
+
 #[test]
 fn skill_evidence_event_schema_matches_the_compiled_use_record_contract() {
     let root = repository_root();
