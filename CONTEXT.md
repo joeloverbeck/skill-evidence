@@ -306,6 +306,13 @@ A first-class terminal result — exit code `3` — where the command declines f
 and writes nothing at all. A refusal is the system working, not an error.
 _Avoid_: failure, rejection, error, denial
 
+**Unsafe failure**:
+The terminal result — exit code `1` — where the command could not complete safely and its effect may
+be incomplete. The counterpart to a refusal rather than a kind of one: a refusal declines for want of
+authority and writes nothing, while an unsafe failure is the system unable to finish and saying how
+far it got. It carries a `Recovery` when a named operator action would finish what it interrupted.
+_Avoid_: refusal, error, crash
+
 ### Distribution
 
 **Host**:
