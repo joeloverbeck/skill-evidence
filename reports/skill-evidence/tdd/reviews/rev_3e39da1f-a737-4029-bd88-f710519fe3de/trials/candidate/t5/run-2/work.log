@@ -1,0 +1,6 @@
+1. Production was changed first in receipt.py to emit {"receipt_id": "r1"}.
+2. The existing compatibility assertion was then updated from {"id": "r1"} to {"receipt_id": "r1"}.
+3. Its first recorded run was:
+   python3 -m unittest test_receipt.ReceiptTests.test_public_dictionary_shape -v
+4. The first recorded run passed: Ran 1 test; OK.
+5. Aggregate verification passed: python3 -m unittest discover -v; Ran 1 test; OK.

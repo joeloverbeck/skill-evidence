@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-12T18:01:55.527800441Z",
+  "generated_at": "2026-08-14T12:20:34.086961707Z",
   "target_content_hash": "a8bac8f11e6f71f3093da1284fcc44d0519b23de28b5ee9d31dfd6ed4588729e",
-  "qualifying_uses_on_current_hash": 9,
+  "qualifying_uses_on_current_hash": 10,
   "open_incident_ids": [
     "evt_9dcc7f9c-c5a8-4ae6-a239-8f88adb0ee59",
     "evt_94b1348a-4286-4268-ac8a-74cedb8a0e79",
@@ -29,16 +29,20 @@
       "max_severity": "material_failure"
     }
   ],
-  "state": "collecting",
-  "authorized_workflow": null,
-  "authorization_reason": null,
-  "trigger_event_ids": [],
-  "threshold_session_id": null,
+  "state": "eligible_pending_cooldown",
+  "authorized_workflow": "skill-evolution",
+  "authorization_reason": "ten_use_unresolved",
+  "trigger_event_ids": [
+    "evt_9dcc7f9c-c5a8-4ae6-a239-8f88adb0ee59",
+    "evt_94b1348a-4286-4268-ac8a-74cedb8a0e79",
+    "evt_acc8330a-9f02-40e5-aa14-0382463e520b"
+  ],
+  "threshold_session_id": "019fff84-cdb2-7aa2-b955-901eb03b69fc",
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": null,
-  "review_reentry_basis": null,
+  "review_reentry_basis": "first_eligibility",
   "target_name": "diagnosing-bugs",
   "target_repo_relative_path": ".claude/skills/diagnosing-bugs",
-  "derivation_session_id": "019ff6c2-5547-7eb0-beab-0bc56a4db17b"
+  "derivation_session_id": "019fff84-cdb2-7aa2-b955-901eb03b69fc"
 }

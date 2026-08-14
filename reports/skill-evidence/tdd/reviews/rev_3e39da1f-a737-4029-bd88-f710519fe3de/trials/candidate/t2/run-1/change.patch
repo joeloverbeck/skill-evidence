@@ -1,0 +1,26 @@
+diff --git a/tests/test_slug.py b/tests/test_slug.py
+index 0000000..1111111 100644
+--- a/tests/test_slug.py
++++ b/tests/test_slug.py
+@@
++    def test_parse_trims_whitespace(self):
++        self.assertEqual(Slug.parse("  hello  ").value, "hello")
++
++    def test_parse_lowercases_ascii(self):
++        self.assertEqual(Slug.parse("HELLO").value, "hello")
++
++    def test_parse_refuses_empty(self):
++        with self.assertRaisesRegex(ValueError, "empty slug"):
++            Slug.parse("   ")
+diff --git a/slug.py b/slug.py
+index 2222222..3333333 100644
+--- a/slug.py
++++ b/slug.py
+@@
+ class Slug:
+     @classmethod
+     def parse(cls, raw):
++        value = raw.strip().lower()
++        if not value:
++            raise ValueError("empty slug")
++        return cls(value)

@@ -1,0 +1,215 @@
+diff --git a/routebook/grouping.py b/routebook/grouping.py
+index dd72f56..67aafa0 100644
+--- a/routebook/grouping.py
++++ b/routebook/grouping.py
+@@ -2,11 +2,23 @@
+ 
+ from collections.abc import Iterable
+ 
++from .normalization import normalize_destination
++
+ 
+ def group_routes(routes: Iterable[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
+-    """Group legacy route dictionaries by their country spelling."""
++    """Normalize route destinations and group them by country code."""
+ 
+     grouped: dict[str, list[dict[str, str]]] = {}
++    seen_ids: set[str] = set()
+     for route in routes:
+-        grouped.setdefault(route["country"], []).append(dict(route))
++        route_id = route["id"]
++        if route_id in seen_ids:
++            raise ValueError(f"duplicate route id: {route_id}")
++        seen_ids.add(route_id)
++        city, country = normalize_destination(route["city"], route["country"])
++        normalized_route = dict(route)
++        normalized_route.update(city=city, country=country)
++        grouped.setdefault(country, []).append(normalized_route)
++    for country_routes in grouped.values():
++        country_routes.sort(key=lambda route: (route["city"], route["id"]))
+     return grouped
+diff --git a/routebook/normalization.py b/routebook/normalization.py
+index 59112db..7c91b32 100644
+--- a/routebook/normalization.py
++++ b/routebook/normalization.py
+@@ -2,6 +2,9 @@
+ 
+ 
+ def normalize_destination(city: str, country: str) -> tuple[str, str]:
+-    """Return the legacy destination representation."""
++    """Return a normalized destination pair."""
+ 
+-    return city, country
++    normalized_city = " ".join(city.split())
++    if not normalized_city:
++        raise ValueError("city must not be blank")
++    return normalized_city, country.strip().upper()
+diff --git a/routebook/rendering.py b/routebook/rendering.py
+index 5536b8d..76e5711 100644
+--- a/routebook/rendering.py
++++ b/routebook/rendering.py
+@@ -4,6 +4,11 @@ from collections.abc import Mapping, Sequence
+ 
+ 
+ def render_manifest(groups: Mapping[str, Sequence[dict[str, str]]]) -> str:
+-    """Render the legacy debug representation."""
+-
+-    return repr(dict(groups))
++    """Render deterministic country headers followed by their routes."""
++
++    lines: list[str] = []
++    for country in sorted(groups):
++        lines.append(f"{country}:")
++        routes = sorted(groups[country], key=lambda route: (route["city"], route["id"]))
++        lines.extend(f"  {route['id']}: {route['city']}" for route in routes)
++    return "\n".join(line.rstrip(" \t") for line in lines) + "\n"
+diff --git a/routebook/stats.py b/routebook/stats.py
+index 3ffa5a4..969a10a 100644
+--- a/routebook/stats.py
++++ b/routebook/stats.py
+@@ -4,6 +4,9 @@ from collections.abc import Mapping, Sequence
+ 
+ 
+ def manifest_stats(groups: Mapping[str, Sequence[object]]) -> dict[str, object]:
+-    """Return the legacy total-only statistics mapping."""
++    """Return total and alphabetically ordered per-country route counts."""
+ 
+-    return {"total": sum(len(routes) for routes in groups.values())}
++    return {
++        "total": sum(len(routes) for routes in groups.values()),
++        "countries": {country: len(groups[country]) for country in sorted(groups)},
++    }
+diff --git a/tests/test_grouping.py b/tests/test_grouping.py
+index d3161d8..3f33d84 100644
+--- a/tests/test_grouping.py
++++ b/tests/test_grouping.py
+@@ -4,9 +4,41 @@ from routebook import group_routes
+ 
+ 
+ class GroupRoutesTests(unittest.TestCase):
+-    def test_legacy_groups_by_original_country(self):
+-        routes = [{"id": "r1", "city": "Madrid", "country": "es"}]
+-        self.assertEqual(group_routes(routes), {"es": routes})
++    def test_groups_routes_by_normalized_country_code(self):
++        routes = [{"id": "r1", "city": "  Madrid ", "country": "es"}]
++        self.assertEqual(
++            group_routes(routes),
++            {"ES": [{"id": "r1", "city": "Madrid", "country": "ES"}]},
++        )
++
++    def test_sorts_each_group_by_normalized_city_then_route_id(self):
++        routes = [
++            {"id": "r3", "city": " Zurich", "country": "ch"},
++            {"id": "r2", "city": "Bern", "country": "CH"},
++            {"id": "r1", "city": "  Bern ", "country": "ch"},
++        ]
++        self.assertEqual(
++            [route["id"] for route in group_routes(routes)["CH"]],
++            ["r1", "r2", "r3"],
++        )
++
++    def test_rejects_duplicate_route_ids(self):
++        routes = [
++            {"id": "r1", "city": "Madrid", "country": "ES"},
++            {"id": "r1", "city": "Paris", "country": "FR"},
++        ]
++        with self.assertRaisesRegex(ValueError, "duplicate route id: r1"):
++            group_routes(routes)
++
++    def test_preserves_distinct_route_ids_for_same_normalized_city(self):
++        routes = [
++            {"id": "r2", "city": "New   York", "country": "US"},
++            {"id": "r1", "city": " New York ", "country": "us"},
++        ]
++        self.assertEqual(
++            [route["id"] for route in group_routes(routes)["US"]],
++            ["r1", "r2"],
++        )
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/tests/test_normalization.py b/tests/test_normalization.py
+index 93f1ece..90dc4d1 100644
+--- a/tests/test_normalization.py
++++ b/tests/test_normalization.py
+@@ -4,8 +4,21 @@ from routebook import normalize_destination
+ 
+ 
+ class NormalizeDestinationTests(unittest.TestCase):
+-    def test_legacy_preserves_destination_spelling(self):
+-        self.assertEqual(normalize_destination("  New   York ", "us"), ("  New   York ", "us"))
++    def test_trims_surrounding_city_whitespace(self):
++        self.assertEqual(normalize_destination("  Madrid  ", "ES"), ("Madrid", "ES"))
++
++    def test_trims_surrounding_country_whitespace(self):
++        self.assertEqual(normalize_destination("Madrid", "  ES  "), ("Madrid", "ES"))
++
++    def test_collapses_internal_city_whitespace(self):
++        self.assertEqual(normalize_destination("New   York", "US"), ("New York", "US"))
++
++    def test_uppercases_two_letter_country_code(self):
++        self.assertEqual(normalize_destination("Madrid", "es"), ("Madrid", "ES"))
++
++    def test_rejects_blank_city(self):
++        with self.assertRaisesRegex(ValueError, "city must not be blank"):
++            normalize_destination(" \t ", "ES")
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/tests/test_rendering.py b/tests/test_rendering.py
+index 84776fa..4984c25 100644
+--- a/tests/test_rendering.py
++++ b/tests/test_rendering.py
+@@ -4,9 +4,28 @@ from routebook import render_manifest
+ 
+ 
+ class RenderManifestTests(unittest.TestCase):
+-    def test_legacy_uses_debug_representation(self):
++    def test_emits_stable_country_lines_followed_by_their_routes(self):
++        groups = {
++            "FR": [{"id": "r3", "city": "Paris", "country": "FR"}],
++            "ES": [
++                {"id": "r2", "city": "Seville", "country": "ES"},
++                {"id": "r1", "city": "Madrid", "country": "ES"},
++            ],
++        }
++        self.assertEqual(
++            render_manifest(groups).splitlines(),
++            ["ES:", "  r1: Madrid", "  r2: Seville", "FR:", "  r3: Paris"],
++        )
++
++    def test_ends_with_exactly_one_newline_without_trailing_horizontal_whitespace(self):
+         groups = {"ES": [{"id": "r1", "city": "Madrid", "country": "ES"}]}
+-        self.assertEqual(render_manifest(groups), repr(groups))
++
++        self.assertEqual(render_manifest(groups), "ES:\n  r1: Madrid\n")
++
++    def test_removes_trailing_horizontal_whitespace_from_each_line(self):
++        groups = {"ES": [{"id": "r1", "city": "Madrid \t", "country": "ES"}]}
++
++        self.assertEqual(render_manifest(groups), "ES:\n  r1: Madrid\n")
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/tests/test_stats.py b/tests/test_stats.py
+index 3ed443f..edcab0b 100644
+--- a/tests/test_stats.py
++++ b/tests/test_stats.py
+@@ -4,8 +4,15 @@ from routebook import manifest_stats
+ 
+ 
+ class ManifestStatsTests(unittest.TestCase):
+-    def test_legacy_reports_total(self):
+-        self.assertEqual(manifest_stats({"ES": [{}, {}]}), {"total": 2})
++    def test_reports_total_route_count(self):
++        stats = manifest_stats({"ES": [{}, {}], "FR": [{}]})
++
++        self.assertEqual(stats["total"], 3)
++
++    def test_reports_per_country_counts_in_alphabetical_order(self):
++        stats = manifest_stats({"FR": [{}], "ES": [{}, {}]})
++
++        self.assertEqual(list(stats["countries"].items()), [("ES", 2), ("FR", 1)])
+ 
+ 
+ if __name__ == "__main__":

@@ -1,0 +1,17 @@
+Cycle 1 red command: python3 -m unittest tests.test_slug.SlugTests.test_parse_trims_whitespace -v
+Cycle 1 intended red: expected "hello", observed "  hello  "
+Cycle 1 green command: python3 -m unittest tests.test_slug.SlugTests.test_parse_trims_whitespace -v
+Cycle 1 green result: OK
+
+Cycle 2 red command: python3 -m unittest tests.test_slug.SlugTests.test_parse_lowercases_ascii -v
+Cycle 2 intended red: expected "hello", observed "HELLO"
+Cycle 2 green command: python3 -m unittest tests.test_slug.SlugTests.test_parse_lowercases_ascii -v
+Cycle 2 green result: OK
+
+Cycle 3 red command: python3 -m unittest tests.test_slug.SlugTests.test_parse_refuses_empty -v
+Cycle 3 intended red: ValueError("empty slug"), observed no exception
+Cycle 3 green command: python3 -m unittest tests.test_slug.SlugTests.test_parse_refuses_empty -v
+Cycle 3 green result: OK
+
+Aggregate command: python3 -m unittest discover -s tests -v
+Aggregate result: Ran 3 tests; OK

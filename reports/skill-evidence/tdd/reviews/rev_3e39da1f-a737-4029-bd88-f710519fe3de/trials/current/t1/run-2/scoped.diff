@@ -1,0 +1,522 @@
+diff --git a/routebook/__pycache__/grouping.cpython-314.pyc b/routebook/__pycache__/grouping.cpython-314.pyc
+index 7baecf134987ca2fe180f5f51f20292af459064d..a6281db648d0f51473613902b28499b7d0b090db 100644
+GIT binary patch
+literal 1841
+zcma)7O-vg{6rTO@dIA_50>OnOwt&#MsqGY_Qc6N84M_+pqARk!SXhg9lDI5hYj&3u
+zq*gxkKn_)NsYIJf<&a9L)KnZ=i9;(zRU-9}gAu>oa)?yr&>M(Du6?ui@|PU?<eho*
+z=Djy>zW3hvTy3BV0WCcH{1Zb!=pVN5h_5ia31EsyMiv@JGB?Cs<t;vf#yOcE60VAt
+z7(ueogk-S^=^@J}``S=UnhnZ^ZIS3rYS@Kb{$?V^Ie5q-RGrWX@QrzcPN{lsmSi+y
+zTDiPx<&1omgQM8T=oowu6WaX)h9XkXIRDNU2x%ZYi9X_PaWa>Noie4pXi-|+lkIUS
+z{>^4jiqJt`=3i+kdD^es{U3f0pP1wU6X9PLqay(#7BOKamQC|9k-B10%VjM`FfHnc
+zdd{=}Bk2ai$TArqtxkW^nkpnMO^cIhL$?`RaZ0A+DU#}mXKhMJ-imi7ZyR(n=^im*
+z7?a68{0lQqO(vt}^M<8bB$J^5@QUFx`(P-d7bwUb-(kad;rs3P&7VG4`1FUw+G}rZ
+zGubcNZ>h)P<FTi0Pt8BiJ{e!@A1n2at-XESwb%s@$ju#N7%}`HPvY*+5PT6OQGrW)
+zc|~2W3PJ^5K_PT`9ymb}WbR;I6ut+vv=c1XX;uX;$^22h8q~>mRXpF~6n@m_>F&=*
+zZ9M%5O8Y%6&=C%uFUaD-byuanZo^Cm)2udKQUuRiK~kjAYEQmDe>^Drx+~TZq;R7Q
+z_#>qF639DYG<akamWt$^5<$b?ver1wJk`Cd>0t}F0(J$z;vYT!vX(4Czxul?xPi~G
+z=M(A_&z`-)x;9!a)ab-abgx;pXx6av7M+1vBMFDkX|oNQUC?t`sH(C>G^f2Ab;NAW
+znsNLU^%zfCu(TeALxsXp%L3f(fPpo+e5gHPeW)x_tdT0dLSXSDf<Ez;17)}ApfxZ$
+z_=2uZO=xPLbJ}fyOj#pwK{v9hZuS9F-Up13$s#MF2lk@!@UtcI=+f_#%ZY2W7Np=@
+zm?Sf?Drih%IaP|P+hmYZgF1q$X_Q4zSra*uUC;mlrwa5maznLs%aPPVf#fwunr3FE
+zBbo-aVwke#aQtpyM01Y0v1M|aNgJ8FJ)E4-KJ4WSIJFfxEB7(k(H+q;m2X~i@V@j6
+z?7Kbw1ehY)meBdm;+3uDQ}@mkhyJc>n)7W|hwe6f**hOwt!~?@KUs>T76+Hwe;r=D
+zSUUCoO8r2oW?&Q7eHFM9xJ%|QeLcB~TergT2W0W`!>Og~k9yWFez+1Ixf7TZw^||#
+zzI(kT9Nxs?4IEj<k%h4mj;!L|O&r|7&C9rXzI$O{1;4(56U#VJO1`&_`*(t<KD-@5
+zEv?@tzDcY%zcE+4iBD|cmSy-wua$7iIv(B;P|LYz)%C>@H!UME$?<10nvu<9oM6__
+zb&_T8p_x!8vgPMA;9=+fuapzT(4Y-$V7c`wWy;WOo%GQd$XE%PtQ@xmj^qA9jn7g0
+Nb9DZN1W%xA^dF`4g8%>k
+
+delta 713
+zcmZ8e&u`LD9RI!+N*x=rIRiuI8l67~mcn2%%)&+ETuhePL=MKdK>J{29VM>?hX>&3
+z(S?H^JnXO~nt0jGsQ<)bCW<lfV!X2Ku&b}7CT8EH-yfgP_kF&7-?tz5!v|u4u@Rv5
+z>SwFcLfe7xjmxy^fD9Hq1sN@)`;5iRfXswIW<#I{Emrnifv9);@$~-7i>SRPts9$I
+zsu)-|8kiKZvLTs7k<1NE*G1gWR9scCL~zX@mU$YsRFzT<4L>vOxR%1HtXfEx#6l*O
+z5z~petXNbR7Q|8}nV3&zOE{%sNvqcCRLV+<x-niYi;7VvCYDOtmQ^RX+e24lqx2RW
+z{mh(mofF{Dxg*=X3GdGCn(y!IZ0*Glr;-EUy4RWMHf4@!Cn(7FuGs=CfakbHlMYBw
+zLwN|oy);0L$)nZ(d)*^>Mn*RyZb3sF(#)`0rAnvmiPuFckZ01a+`l*j4{iaRflH7_
+zbm7eN+e^f#*90Ax3rbU<xrGH)Q!LG>7KnyTq1Y6xb*vGAE~ILareM~vu4~nDyzg_N
+zDBFGLooo{y9UNteJ-_cO+qziodmT;F{?TiKK>Rj2>X2(ghD=h(S?eNAIxyfMG1po8
+zF&=v1{l=f|@sR^Q@_K$}>hMDBt^9>g^!UsHpZV<h@aU8OD}VQhg^BPl|HMdVg^W>!
+xm8hrtk(<dmy6?cjhGY4~O+&5gI7h;?&)$p~q;9|>gucW1-!OZ^(KmBW`~?@asyqMy
+
+diff --git a/routebook/__pycache__/normalization.cpython-314.pyc b/routebook/__pycache__/normalization.cpython-314.pyc
+index 4050c2da768100eb4fdf31a3ad5821f0727dfabe..3ca394cc1e4ff23bc1e41baa70372be6f98fd685 100644
+GIT binary patch
+delta 595
+zcmey$x|p3$n~#@^0SFQv)MdFbZscQS)OOV`$t}<?NlDR7Ez8d-Ey>K!(=AFZ(=|>t
+zw$x27Eh<XQE73L5FV8Q^p1hdRx}J^E<Rb%+Si<}PM6F2%Q(IE^I3E$-;juLzEcqE^
+zNiq|NgaQ^I&CI~S@_7l6(ZCSI7{CaVLeOCh0YEkAzyvB_0@6_r#05-YOzKd<bRGr<
+z8HN~ED3>9K39Jmr&0q{y3}A<eBWRd$0h|ai7z-w6%%seq$y}unlv+|+l&6rWke6SS
+zo0yYXm0F*okdj(ll9`tX3Msu?j0#m^$(bdU3c01lB|v2*3Q4I7NjZsm*_y1kShDgn
+z^KP*g7vyA?+~NvL%qdNEEh@?{0t%HBWft6GEiEWWEz)Ez0)<Wy$Pc&p;WnkjgUl@k
+z1&ErOLJ=t5Zi(hiu3!>P76r0FT8iy~L<7SIHU@F2=@}C<W|YjYnpriw=CYVhga3VQ
+zsXKfU7bFcY^BG;>FuK7lHQ#rp?`;3;GKLpr3@^(VU*I;rz+zkk3_u1yO{QDy@$o77
+o$?@?;Ak$Y)KENa<F9BqM0=<|QNPJ*sWMsU_pzxgy80}zP08a0Q00000
+
+delta 413
+zcmZ8cJxjw-6n!u0he#VO1<^qa2!$dsjZxYny0|zwxHyJ1@1{)~^U8Z^{TOUV_YVF5
+zT@)8V!J(r+z*WJ&AeADnz89Rl@XkH=p8F1*>+E-0ThsEhNYvHGMSF}Mv@{;vnJsz@
+zW}8At`@kCDbxh7YlXrqJG@u_4h&(VEbSaDZ|8-1=kop0faM>Lj>^gBR-*BsT)!3|T
+z)QtwI)eOICRkp0U4>kcah`K#t6<bC~3sKYXXpeC){opk2F&ORQ?SYDyzL0<$bt2on
+zm$XM1@4XbC_n&AYPGuBNk@#1Vs|cm0GlC4!5w?|8RL1AVAqeY8k6WOJ&~&{sodA!6
+z$c+OU=^`8h4pE$p>$j*_R#-|{u(SX!T}!3Wr?PC%2`UAi6EH-R49d-4?!2ZJnOq!{
+omG`XU5b8M&lc!8WXcVanD+MuN@pxXqM8z1tA^j&Kq9q@H0l5`#RR910
+
+diff --git a/routebook/__pycache__/rendering.cpython-314.pyc b/routebook/__pycache__/rendering.cpython-314.pyc
+index 6d944b57f0567a969b893d79dbac0d0b157f59ac..30f01f8079179b34256418e7647c4f9fa46a55ad 100644
+GIT binary patch
+literal 1651
+zcmZ`(O-vnC6h8Cw=J7KK*b-XW$oObqd@b)i1&U%RNo}Y#q!p(2;ezlo%v^BjF!Q`~
+zUj-KS#kinuiVKy6CM@d0#6=f1aiK{UE=-IGq$RaC-53|9JMbkoy7Jt4Kl~(~<eoYA
+zo_o%mpYPn$&$ToG(#_vLoKMRDe~3+ua34`QiJuafz+f6o=`HD!%;ZZ7Q@X*FJHb>s
+z!E0lxsrEoBw%m1<Su-9n7A)VLB_T5?@f|{4e=d`fdHk|fD4@(6u9EkQ#J7npp?9$a
+z#c?UP%AX)BK@O(n*FFYt@a#BDNbgCeG=-W9P1OQ~DYbs4)uml+UFw&6yJ~uXz4CsI
+zDewBu%9xh&RQTZ991V(vkZY8%BK1=$jgFO&Q7Xdbs^i)$C2?&wpbHiYMP3PhKFbyg
+zS>`xtawG7H%nkfBB{$Ojq<<)F7b#YVrTelU1oV0qf56C05TI1ATVaXo`Ml-(0kas%
+z=c$fvMWW#=$V%`Gnxvi`!M=R+&V_G}+&ghE{Ncjg#qTm(sq-5r&Tk!mV_Rr{3ZqM9
+zG=iw?LJ%Z;Vf<?OFBD3Ufr2zuYY8@Cpenb)#kT<pa!wi-*&d*rJRUo6gj-XpS=YYZ
+zu<LtrUqdQrdbQfFf`b1MfH**=+6g(O4F;;`yMD(e02<*1Fk|D52aIr=t4CtSdiSWY
+zz1niG8CBb`gQCx<OG3l)9V2Q+Xt=%+RzMw4gmUIz*=XEXKT(ZCxT=$q!&%u2F5F9d
+z_x%D=GFNSvEpgd(z5#?xtnxEa>LhJO&Krh3YhlK*M)->rEaYo5l^ON|+w#H@6e?E)
+zBEsj9mEil)`^g_K|9oa+;@YogH_uMe7CgouDA&o-zNkgl`*D>$WC`d-+jrpNDeSOh
+zVzu_itmCZXnX)$z9s1PqI!@3@l}xqPlSL@Sx?v2<UFk~?oKai}>n$4w72z(+uN$--
+z1=@=2iWnV=)8rPgK62(|dKgbb0f?kgDN5t;9P!CwfsXLR|5v4UN2DGOB72I-ZG+s=
+z^muII{>hb@)s9v6*|F7@HFG_-KKpgc+RY6;`$!+$)CcbtAL-{d^mD%q{u8Qb`cdD2
+z#HFTGjB8;)8F9FVZy3Ub9z`wJ$RfiHSLXv)ya=MIJm$GR33<E%rzK2EjCC0KOB$Ga
+z)Zo?w3DA>h8_o4R3K*~kN4iR*PYxYjOMX7G6928C<+grHU!DA7`qSz4(FYx;9yXkQ
+z(%!kIebu^|o_yH;?uu5uvs2BrtYFT6gWTA(6NkfzZ5{Ns+e5d8R<Av1KDOp;H77RI
+zM1+tlm|#4gcLF<~=dE_&dBhekRhY46?C70~p13GRD!?9D)sVUnI7N?)(3eml5D~T^
+U+g2n=dJM*&kbb7&`x9CG2Zcpcl>h($
+
+delta 461
+zcmZ8d%SyvQ6rHg#R;{(7J5d6HQe{kQDs4gi260hb6eP{u)M%QNnWR1zwp({fUHAop
+zOaH+SD7aE^?NX(JTkq7z!n3&N&bj9vW~QGyA4#vIC&mck`uXhOmE5IwY5T_94;x?}
+zgy4rQ5H)ZPO(`5x9(umdpyhE0954kmLlMdUa>O}~S{@up#d{W5Wp3wPW*4m@E9BP7
+ztj0?v<`(n0^?ca{i-YL}%^0JiJoCe;pw65y77|R?JC0%j-Ah_bCg}V-!P4!~**5aM
+z931=V@(xw?2gAq-LbU!eHXTy^n^jT$Muil9)L&j8S$ev(0|5tNMEhX)P`8~EgF`K@
+z8~9WK5`xH%yf9eJZVx?aN)w})m!(2Sk}7dgjAMP86oa6>h8=h=$Vg;R9hj!E>5vbd
+zq%v39MWvg17@zBDb6s6$o62-c#01iJOmd?U^4NzhF@u`Qm&)^&pp-rm<AtzK9e-l5
+F@dZ}obh7{e
+
+diff --git a/routebook/__pycache__/stats.cpython-314.pyc b/routebook/__pycache__/stats.cpython-314.pyc
+index 870b1cb1cc53165b139e4dddcd75cebba3b696c9..423db78f9af7a3b2d6d159c1af627679a249d9da 100644
+GIT binary patch
+delta 648
+zcmYLH&1(}u6o0du>~5rqSu_<=unVEu5I2FQ*p}Lg2L+L~5-=hL!ZtgN(ar8UGaJ!^
+z$zPyCM0%(<FM<aJFNGd@@aUl$g1RR?d5u=6-a4C)Ixz3|zJBk$`DjO8DA7zTdJOnd
+ze>}eX^j-8e$}Htr-OVx6)N#YHJXUjTo#2L^$N2@l;t_&vrqARaIOJaYFUmA$IJ*T0
+zAS3BlAhzaS<=-gp$Gg+>d#U;E#6mCd?wB9)AEn*J?($kcYd>gOL4h1Dg`)@%+TY|#
+z3ra_^BFql;INU&<kONP+auVRaTH^W50sSUAmmC)2Fe0oA*Tw-Na2i~}MFms}k8+B_
+zb$O)!$JwDe;unOXkP}k8;UwQKszF+Ov{=B*BerH#s{~h@2E&?Ro0?&{cZ_w+Y8AuM
+zTuk(e<JpWn)QIEpl)go?ewaDTu>8m%TEjFQ@+ImJhD~3zu<eV~tNT*Jusj|UiNr_p
+z<zX$Na*Og)!x>E@V?n4Hs~dK015;L}%wUw9;@*Hn*SKiG9|<mAM!UrwyAxm8w%^We
+zr8YNSI-O+pvzpzuTUYnuE8msl&rdwN^(8U&DKXVaob9O7Uls1?g~c(c2Vz+I_ge&Y
+z717}So+K~Hq1ANQm&;|-X`c^GE(JYb1Br1MOr>0?JEmvhWir8i!Sm5L7d;Un^bL|f
+MK|hfAujn%l0mX=&xBvhE
+
+delta 745
+zcmZ8f&u`Lj6n|gJnxR5Ae;|XnRY{hSr4%e15H~n5cQH|ehKnXk*M4E$O55~Xka-Z|
+zzko3umY5h19y~}~;>Cjpj~*}!2b*{{-Y^^%Z+^?zBEF>Wy}r-q`#zt3)0fk2pMN>v
+zKL<2AKc4N*cm0o0^R=*JRI#vYV9lswYa7dZ0<mO)?5Uc@<GQL~UB-fiO~bOu|6^NG
+zC{$PR6XMn_5sO(xN|t#kEvETY;%1iLRx%mBoK7ZIlG!pA6)dQ_S);4$B(E8>dWDyb
+znnkcsRvUKB!tFL%Zmv>~EjR`S-A2Dh`5^s9d^dd<>@Q_{(M&&*9gN1GlrQ2}_VcZN
+z?%oM+=zgAz+&m7JRtCU3+@wtlis<nfTJ&6n65OZgWHbR%<H^ifml_`vP!wX!(?k(d
+zyE<p@U{1poN#5sd!<IDO(6xPz*pjUhTa^h{l}uCBD{*IPgim<$QWcRt!wgL~V1fF3
+z2%9rh-~7jB37u*;pf$AscP;|>U>=GPg%w6cF?2VE97e->%;R|C35T_envDtZ(5;J{
+zb%7Sgw^qSAZkSfixn7lYwTy|q<=Q0iHO-JEjpX8|lxEIHkB}fuzo?~NsL;*74IW(T
+zlwL(Tkq`Ml#5Mjr6h>5#A+@T*)+McmNeo%;brbih7Eg2olVa8!g+?5XHZ2&i;J^Ih
+z!M9N1{p!c{?)qW=C{zd>T`Ba=Z}hwyR)DhFU1kZ*wH+oLy+&W%<z$wo0fP|w4&k4`
+LAG7YSGGhM)MWMT&
+
+diff --git a/routebook/grouping.py b/routebook/grouping.py
+index dd72f56..cfbcc0d 100644
+--- a/routebook/grouping.py
++++ b/routebook/grouping.py
+@@ -2,11 +2,22 @@
+ 
+ from collections.abc import Iterable
+ 
++from .normalization import normalize_destination
++
+ 
+ def group_routes(routes: Iterable[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
+-    """Group legacy route dictionaries by their country spelling."""
++    """Group routes by normalized country code."""
+ 
+     grouped: dict[str, list[dict[str, str]]] = {}
++    route_ids: set[str] = set()
+     for route in routes:
+-        grouped.setdefault(route["country"], []).append(dict(route))
++        if route["id"] in route_ids:
++            raise ValueError(f"duplicate route id: {route['id']}")
++        route_ids.add(route["id"])
++        city, country = normalize_destination(route["city"], route["country"])
++        normalized_route = dict(route)
++        normalized_route.update(city=city, country=country)
++        grouped.setdefault(country, []).append(normalized_route)
++    for country_routes in grouped.values():
++        country_routes.sort(key=lambda route: (route["city"], route["id"]))
+     return grouped
+diff --git a/routebook/normalization.py b/routebook/normalization.py
+index 59112db..8780d61 100644
+--- a/routebook/normalization.py
++++ b/routebook/normalization.py
+@@ -2,6 +2,9 @@
+ 
+ 
+ def normalize_destination(city: str, country: str) -> tuple[str, str]:
+-    """Return the legacy destination representation."""
++    """Return a normalized destination."""
+ 
+-    return city, country
++    normalized_city = " ".join(city.split())
++    if not normalized_city:
++        raise ValueError("city must not be blank")
++    return normalized_city, country.strip().upper()
+diff --git a/routebook/rendering.py b/routebook/rendering.py
+index 5536b8d..b890ef6 100644
+--- a/routebook/rendering.py
++++ b/routebook/rendering.py
+@@ -4,6 +4,13 @@ from collections.abc import Mapping, Sequence
+ 
+ 
+ def render_manifest(groups: Mapping[str, Sequence[dict[str, str]]]) -> str:
+-    """Render the legacy debug representation."""
++    """Render countries and routes in stable order."""
+ 
+-    return repr(dict(groups))
++    lines: list[str] = []
++    for country in sorted(groups):
++        lines.append(country.rstrip(" \t"))
++        routes = sorted(groups[country], key=lambda route: (route["city"], route["id"]))
++        lines.extend(
++            f"  {route['id']}: {route['city']}".rstrip(" \t") for route in routes
++        )
++    return "\n".join(lines) + "\n"
+diff --git a/routebook/stats.py b/routebook/stats.py
+index 3ffa5a4..35b2a09 100644
+--- a/routebook/stats.py
++++ b/routebook/stats.py
+@@ -4,6 +4,10 @@ from collections.abc import Mapping, Sequence
+ 
+ 
+ def manifest_stats(groups: Mapping[str, Sequence[object]]) -> dict[str, object]:
+-    """Return the legacy total-only statistics mapping."""
++    """Return aggregate and alphabetical per-country route counts."""
+ 
+-    return {"total": sum(len(routes) for routes in groups.values())}
++    countries = {country: len(groups[country]) for country in sorted(groups)}
++    return {
++        "total": sum(countries.values()),
++        "countries": countries,
++    }
+diff --git a/tests/__pycache__/test_grouping.cpython-314.pyc b/tests/__pycache__/test_grouping.cpython-314.pyc
+index c08a5d145c6addbabd6a1380730339e3e037e2b4..5385a32583c74603926ced5cdd032960135e6e1f 100644
+GIT binary patch
+literal 2634
+zcmb7G&2Q936d!-C*RexFK0%O}hNf(25<wygr5`LIq8ySU6GapOQ^)HB!^Td>vnk1;
+zih2N~UO48^L)25aR5|9@{s&77O5}2gRQ1qXN)S{%_08A|o3KIP-F-Xr?0Iiye!uq{
+zAFVfa1lN;|?{5C0BJ?NgR4yfLY~6;&0=kZD;R2%UU%ViEAyTmuwV*@DmfDalUqcsR
+z{LX7oN<37)rr65K%Lo;k5jue2X=CTJ2x1MU&Q8eH#eX^VZ{{1#39&In!qN-|L%qnY
+z9xkMvt&`AjV6N8?6>LPs>nfF6Q3#RR5S48atit9?Ra*v|u@$O~Bbv3<E|kl}4d+<~
+zn<p6aA{x1s$SeWdDOiuT^))mWkPT67(Uxr4R{EtrVMZ877ptF#r`UBh-2;Tig~9Z`
+ztyYaz+30>@P)weOwP#>9S}gj7SR}_{+4bpMtd2MZ0-lT;mI6xVV$q9Yarn~c12L|1
+zqR1n3_?wbbBrF~H<j5;d#%i)#5sTez#rb|ZJ=0GMg<fwqES9Jr2ED|a?H%w2PW8Ga
+zLcD<X9`FA)B)9rulWD{)<{R$^Q++dYaX0fPo(NCO;UFZ_PSKzD3OJn^{1?3Vqn&%%
+z_jUs_Fw<xl%mP|(YFlhxoL#!TvTyZVd2hblc=n#Ut{H1u`$Mh$iP65;`nzGRn~nF!
+z76+GFm)loPtrp77L*=G(Wn=icB4zb02!ytwSO*S{;!iwB6%K$R^i;q!lVA!xtqNi3
+zoe<7`xS!=tt~9O=akD&2C2rEI@CbT+QWX#CfCmO)I|4*FPO{J-jD>_Pg0Kn#|G>Oy
+zS$WH{hC)&b9E)h|rU_<V%css!QqP<XU{WfOCTPbeI3`g@XoNk-y^-L$6IP%frZ>DG
+zDLo7%JYO5!cMim675xBa0c`+`gNv<8?aQZD3T5LogO&9=S8}UkW#eq6U%9`Tk@xEN
+z)J+{_&FzF(YJO~VZ#1^tr;FoDS2%YX^6P2;^77p3;c~<0JNppMtbeX#vN~yn`D~*M
+z1AtRzh0pXg$}spqQ0xrAC+<p;w7e0jh`?z93nj56;VRj?S`pnUu>e8P*ry_<tlxz!
+zbQFC6^I_K%#6Ez05affXlYiI~r=^3)7jjunpoA5*7^GZuh!0XSNk(&0Y$Q@*JAMTE
+zqK`Ypk~d69NVu-N&LE33h<G<W7dTWX%@lptq25cXMDelOTzSKggRrFN5}4gt(YBmh
+z0akpxsYsj!8miyBW_CO@JARyBGkYGJJzO3h8P*F4)gJ{He19{0{)<@Y{A}c9<yW~b
+z-;&)1^h<@m!;`-TbVVDqHv(Nt@3k6gz)lW`RF#Ftt*ZYl)W4p<*A6qPB>)`PdCf{r
+z2aDJJZq=TM`3&*ku$c7#EkB}u;L=xM;mMHT$eH#qKXcC1hVJbnybrUEZt>0Bt-kj!
+zf3+%?jZa@8`Nn$QwSE<e)vub??*n*a&|?kbfGq~cI>yssp;TmT17mhjrg!#WJn55&
+z7X82rLW~K#pdiAun;c^1FqpUn<A^%ccd<h$@h8|D2t;bc*eycA6nvMuUa^QVyr!5{
+zP8h~c{4-o_39D^x*qc(+0p{Pk!11S|qUcZSO)wp*a_B`vouY3dFkFfF0Jf58#}6Pu
+zCe})UPg&W;S$?`tgyAh-ov}6s-XRCz<*ArF#4;O4x>;%_Y>Dn`pCr5S85sZ{n__eV
+z%%&s=!XIeQU+BGOYLB4bzrEIW<YC*9X9zl*R|F&*_vRl-`_^US?#TBecfR~bLh^nd
+F_kU1dg9-ou
+
+delta 536
+zcmah_zi-n(6uxsD*9|2FwI$+*NNG?>g)Aqe#f^kg38@Q1g)(%t9Q!%Az1ZRI9Ga!D
+zu~OXvQio0mw*C!_Y!wnnuF3>^q*j8F=YfTVlkR(Z-}}B#cklE353_u~e7QvMygl3B
+zc|s4$pXl<zNp(gRw}~{mg&JAWRhd>x25Jg~nCD&P(8mkKZEDk1Eq4-9C0zrBQ|ge`
+zUT&>u*(Fa1;BxbM>M@Qkf}AdZg_*&VRDuw>b9pg)Z$C>0VDBWrk`eG8_`9~?zAbhm
+z#w-{`0mMGo9EJ&(;$K<@0ggryybyVHThMBE0<Rfbp3`!y)y9Li)eF|wt<Y&U)|%}Q
+zS^?NmJWMf5HZ7LKealZ$F2D|>J(+S)H?`X}27S*TyM27?P`JIZoA9U~#U67}97{gV
+z9JOd(yZ2w+6#h~))H|(q<M7r|_~p8FtRIIT_P?5)a~zS6WDB?U-F!%|s=L#h^()Bn
+z;$O&DE@lyazb3E9FHI|MOb7y>Q%BRCrwcgA^nn+}d_K3#<&Y<2=A%IpqzpRz4z?7p
+mSVNc;D5a-l_9t1oFbZ_z&EB_4{iIUAAlOW1lwGRmdB`6x*qYJ+
+
+diff --git a/tests/__pycache__/test_normalization.cpython-314.pyc b/tests/__pycache__/test_normalization.cpython-314.pyc
+index b3732f8fe715ceeaec83a7c254c593176591a2f1..ce6b4e8863a9d22c631ffecbc30ca12ebe6f0597 100644
+GIT binary patch
+literal 1992
+zcmcIl&2Jl35TE_9vvzh<TH<^_lWbJf$_b7enxdefs1*d!LrmDT0i>o+oAqniX1#0P
+zzHJ&GP{e_9=8RB}&5a8Ze+D5bi5^@K;=nC56-Atwx3*QIP<-mM{o8pTGxO%RGvmoV
+zD-Sq6_~p~v1r6X=IcbkfOE|iV!WP^BN4WxAKGiGAyDC@5paA3GXoKMBtFV-9D?WYB
+zpiMcrzM63|vmXLf`vFb^o;I61oj49Nt?3y0I+Om2+27?_rKpHP7_pig_zg;`H0FNj
+zaz6^aP76wFax{yAi<e#nt~kKe8(FRmK!hd-@iLBzn2{IfSw~0gaWdRk0iJWRXQ0?4
+zhAVAXZ$I^P6~)+VyO5q_#2BG*G>^g-tiV#|t~`O`dW!=92i?!8%~eNhOBkz)PW48w
+zZCB`q{ZYi$?S^h&Ted6PYQt!+3H93YwkmqvIHrs*e3G~Ulcu*7p~p118B5=1#XDtQ
+ztCxATTB3KNAdwW67`;=vKrg&e@)E{q$V;!4H_%I&%ZO4WZEjOer|O$xTy7H1{8~(6
+zREv_Z>W8<;#>YPH)LoB?xo5I8)m6C%FB^{_Y{7wH?i)ip#?a5^`2Es11H0zzfjRnT
+zM$6@o@BlnV%JWEW&Q2+32D+*+c`ufe(2LOIlvyZ>b7@Ro6a;QPrZMqDPFd&%#Pj)P
+zCoPw|(9+$6^!MN7^zWLlx5;5I;IZdNj>s;$RpwWPO5;jVWd%usy0H9z>?HL%Wu7bP
+z;TsVNC`XQnhq=SqCO)fFbYrKxi5De1FC%oM&ff6UgS+4L?+(v@e`)DQ<Nf2@$QPT|
+z>X)hJGitR}od7efN}f}QlBkJBI(pOfc4z!oMaw#tpLWk{*0l|ja1K4naSN@V1|R$8
+z2#lp4S^0C?2>41-YiM@PW&?PxQq+XmEOW>8kxY?aaf5^|U=^~o=8q-kV49qa-liUp
+z$y(rs>uFw!=`P85Tt(g>eiZ@fwNCC^qdV5<SB-sZ;-NJmEA;GxSN6>E6Ak(%aS^{i
+zSQCH8vShxtE@r;%y`0T$V+eU+5E8mIN{Gl4Qj4ldAZ3#f*}7UgCkVOevzP~dNW+K_
+z)`xc3DG5UoWQPz1LSl}M$s;buhP0MouxRNdAzpwqReg_pGzbX6KMAX25!K{dyp+~2
+zlP@g=*|p;_gum`#jE_`3lYeBUpky57Nmk9AKLms{hf)n0O3n2{^w1-WB=j+@V=i*o
+z6ggdsqV@Ep2;(ZQzJ=M}^kt(9p-Vj`y*16Ht;Be<Nyj{sJj*-A7ZDCMMNxi&6TiXa
+s<LoKr{C#8Jp5C#i9|KMfCqOs9XzXdj2fBH0@w3Ix-}^%Y{iW3GKP&v(MgRZ+
+
+delta 536
+zcma)(v1=4T6vk&ZdwWYv_LLOKp>iWaU=!BO=G4o9oQ=WmiU@)tZZ^Ab&&kd095cHY
+zZH%3D*v3+<6tVC>uoP?zijfsd`vU`tg*a2#SUJUS-uu3puXyimqq3b<XMPr`^W^Kp
+z-5x%0-r?ngs^#Rhn<%%oX3itmteWLjqgk%w+vk4G6Viu0LdY#HhNLnI*>??5R{_FS
+zaLd<tVc*4-DS@RDD`~lU>EGic@OL>dJ^`@<@z9qd_T`W==D~y}kj3B&7;}-!f8{($
+zlr^ESC-oh+q1{cQAoZe7yW?G4Tkm>1$;O74c7nA_K{tgqNx-MsxKLSn;4z*JyqFh4
+zf}hg+c_E<ujn8^3ImkR@Fo@y@;aGqKF##DSN~KwpQ=Wx#42;oiP+e04Xx;d)w|W%v
+zw8A6w*`7PHmk#ZvkIf6u_urTwnw#&h-~D8V-<6GCpuSr#?^u`dT=~q}TsfgMQTq!^
+z74nqA&&Mk1hk<L`c#1TIQ?}~8t&_^D%uz%$(a@h94V_WhS4KQ381%#$)#??<j>2>X
+iWBdg*zM<7)%fQ?CseMF(LlPV#-A!l9SM^0x$NT{rNT06&
+
+diff --git a/tests/__pycache__/test_rendering.cpython-314.pyc b/tests/__pycache__/test_rendering.cpython-314.pyc
+index c0930cbb61ae9b2c5907a60d8ead3295bb301721..4da9b0e4fe1a770904f2fcbde95d289fd17f8651 100644
+GIT binary patch
+literal 3406
+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
+
+delta 670
+zcmah`F>ljQ5Pr{goU{o+pc0xaK`o6)Q{#lBq>)hRk}*XJQpEs7u6+q^9Xq`D90&tN
+z43vcddFjB21Z+q!@CTTXkSY+Z9%5u;D54UKyq9h)-0<DqcXyw3`ab5KOr%TcW0Oe4
+z&bRv;*YMNy`-Ot&Ec5`~Kn%ALQ*P=^&7c6a@oB`gw!&g-i0N&078SK9iD#mIVnT6H
+z^g+!<1kZ0>k4ZflYq*Aws+w|?^Qf(hyEs>xSGnRkTp<;%*)AJ#y=6H>FmXEweMUyB
+zMU^KlN`bKE?a=awDkQi@U_gor*C=>huJ=d~4k(rCg){txc`N8|fw>WY7Yu={gS}}|
+zVw-f+^*jTHt^>XerqBooqyN&(al~lo!W}AerwY}EV^z9_Rj<~KTKPi5Sa+6|jBdSB
+zUaT~_P<6m`{Xr<CSjF%Hzh~G%D<l-mu6vh-1WX20P6c)d_zn=)@0}lv_}rNCpl8{m
+zPDp`v99R!~Vrf8tg3m1G20m{@<;iT}e`|5^K3$C7#q+cKiPT<VdN(osEdMg|DO-Mf
+z_Vw`1!k5J5U($eAXtfxRek3pAlaY~X&Yut*k#>zi7X_8npKW3PZ$*i%-~%L)OhwOA
+z%l(X)ajkE;J~<_irX<J%p19NxoX~@1G9y}PI;{&hP%*||(edwS?oe0p3f?)lmn-e&
+gN{2{x2Pveb9^d<{X7{z!cI#p5(UqSn(sE<rzh5ZB^Z)<=
+
+diff --git a/tests/__pycache__/test_stats.cpython-314.pyc b/tests/__pycache__/test_stats.cpython-314.pyc
+index dee67299f2cdd98be7fb1130f4d78e4ae90dc453..8d104842a399cb2ad0dbf6ff399261d84913f83f 100644
+GIT binary patch
+literal 1455
+zcma)6OK%)S5U!rbdYo(=6FJx$p*2y!WJ7kBBvwe2D1tn(kb@aV76;p{@$Og*nVng>
+zdriy%SsX}CoO9sdqq*&oV}61ylQ?SNfDi}Y42}dxs(N-}^AOOht*)u5s;>UNs(F3j
+z&;h`;^y6nA{lEZzqKACBJ!SVEDl0G#KAQkVyEVbyv6M9mN8vd5_AvO)984ARz`cFk
+z&UEF>xxRbh1Ayibz)OJM#XYZFI}YPLbrjD!Vg8lEHrZ}hm>y^aNwgSB#ia_AY~*3I
+zW9??`p2jV}YUe;PACxs;Q1*+EVy<COj&GrKeOnb~K=t{~38=XG$Yd|?G^M?R2gpXA
+zkCOJ`AMfGq`lzhH3{35ROCGppdp8B}p^m?rRcGTpKcAgGmU)q!x5lmP32$j(1-7<s
+zOlw!ADu{1aEPXJLG8F2@$DJS+los#q$S_`%ly6L5sjF7IuA0qixRk~n6{Sg4giF<P
+z;kk>|Mn{M+QPs2cPf~HWuIM&KW}wyD%eqWPF2Z&yl;q}EF4B$)c_Zy4N}u^V9<_fD
+zA%x_sC|2O9SKRVOHoTFq%4<Vit9y0r-ulT4o2852y!N<s_0ii;yqmk|2>*=mmnO&T
+zb9@QQ8uM8XQ7cEZ&5(uXh*Q37&E`D|Gt9U4qdrA7{$=IemS^=H->vOu$3}Jv+Pdir
+ziq`!G9}$HTX)>m5ViNU1+_tIeienfP{p9b&kyP4^RM?W}M3bgn)4P)5#$FZ&$#mvV
+z;AUqmXIw}gB|M1R9|jAdiW))8Q_&2CzW!en{husUkGzIr1->6FuR5z@wYhe^d$udO
+zC)Y<WZ4O?3;O@~m^e|j~_i_1+t@8Pe^7+lO;dJ8B^7^IspLo6)z&u~$n0ngdJPBGM
+z=lTHWt+d&RNiT9v{oH$VnDfO*NEJs(n53Kw`WlE~6#6JPof<WGpp=LfurDRXzrcAT
+z#=&St4b=$am~)(pL;H*vMg+WNFcs7XM$kt|QsUq5<2`@1n0t%;R<PV@wgV(h;l`5+
+zZv}`quk>lJlSGPm(fwvL7Si;tVOD#0(0VPv2{mWXU~7lsM2XHM95PzH%h~0xh%vNL
+zZSqYNJ2qqNJ2?C^yz;D2VAJg3$X4mpM(NZupr@T9;1nNx`mJ4h>J;x!em?odd%xJ=
+I95adk0HtJIO8@`>
+
+delta 461
+zcmZ3_J&S`^n~#@^0SIQ?t;^z=$a_>r4aiAkXkdtCC}9j@C}E0YD`6I6$Y%&*6lW-5
+z31TW?4Pz)_3u0Dg&}5m+!l=dQF<GC{k|mBwpK)>-qka8i{fzwFRQ;^{)SUdX)S{%+
+z<ZS)oqGbKz?97}T-PE$ol+?WBRQ;mVg8ZVAVszn>loX&;S!QZ^F^G;gPBpenNi<B;
+zO*A()*EKOPveZpVv9QohGdDCaHMC4iHBL#@&&(?*1sYXisGE~7n3t}boL^d0oT{Ie
+zSy572lsfqVqo|)`NosLPd`@b5Vsd3X)b99_{F20+TROgpd6{WI>EM#YlHw2`qgW58
+zYIb1g6st`3Ws(<iKM=UX<{F2`XHf91Wbo5upB&6$HF*+CsE8m?<VQO&5Wh1qvU)Op
+zU;vVn8Ce~91b`B^SaK6H^NRQ<`>{%R$^Zozfw<TlNPJ*sWMsU}!2gs%<qI1VqbK7G
+siR+SD7bUg6Fo1X;xENS?I;yTPOWt7NY4>gNZS()g%)la5#0S(103Wf4<NyEw
+
+diff --git a/tests/test_grouping.py b/tests/test_grouping.py
+index d3161d8..08cb58b 100644
+--- a/tests/test_grouping.py
++++ b/tests/test_grouping.py
+@@ -4,9 +4,48 @@ from routebook import group_routes
+ 
+ 
+ class GroupRoutesTests(unittest.TestCase):
+-    def test_legacy_groups_by_original_country(self):
++    def test_groups_by_normalized_country_code(self):
+         routes = [{"id": "r1", "city": "Madrid", "country": "es"}]
+-        self.assertEqual(group_routes(routes), {"es": routes})
++        self.assertEqual(
++            group_routes(routes),
++            {"ES": [{"id": "r1", "city": "Madrid", "country": "ES"}]},
++        )
++
++    def test_sorts_each_group_by_normalized_city_then_route_id(self):
++        routes = [
++            {"id": "r2", "city": "Madrid", "country": "es"},
++            {"id": "r3", "city": "  A   Coruna ", "country": "es"},
++            {"id": "r1", "city": "Madrid", "country": "es"},
++        ]
++        self.assertEqual(
++            group_routes(routes)["ES"],
++            [
++                {"id": "r3", "city": "A Coruna", "country": "ES"},
++                {"id": "r1", "city": "Madrid", "country": "ES"},
++                {"id": "r2", "city": "Madrid", "country": "ES"},
++            ],
++        )
++
++    def test_rejects_duplicate_route_ids(self):
++        routes = [
++            {"id": "r1", "city": "Madrid", "country": "es"},
++            {"id": "r1", "city": "Paris", "country": "fr"},
++        ]
++        with self.assertRaises(ValueError):
++            group_routes(routes)
++
++    def test_preserves_distinct_route_ids_for_same_city(self):
++        routes = [
++            {"id": "r2", "city": "Madrid", "country": "es"},
++            {"id": "r1", "city": " Madrid ", "country": "ES"},
++        ]
++        self.assertEqual(
++            group_routes(routes)["ES"],
++            [
++                {"id": "r1", "city": "Madrid", "country": "ES"},
++                {"id": "r2", "city": "Madrid", "country": "ES"},
++            ],
++        )
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/tests/test_normalization.py b/tests/test_normalization.py
+index 93f1ece..e2a3204 100644
+--- a/tests/test_normalization.py
++++ b/tests/test_normalization.py
+@@ -4,8 +4,24 @@ from routebook import normalize_destination
+ 
+ 
+ class NormalizeDestinationTests(unittest.TestCase):
+-    def test_legacy_preserves_destination_spelling(self):
+-        self.assertEqual(normalize_destination("  New   York ", "us"), ("  New   York ", "us"))
++    def test_trims_surrounding_whitespace(self):
++        self.assertEqual(
++            normalize_destination("  New York ", " US "),
++            ("New York", "US"),
++        )
++
++    def test_collapses_internal_city_whitespace(self):
++        self.assertEqual(
++            normalize_destination("New\t  York", "US"),
++            ("New York", "US"),
++        )
++
++    def test_uppercases_two_letter_country_code(self):
++        self.assertEqual(normalize_destination("Madrid", "es"), ("Madrid", "ES"))
++
++    def test_rejects_blank_city(self):
++        with self.assertRaises(ValueError):
++            normalize_destination(" \t ", "es")
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/tests/test_rendering.py b/tests/test_rendering.py
+index 84776fa..06cca72 100644
+--- a/tests/test_rendering.py
++++ b/tests/test_rendering.py
+@@ -4,9 +4,36 @@ from routebook import render_manifest
+ 
+ 
+ class RenderManifestTests(unittest.TestCase):
+-    def test_legacy_uses_debug_representation(self):
++    def test_emits_stable_country_lines_followed_by_routes(self):
++        groups = {
++            "FR": [{"id": "r3", "city": "Paris", "country": "FR"}],
++            "ES": [
++                {"id": "r2", "city": "Seville", "country": "ES"},
++                {"id": "r1", "city": "Madrid", "country": "ES"},
++            ],
++        }
++        self.assertEqual(
++            render_manifest(groups).splitlines(),
++            ["ES", "  r1: Madrid", "  r2: Seville", "FR", "  r3: Paris"],
++        )
++
++    def test_ends_in_exactly_one_newline_without_trailing_horizontal_whitespace(self):
+         groups = {"ES": [{"id": "r1", "city": "Madrid", "country": "ES"}]}
+-        self.assertEqual(render_manifest(groups), repr(groups))
++        rendered = render_manifest(groups)
++        self.assertTrue(rendered.endswith("\n"))
++        self.assertFalse(rendered.endswith("\n\n"))
++        self.assertTrue(
++            all(line.rstrip(" \t") == line for line in rendered.splitlines())
++        )
++
++    def test_strips_trailing_horizontal_whitespace_from_rendered_fields(self):
++        groups = {
++            "ES ": [{"id": "r1 ", "city": "Madrid\t ", "country": "ES"}],
++        }
++        rendered = render_manifest(groups)
++        self.assertTrue(
++            all(line.rstrip(" \t") == line for line in rendered.splitlines())
++        )
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/tests/test_stats.py b/tests/test_stats.py
+index 3ed443f..10dbcef 100644
+--- a/tests/test_stats.py
++++ b/tests/test_stats.py
+@@ -4,8 +4,12 @@ from routebook import manifest_stats
+ 
+ 
+ class ManifestStatsTests(unittest.TestCase):
+-    def test_legacy_reports_total(self):
+-        self.assertEqual(manifest_stats({"ES": [{}, {}]}), {"total": 2})
++    def test_reports_total_route_count(self):
++        self.assertEqual(manifest_stats({"ES": [{}, {}]})["total"], 2)
++
++    def test_reports_country_counts_in_alphabetical_order(self):
++        stats = manifest_stats({"FR": [{}], "ES": [{}, {}]})
++        self.assertEqual(list(stats["countries"].items()), [("ES", 2), ("FR", 1)])
+ 
+ 
+ if __name__ == "__main__":
