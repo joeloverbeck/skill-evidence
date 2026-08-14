@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-13T15:14:29.052088498Z",
+  "generated_at": "2026-08-14T08:49:49.283019761Z",
   "target_content_hash": "58ee690ec479d13e9ff51567f4e57087f319ac7a1aca6511d61c8628f5e43fa6",
-  "qualifying_uses_on_current_hash": 41,
+  "qualifying_uses_on_current_hash": 42,
   "open_incident_ids": [
     "evt_7814cfa8-ad78-4511-b202-f78ad96902d3",
     "evt_c5666704-0654-4a6f-9626-2deb557e1302",
@@ -23,7 +23,10 @@
     "evt_e5e679fd-25c7-4f95-b193-cbb13d6c4fed",
     "evt_a597f189-eb05-4938-a80f-dd513a297c5e",
     "evt_dbdce886-81c8-48d5-b685-c82a8bdf8c05",
-    "evt_2eeca470-1219-4a8e-9237-3e45235a1b72"
+    "evt_2eeca470-1219-4a8e-9237-3e45235a1b72",
+    "evt_216d3c50-23c0-41f6-81a4-0cf614d79d2a",
+    "evt_2b261e9d-ae29-4a68-b1dc-2fe3fed34fc4",
+    "evt_48c2cd36-dd5a-4c76-90ee-00f3648bd1da"
   ],
   "candidate_clusters": [
     {
@@ -38,9 +41,10 @@
         "evt_966b403f-dee2-45ea-8d7e-d421e142f2b1",
         "evt_04861eba-713e-4caa-b70f-a7634c38e7a6",
         "evt_e5e679fd-25c7-4f95-b193-cbb13d6c4fed",
-        "evt_2eeca470-1219-4a8e-9237-3e45235a1b72"
+        "evt_2eeca470-1219-4a8e-9237-3e45235a1b72",
+        "evt_216d3c50-23c0-41f6-81a4-0cf614d79d2a"
       ],
-      "independent_incidents": 8,
+      "independent_incidents": 9,
       "max_severity": "material_failure"
     },
     {
@@ -50,9 +54,11 @@
         "evt_c312aad4-b0a8-4396-96a1-7b240942e00c",
         "evt_507fb751-bb88-4fc9-82cc-dcc18e03bcf5",
         "evt_a597f189-eb05-4938-a80f-dd513a297c5e",
-        "evt_dbdce886-81c8-48d5-b685-c82a8bdf8c05"
+        "evt_dbdce886-81c8-48d5-b685-c82a8bdf8c05",
+        "evt_2b261e9d-ae29-4a68-b1dc-2fe3fed34fc4",
+        "evt_48c2cd36-dd5a-4c76-90ee-00f3648bd1da"
       ],
-      "independent_incidents": 3,
+      "independent_incidents": 4,
       "max_severity": "material_failure"
     }
   ],
@@ -69,7 +75,8 @@
     "evt_966b403f-dee2-45ea-8d7e-d421e142f2b1",
     "evt_04861eba-713e-4caa-b70f-a7634c38e7a6",
     "evt_e5e679fd-25c7-4f95-b193-cbb13d6c4fed",
-    "evt_2eeca470-1219-4a8e-9237-3e45235a1b72"
+    "evt_2eeca470-1219-4a8e-9237-3e45235a1b72",
+    "evt_216d3c50-23c0-41f6-81a4-0cf614d79d2a"
   ],
   "threshold_session_id": "019ff6c2-5547-7eb0-beab-0bc56a4db17b",
   "not_before": null,
@@ -78,7 +85,7 @@
   "review_reentry_basis": "post_review_incident",
   "target_name": "code-review",
   "target_repo_relative_path": ".claude/skills/code-review",
-  "derivation_session_id": "019ffa60-9ceb-7721-93ea-cec980edfc4e",
+  "derivation_session_id": "ff7be8ee-53d5-49be-a6df-372305119e65",
   "instrument_limited_incident_ids": [
     "evt_7814cfa8-ad78-4511-b202-f78ad96902d3",
     "evt_c5666704-0654-4a6f-9626-2deb557e1302",
