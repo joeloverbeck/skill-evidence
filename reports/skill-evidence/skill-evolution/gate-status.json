@@ -1,42 +1,33 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-14T10:26:59.797737797Z",
-  "target_content_hash": "61e86d7c77c007c28d7b1e4bd62f7c296307ca156badf96e840453ff2534bb1f",
+  "generated_at": "2026-08-15T08:41:54.138590304Z",
+  "target_content_hash": "7108425baa11008dafd53caa4d81855b8f4f712dae886e4bf28134b0ca26c2b7",
   "qualifying_uses_on_current_hash": 2,
   "open_incident_ids": [
-    "evt_53e22705-0564-413c-a46e-46b84d51f99a",
-    "evt_e1338c55-35fb-407f-b4e0-e5a654e4d4ac"
+    "evt_5ad0810e-e36b-487f-bc03-216e052003ca",
+    "evt_b60dd645-1b6d-49f2-ab00-5236eeeadc76"
   ],
   "candidate_clusters": [
     {
       "symptom_key": "output",
       "open_event_ids": [
-        "evt_53e22705-0564-413c-a46e-46b84d51f99a"
+        "evt_5ad0810e-e36b-487f-bc03-216e052003ca",
+        "evt_b60dd645-1b6d-49f2-ab00-5236eeeadc76"
       ],
-      "independent_incidents": 1,
-      "max_severity": "material_failure"
-    },
-    {
-      "symptom_key": "state",
-      "open_event_ids": [
-        "evt_e1338c55-35fb-407f-b4e0-e5a654e4d4ac"
-      ],
-      "independent_incidents": 1,
-      "max_severity": "severe_incident"
+      "independent_incidents": 2,
+      "max_severity": "friction"
     }
   ],
-  "state": "quarantined_pending_cooldown",
-  "authorized_workflow": "skill-evolution",
-  "authorization_reason": "severe",
-  "trigger_event_ids": [
-    "evt_e1338c55-35fb-407f-b4e0-e5a654e4d4ac"
-  ],
-  "threshold_session_id": "019fff84-cdb2-7aa2-b955-901eb03b69fc",
+  "state": "collecting",
+  "authorized_workflow": null,
+  "authorization_reason": null,
+  "trigger_event_ids": [],
+  "threshold_session_id": null,
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": null,
-  "review_reentry_basis": "first_eligibility",
+  "review_reentry_basis": null,
   "target_name": "skill-evolution",
   "target_repo_relative_path": ".claude/skills/skill-evolution",
-  "derivation_session_id": "019fff84-cdb2-7aa2-b955-901eb03b69fc"
+  "derivation_session_id": "01a003c3-dfe6-7a70-9409-2b617ad9e680"
 }
