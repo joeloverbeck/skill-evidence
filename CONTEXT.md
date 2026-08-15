@@ -193,6 +193,14 @@ witness. Nor is an observable that a compliant run which finds nothing would omi
 would not still emit it, it is not a witness.
 _Avoid_: check, signal, indicator, assertion
 
+**Natural observable**:
+The artifact reading one mechanism clause is decided from, named in the frozen plan before any result
+exists. Admissible only when it is readable from the run's own outputs and the frozen inputs — the
+same class a witness is drawn from — because those are the artifacts retention actually carries. An
+observable naming anything else is an **unretainable observable**, not a harder reading. See
+[`docs/adr/0011-a-frozen-reading-rests-only-on-artifacts-the-retention-contract-carries.md`](docs/adr/0011-a-frozen-reading-rests-only-on-artifacts-the-retention-contract-carries.md).
+_Avoid_: signal, proxy, indicator, process ledger, chronology
+
 **Artifact identity relation**:
 The rule one frozen reading uses to decide whether two artifacts count as the same. Fixed before
 outcomes exist, like a witness and for the same reason, so a comparison the plan did not freeze at
@@ -209,6 +217,15 @@ reading the retained artifact rather than by re-running or re-cutting it, and it
 that rested on the premise — never the trial's other readings, and never as a limit of the
 instrument.
 _Avoid_: bad fixture, broken trial, invalid run
+
+**Unretainable observable**:
+A frozen clause whose natural observable names an artifact the retention contract does not carry, so
+no finished run could make the reading readable. Like a frozen-input fault it is a defect in the plan
+rather than a limit of the instrument, and it voids that clause's reading alone — supporting no
+unable-to-be-expressed marking, no instrument-limited naming, and no `blocked_no_valid_test`. Distinct
+from a reading left **unread** because the artifact its plan named is absent from one packet, which
+bars the proxy rather than the clause.
+_Avoid_: missing artifact, untestable clause, instrument limit, retention gap
 
 **Material candidate regression**:
 An observation that bars a candidate at the acceptance gate. Establishing one takes four things the
