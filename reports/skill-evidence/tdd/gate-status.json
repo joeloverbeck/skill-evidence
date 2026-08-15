@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-14T10:13:56.536Z",
+  "generated_at": "2026-08-15T04:49:06.382671203Z",
   "target_content_hash": "6ebe6d7e971bc10adee946810548076f23fd3d7e0c6f32d0fe88787e3bd0d346",
-  "qualifying_uses_on_current_hash": 0,
+  "qualifying_uses_on_current_hash": 1,
   "open_incident_ids": [],
   "candidate_clusters": [],
   "state": "closed",
@@ -16,5 +16,5 @@
   "review_reentry_basis": null,
   "target_name": "tdd",
   "target_repo_relative_path": ".claude/skills/tdd",
-  "derivation_session_id": "019ffbb4-d24f-7241-825a-01c1edf26691"
+  "derivation_session_id": "019fffdd-a670-7581-a788-1fa66c46b194"
 }
