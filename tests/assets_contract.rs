@@ -513,6 +513,113 @@ fn installed_skill_evolution_reconciles_every_mechanism_clause_with_its_reproduc
 }
 
 #[test]
+fn installed_skill_evolution_reference_admits_only_retained_natural_observables() {
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    for required in [
+        "test its **natural observable** for admissibility",
+        "the run's own outputs and frozen inputs",
+        "the artifacts step 6 retains",
+        "an **unretainable observable**",
+    ] {
+        assert!(
+            plan.contains(required),
+            "the frozen plan must preserve `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
+fn installed_skill_evolution_reference_treats_an_unretainable_observable_as_a_plan_defect() {
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
+
+    let freeze = reference
+        .find("### 4. Freeze the validation plan before any candidate exists")
+        .expect("the plan-freezing step remains explicit");
+    let current_arm = reference
+        .find("### 5. Construct an isolated candidate")
+        .expect("the current-arm step remains explicit");
+    let plan = &reference[freeze..current_arm];
+
+    for required in [
+        "An unretainable observable is a defect in the plan",
+        "the same consequence as a **frozen-input fault**",
+        "voids that clause's reading and nothing else",
+        "supports no unable-to-be-expressed marking",
+        "no `--instrument-limited` naming",
+        "no `blocked_no_valid_test`",
+        "The trial's other readings, protected behaviors, and deterministic checks still count",
+    ] {
+        assert!(
+            plan.contains(required),
+            "an unretainable observable must preserve `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
+fn installed_skill_evolution_reference_records_an_absent_named_artifact_unread() {
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
+
+    let validation = reference
+        .find("### 6. Run blind comparative validation")
+        .expect("the blind-validation step remains explicit");
+    let acceptance = reference
+        .find("### 7. Apply the acceptance gate")
+        .expect("the acceptance step remains explicit");
+    let step_six = &reference[validation..acceptance];
+
+    for required in [
+        "Adjudicate each frozen reading only from the artifacts its plan named",
+        "If a named artifact is absent from the packet, record the reading **unread**",
+        "never substitute another artifact or a proxy",
+        "An unread reproduction reading cannot establish recurrence or authorize candidate construction",
+    ] {
+        assert!(
+            step_six.contains(required),
+            "blind validation must preserve `{required}`: reference={reference}"
+        );
+    }
+    assert!(
+        reference.contains("- Unread reading → absent named artifact:"),
+        "the retained review report must make every unread reading independently inspectable: reference={reference}"
+    );
+}
+
+#[test]
+fn installed_skill_evolution_reference_restates_frozen_wording_verbatim_or_omits_it() {
+    let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
+
+    let report = reference
+        .find("Before any close, write the review report")
+        .expect("the terminal report instructions remain explicit");
+    let close = reference[report..]
+        .find("Then close with the disposition carried here")
+        .map(|offset| report + offset)
+        .expect("report authoring remains before close");
+    let report_contract = &reference[report..close];
+
+    for required in [
+        "When the terminal report restates a frozen mechanism clause or its observable, reproduce the frozen wording verbatim or do not restate it at all",
+        "Never paraphrase a frozen clause or observable into the reading actually taken",
+        "- Frozen mechanism clause / observable (verbatim, or omitted):",
+    ] {
+        assert!(
+            report_contract.contains(required),
+            "the terminal report must preserve `{required}`: reference={reference}"
+        );
+    }
+}
+
+#[test]
 fn installed_skill_evolution_reference_reserves_blocked_for_the_whole_review() {
     let reference = shipped(".claude/skills/skill-evolution/references/authorized-review.md");
 
