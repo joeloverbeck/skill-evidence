@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-12T16:23:22.745Z",
+  "generated_at": "2026-08-15T03:58:11.567828904Z",
   "target_content_hash": "97f7208528885b6bf219d45525f5e086b45291c8b1f66090915d6e8bd6709dc8",
-  "qualifying_uses_on_current_hash": 11,
+  "qualifying_uses_on_current_hash": 12,
   "open_incident_ids": [
     "evt_4833594e-7e25-4a2f-a94a-278e6e3b9e86",
     "evt_2aabfe78-d93c-48c4-b54e-346b838bfb83",
@@ -13,7 +13,9 @@
     "evt_b193c571-5103-49bf-9743-1447f5f23db6",
     "evt_c587abf2-e777-47c5-9715-075a92b9ce88",
     "evt_5e75a1db-5657-48a8-9911-eb06dd8b4105",
-    "evt_38d9661e-493e-4f09-ada1-18dee89f6469"
+    "evt_38d9661e-493e-4f09-ada1-18dee89f6469",
+    "evt_14484f46-b490-4395-95cd-dcc8b3af82d0",
+    "evt_769abb37-499c-4fed-b03b-521eeb06e1e7"
   ],
   "candidate_clusters": [
     {
@@ -29,24 +31,30 @@
       "open_event_ids": [
         "evt_b193c571-5103-49bf-9743-1447f5f23db6",
         "evt_5e75a1db-5657-48a8-9911-eb06dd8b4105",
-        "evt_38d9661e-493e-4f09-ada1-18dee89f6469"
+        "evt_38d9661e-493e-4f09-ada1-18dee89f6469",
+        "evt_14484f46-b490-4395-95cd-dcc8b3af82d0",
+        "evt_769abb37-499c-4fed-b03b-521eeb06e1e7"
       ],
-      "independent_incidents": 3,
+      "independent_incidents": 4,
       "max_severity": "material_failure"
     }
   ],
-  "state": "collecting",
-  "authorized_workflow": null,
-  "authorization_reason": null,
-  "trigger_event_ids": [],
-  "threshold_session_id": null,
+  "state": "eligible_pending_cooldown",
+  "authorized_workflow": "skill-evolution",
+  "authorization_reason": "material_recurrence:execution",
+  "trigger_event_ids": [
+    "evt_b193c571-5103-49bf-9743-1447f5f23db6",
+    "evt_38d9661e-493e-4f09-ada1-18dee89f6469",
+    "evt_14484f46-b490-4395-95cd-dcc8b3af82d0"
+  ],
+  "threshold_session_id": "ce2c7cb8-0ca0-4435-a777-28e34afe4f4f",
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": "8f1a4f65-fc16-4cac-90aa-cc223195ad01",
-  "review_reentry_basis": "queued_behind_instrument_limited_review",
+  "review_reentry_basis": "post_review_incident",
   "target_name": "domain-modeling",
   "target_repo_relative_path": ".claude/skills/domain-modeling",
-  "derivation_session_id": "019ff6c4-14b4-7b42-ba51-42a570018e84",
+  "derivation_session_id": "ce2c7cb8-0ca0-4435-a777-28e34afe4f4f",
   "instrument_limited_incident_ids": [
     "evt_2aabfe78-d93c-48c4-b54e-346b838bfb83",
     "evt_92d00622-339f-4004-86c9-60fbeb50d218",

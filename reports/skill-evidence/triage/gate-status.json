@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-13T14:03:40.787743663Z",
+  "generated_at": "2026-08-15T03:23:01.47106228Z",
   "target_content_hash": "9968ebd3d4508f01bb91ddac011c09330651bcea7c9a5fdcd9dcad593cb4f4bc",
-  "qualifying_uses_on_current_hash": 9,
+  "qualifying_uses_on_current_hash": 10,
   "open_incident_ids": [
     "evt_a6eaf146-e80f-4d8c-9346-16becd84a91d",
     "evt_35a84c74-5fa9-4319-aaa1-772400136d1d",
@@ -13,7 +13,8 @@
     "evt_9e5ca779-e8a5-4caf-85d8-645cc4d13b52",
     "evt_e7a51ddc-3bd2-4ccc-a061-5dfe68c8c9c7",
     "evt_4d850574-05b3-41ab-a65b-e0eddd402e20",
-    "evt_e8124276-da23-4a73-b35f-52e09401d80f"
+    "evt_e8124276-da23-4a73-b35f-52e09401d80f",
+    "evt_2ff5b5e5-bf3f-4319-aa78-021c2181151c"
   ],
   "candidate_clusters": [
     {
@@ -35,20 +36,32 @@
       ],
       "independent_incidents": 2,
       "max_severity": "material_failure"
+    },
+    {
+      "symptom_key": "coordination",
+      "open_event_ids": [
+        "evt_2ff5b5e5-bf3f-4319-aa78-021c2181151c"
+      ],
+      "independent_incidents": 1,
+      "max_severity": "friction"
     }
   ],
-  "state": "collecting",
-  "authorized_workflow": null,
-  "authorization_reason": null,
-  "trigger_event_ids": [],
-  "threshold_session_id": null,
+  "state": "eligible_pending_cooldown",
+  "authorized_workflow": "skill-evolution",
+  "authorization_reason": "ten_use_unresolved",
+  "trigger_event_ids": [
+    "evt_e7a51ddc-3bd2-4ccc-a061-5dfe68c8c9c7",
+    "evt_4d850574-05b3-41ab-a65b-e0eddd402e20",
+    "evt_e8124276-da23-4a73-b35f-52e09401d80f"
+  ],
+  "threshold_session_id": "ce2c7cb8-0ca0-4435-a777-28e34afe4f4f",
   "not_before": null,
   "active_review_id": null,
   "last_completed_review_id": "48b04150-c9c8-42a7-982a-324aceb6d21e",
-  "review_reentry_basis": "queued_pre_close_evidence",
+  "review_reentry_basis": "post_review_incident",
   "target_name": "triage",
   "target_repo_relative_path": ".claude/skills/triage",
-  "derivation_session_id": "f8e91767-b1ba-4115-ac95-a11d29b11591",
+  "derivation_session_id": "ce2c7cb8-0ca0-4435-a777-28e34afe4f4f",
   "instrument_limited_incident_ids": [
     "evt_35a84c74-5fa9-4319-aaa1-772400136d1d",
     "evt_ebe48487-5c26-4fd4-af46-20a06ede8ee8",
