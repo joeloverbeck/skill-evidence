@@ -1,6 +1,6 @@
 ---
 name: commission-method-gap-research
-description: Commission externally grounded method-gap research for an existing skill only. Use when the user wants to discover missing instrument classes or methodological blind spots that the skill's own execution evidence may never expose, or wants a census of prior method-gap research to decide whether another audit is due. Do not use for ordinary skill friction, rewriting, defect repair, or a generic literature search.
+description: Commission externally grounded method-gap research for an existing skill only. Use when the user wants to discover missing instrument classes or methodological blind spots that the skill's own execution evidence may never expose, or wants a census of prior method-gap research to decide whether another audit is due. Do not use for ordinary skill friction, rewriting, defect repair, or a generic literature search (that is `research`).
 ---
 
 # Commission Method-Gap Research

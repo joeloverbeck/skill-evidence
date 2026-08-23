@@ -16,6 +16,10 @@ This repository has no value stream of its own — everything here is enabling w
 
 ## Agent skills
 
+Skill prose writes skill names as `/name` — Claude Code's trigger syntax. Codex invokes the same
+skill as `$name`. Read `/name` as *the skill called name*, and when you tell the user to run one,
+use the prefix of the harness you are in.
+
 ### Issue tracker
 
 Issues live as GitHub issues in `joeloverbeck/skill-evidence`, driven by the `gh` CLI; external PRs are also a triage surface. See `docs/agents/issue-tracker.md`.

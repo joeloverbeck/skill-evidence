@@ -146,7 +146,7 @@ Enter this phase only on a diagnosis-and-repair request. A diagnosis-only run en
 
 Before editing, read the repository or project convention that owns the target artifact and classify it as a mutable working surface or frozen, published, or custodied evidence. Mutate only a mutable owner. For frozen evidence, preserve the producing bytes, hashes, invalid attempts, and superseded artifacts, then use the owner's versioning or supersession route and rerun every downstream check it requires.
 
-A stronger governing or companion workflow's custody, freeze, or supersession protocol takes precedence and is followed unchanged. In this repository, [`docs/agents/instrument-kit.md` §Immutable publication](../../../docs/agents/instrument-kit.md#immutable-publication), [`.claude/skills/pressure-test/references/artifact-lifecycle.md` §Output Identity And Clobber Guards](../pressure-test/references/artifact-lifecycle.md#output-identity-and-clobber-guards), and [`.claude/skills/road-back/references/instrument-faults-and-freezes.md` §The mid-wave instrument-fault protocol](../road-back/references/instrument-faults-and-freezes.md#the-mid-wave-instrument-fault-protocol) remain the canonical homes for their stronger rules.
+A stronger governing or companion workflow's custody, freeze, or supersession protocol takes precedence and is followed unchanged.
 
 Write the regression test **before the fix** — but only if there is a **correct seam** for it.
 
@@ -172,4 +172,4 @@ Required before declaring an authorized repair done:
 - [ ] Truly throwaway prototypes deleted (or moved to a clearly-marked debug location); captured traces, invalid attempts, frozen artifacts, and superseded evidence retained whenever the governing custody or provenance contract requires them
 - [ ] The proven causal chain or hypothesis that turned out correct is stated in the commit / PR message — so the next debugger learns
 
-**Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) hand off to the `/improve-codebase-architecture` skill with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.
+**Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) tell the user to run the `improve-codebase-architecture` skill with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.

@@ -1,14 +1,7 @@
 ---
 name: research-brief
-description: "Use when you need to hand a research task to a separate deep-research executor — ChatGPT-Pro (remote-fetch) or another Claude/Claude Code session with direct repo access (local-session) — and want the comprehensive prompt authored here, with full repo access, instead of reconstructing it in a throwaway session. Interviews you to ~95% confidence, then emits a self-contained, paste-ready requirements prompt and (remote-fetch executor, fetchable repo only) refreshes the upload manifest — a repository the remote-fetch executor cannot access takes the remote-fetch (inline) variant: fully self-contained, no manifest. Triggers: needing a next spec/feature, a thorny fix, a hardening pass, or a foundational/doc overhaul deep-researched in another session. Produces: reports/<topic>-research-brief.md + (remote-fetch, fetchable repo only) a refreshed reports/manifest_<date>_<shortsha>.txt. Mutates: only reports/ on user approval."
-user-invocable: true
-arguments:
-  - name: research_target
-    description: "What the deep-research executor (ChatGPT-Pro, or a named local session) should produce — the thing to be deep-researched (string). A sentence is fine; the skill sharpens it through exploration and interview."
-    required: true
-  - name: reference_path
-    description: "Optional path to a report, finding-set, or analysis to fold into the brief as established context."
-    required: false
+description: "Use when you need to hand a research task to a separate deep-research executor — ChatGPT-Pro (remote-fetch) or another Claude/Claude Code session with direct repo access (local-session) — and want the comprehensive prompt authored here, with full repo access, instead of reconstructing it in a throwaway session. Interviews you to ~95% confidence, then emits a self-contained, paste-ready requirements prompt and (remote-fetch executor, fetchable repo only) refreshes the upload manifest — a repository the remote-fetch executor cannot access takes the remote-fetch (inline) variant: fully self-contained, no manifest. Triggers: needing a next spec/feature, a thorny fix, a hardening pass, or a foundational/doc overhaul deep-researched in another session. Produces: reports/<topic>-research-brief.md + (remote-fetch, fetchable repo only) a refreshed reports/manifest_<date>_<shortsha>.txt. Mutates: only reports/ on user approval. Not for a bounded question that can be answered in this session — that is the `research` skill."
+argument-hint: "<what the deep-research executor should produce> [reference_path]"
 ---
 
 # Research Brief

@@ -10,7 +10,7 @@ Break a plan into independently-grabbable issues using vertical slices (tracer b
 
 This skill is user-invoked only. Proceed only when the user explicitly invoked `/to-issues` or `$to-issues`. If the user named a different skill instead, or an implicit workflow merely reaches issue breakdown, stop and ask the user to invoke one of those forms; do not substitute this workflow.
 
-The issue tracker and triage label vocabulary should have been provided to you — run `/setup-matt-pocock-skills` if not.
+The issue tracker and triage label vocabulary should have been provided to you — if not, tell the user to run the `setup-matt-pocock-skills` skill.
 
 ## Process
 

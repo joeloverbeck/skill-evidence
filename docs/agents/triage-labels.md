@@ -28,3 +28,20 @@ Edit the right-hand column to match whatever vocabulary you actually use.
 **That condition fired on 2026-08-11.** Six open issues arrived from one skill-evolution run cluster carrying dependencies no child owns. A three-deep chain: #34 creates external-owner identity, #37 routes evidence with it, and #36's gate can only authorize once #37 lands. A decision dependency: #33's remaining scope is whatever #32's claim-time freeze leaves behind. And a collision: #32 and #34 mutate the same command surface *and* the same installed reference file, which two parallel agents would meet head-on. Release bundling sits on top — both are minor bumps requiring `skills evidence install --force`, and [`../releasing.md`](../releasing.md) §6 makes each such release a seven-step ritual run once per consumer. The label was created and the row added at that point, per the condition above.
 
 Recording the transition is the point, exactly as recording the absence was. The triage skill arrived by wholesale copy and will arrive that way again. What flips is which claim goes stale: a re-copied `SKILL.md` asserting this repo has no umbrella state is now the error to catch, because the tracker has one and `to-issues`'s never-invent-a-label fallback no longer applies to a parent that needs it.
+
+## `wayfinder:*` labels are not triage intake
+
+`wayfinder` (added 2026-08-23) creates one issue labelled `wayfinder:map`, plus child tickets each
+labelled `wayfinder:research`, `wayfinder:prototype`, `wayfinder:grilling`, or `wayfinder:task`.
+These sit outside the canonical role vocabulary above and are not triage states.
+
+A wayfinder ticket carries no triage role, so triage's discovery lists it under **Unlabeled — never
+triaged** and offers to triage it. That is wrong: wayfinder charts its own queue — its **frontier**
+is the open, unblocked, unclaimed children of the map — and a decision ticket is not incoming work
+awaiting evaluation. Charting a map would otherwise flood the triage queue with its own tickets.
+
+The triage skill does not exclude `wayfinder:*` yet. This is recorded rather than fixed: the
+exclusion costs a `triage` content-hash reset, and wayfinder is unused here as of 2026-08-23.
+Exclude `wayfinder:*` from triage discovery the first time a map is charted, batched with whatever
+else `triage` needs by then. A map is the natural shape for `coordination` where this tracker
+defines that role.
