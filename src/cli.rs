@@ -488,7 +488,9 @@ fn run_skill_evolution(
             } = args;
             let (root, target, inputs) = lifecycle_event_inputs(event, "skill-evolution", host)?;
             let external_owners = external_owner
-                .chunks_exact(3)
+                .as_chunks::<3>()
+                .0
+                .iter()
                 .map(|owner| {
                     let kind = crate::ExternalOwnerKind::parse(&owner[1]).ok_or_else(|| {
                         CliError::MissingInput(format!(
@@ -504,7 +506,9 @@ fn run_skill_evolution(
                 })
                 .collect::<Result<Vec<_>, CliError>>()?;
             let constraint_provenance = constraint_provenance
-                .chunks_exact(3)
+                .as_chunks::<3>()
+                .0
+                .iter()
                 .map(|citation| {
                     let field =
                         crate::ConstraintProvenanceField::parse(&citation[2]).ok_or_else(|| {

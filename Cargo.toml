@@ -2,7 +2,7 @@
 name = "skill-evidence"
 version = "0.13.0"
 edition = "2024"
-rust-version = "1.93"
+rust-version = "1.100.0"
 license = "MIT"
 authors = ["Joel Overbeck"]
 description = "The skill-evidence lifecycle: use records, gate projections, evolution reviews, and the four skill packages that drive them."
