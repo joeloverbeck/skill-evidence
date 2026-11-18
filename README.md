@@ -32,7 +32,7 @@ afternoon.
 
 ## What you need
 
-- **Rust 1.93+**, edition 2024.
+- **Rust 1.100.0+**, edition 2024.
 - **An agent setup that reads `.claude/skills/` or `.agents/skills/`.** The installed operator
   packages are Markdown that an agent reads; the crate writes both locations.
 - A repository to run it in. Evidence is per-repository and stays there.
